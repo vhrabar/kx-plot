@@ -18,11 +18,38 @@ Z = np.cos(X) + 2
 
 # ---------- spec parsing ----------
 def test_parse_order_does_not_matter() -> None:
-    assert kx._parse("scatter-dark-grid-leg") == kx._parse("leg-grid-dark-scatter")
+    assert kx.parse("scatter-dark-grid-leg") == kx.parse("leg-grid-dark-scatter")
 
 
 def test_parse_defaults_to_line_and_no_theme() -> None:
-    assert kx._parse("grid") == ("line", None, {"grid"})
+    assert kx.parse("grid") == ("line", None, {"grid"})
+
+
+def test_spec_fields_and_canonical_slug() -> None:
+    spec = kx.parse("leg-grid-dark-scatter")
+    assert (spec.kind, spec.theme, spec.flags) == ("scatter", "dark", frozenset({"grid", "leg"}))
+    kind, theme, flags = spec
+    assert (kind, theme, flags) == spec
+    assert str(spec) == spec.slug == "scatter-dark-grid-leg"
+    assert str(kx.parse("grid")) == "line-grid"
+    assert kx.parse(str(spec)) == spec
+    assert kx.parse(spec) is spec
+
+
+def test_plot_takes_a_spec() -> None:
+    assert len(kx.plot(X, Y, kx.parse("bar")).patches) == len(X)
+    assert len(kx.plot(X, Y, spec=kx.parse("bar")).patches) == len(X)
+    assert len(kx.plot(DF, "t", "speed", kx.parse("bar")).patches) == len(X)
+
+
+@pytest.mark.parametrize(("spec", "hint"), [
+    ("line-lgo", "Did you mean 'leg' or 'legout' for 'lgo'?"),
+    ("scater-drak", "'dark' for 'drak'"),
+    ("line--dark", "a '-' too many"),
+])
+def test_parse_hints_close_tokens(spec: str, hint: str) -> None:
+    with pytest.raises(ValueError, match=re.escape(hint)):
+        kx.parse(spec)
 
 
 @pytest.mark.parametrize(("spec", "match"), [
@@ -33,7 +60,7 @@ def test_parse_defaults_to_line_and_no_theme() -> None:
 ])
 def test_parse_rejects_bad_specs(spec: str, match: str) -> None:
     with pytest.raises(ValueError, match=match):
-        kx._parse(spec)
+        kx.parse(spec)
 
 
 # ---------- each kind, with and without z ----------

@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `kx.parse(spec)` returns a `Spec` with `kind`, `theme` and `flags`. Printed, it is the canonical spec string
+  (kind, theme, then flags A–Z), and `kx.plot` takes a `Spec` wherever it takes a spec string. Mistyped tokens get
+  the closest valid ones as a hint.
 - `kx.plot(df, 'x', 'y', 'z', spec)` names DataFrame columns, and `by=` can name a column. A mistyped column
   gets the closest names as a hint.
 - `kx.plot(..., **kwargs)` passes other keywords to the matplotlib call that draws the kind, over kx's defaults:

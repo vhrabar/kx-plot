@@ -1,7 +1,8 @@
 """Spec grammar (kind-theme-flag-flag-...) and the registry of kinds."""
+import difflib
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 from ._theme import styles
 
@@ -43,13 +44,36 @@ def all_flags() -> set[str]:
     return COMMON_FLAGS.union(*(k.flags for k in KINDS.values()))
 
 
-def parse(spec: str) -> tuple[str, str | None, set[str]]:
-    """Split 'kind-theme-flag-...' into (kind, theme, flags). Strict: no guessing."""
+class Spec(NamedTuple):
+    """A parsed spec. Unpacks as kind, theme, flags; str() gives the canonical slug."""
+    kind: str
+    theme: str | None
+    flags: frozenset[str]
+
+    @property
+    def slug(self) -> str:
+        """kind, theme, then flags in alphabetical order: the same plot always gets the same string."""
+        return "-".join([self.kind, *([self.theme] if self.theme else []), *sorted(self.flags)])
+
+    def __str__(self) -> str:
+        return self.slug
+
+
+def parse(spec: str | Spec) -> Spec:
+    """Split 'kind-theme-flag-...' into Spec(kind, theme, flags). Strict: no guessing, but hints."""
+    if isinstance(spec, Spec):
+        return spec
     toks = spec.split("-")
     themes, flags = set(styles()), all_flags()
-    unknown = [t for t in toks if t not in KINDS.keys() | flags | themes]
+    valid = KINDS.keys() | flags | themes
+    unknown = [t for t in toks if t not in valid]
     if unknown:
-        raise ValueError(f"unknown tokens: {unknown}. Run kx.grammar() to see valid ones.")
+        hints = [" or ".join(map(repr, sorted(close))) + f" for {t!r}"
+                 for t in unknown if (close := difflib.get_close_matches(t, valid, n=2))]
+        hint = f" Did you mean {', '.join(hints)}?" if hints else ""
+        if "" in unknown:
+            hint += " An empty token means a '-' too many."
+        raise ValueError(f"unknown tokens: {unknown}.{hint} Run kx.grammar() to see valid ones.")
     kinds = [t for t in toks if t in KINDS]
     picked = [t for t in toks if t in themes]
     if len(kinds) > 1:
@@ -63,4 +87,4 @@ def parse(spec: str) -> tuple[str, str | None, set[str]]:
     for group in EXCLUSIVE:
         if len(both := sorted(group & set(toks))) > 1:
             raise ValueError(f"flags {both} do not go together; pick one")
-    return kind, (picked or [None])[0], set(toks) & flags
+    return Spec(kind, (picked or [None])[0], frozenset(toks) & flags)

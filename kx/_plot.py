@@ -11,13 +11,13 @@ from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
 from . import kinds  # noqa: F401  (registers every kind)
-from ._spec import KINDS, parse
+from ._spec import KINDS, Spec, parse
 from ._theme import style_path
 
 OUTSIDE = {"loc": "center left", "bbox_to_anchor": (1, 0.5)}       # legend right of the axes
 
 
-def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | None = None, title: str | None = None,
+def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, title: str | None = None,
          ax: Axes | None = None, by: ArrayLike | str | None = None, **kwargs: Any) -> Axes:
     """kx.plot(x, y, z, 'scatter-dark-grid-leg')   or   kx.plot(x, y, 'bar-light')
     kx.plot(df, 'month', 'y2025', 'y2026', 'bar')   names columns of a DataFrame.
@@ -52,14 +52,15 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | None = None, title: 
     return ax
 
 
-def _arrays(data: tuple, spec: str | None, by: ArrayLike | str | None) -> tuple:
+def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None) -> tuple:
     """(x, y, z, spec, by) from kx.plot's positional arguments: arrays, or a DataFrame and column names."""
     data = list(data)
     df = data.pop(0) if data and isinstance(data[0], pd.DataFrame) else None
-    if data and isinstance(data[-1], str) and (df is None or data[-1] not in df.columns):
+    last = data[-1] if data else None
+    if isinstance(last, Spec) or (isinstance(last, str) and (df is None or last not in df.columns)):
         if spec is not None:                    # a trailing string that is not a column is the spec
             raise TypeError(f"spec given twice ({data[-1]!r} and spec={spec!r})")
-        if df is not None:                      # not a spec either, but close to a column: a mistyped column
+        if df is not None and isinstance(last, str):    # not a spec either, but close to a column: a typo
             try:
                 parse(data[-1])
             except ValueError:

@@ -49,8 +49,9 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also ecd
 density (area 1) for `hist`. `cum` makes `hist` cumulative; `hist-norm-cum` is the CDF.
 `hist` puts every series on the same bins, so the bars line up.
 
-Unknown tokens raise an error instead of being guessed. Everything is inspectable:
-`kx.grammar()`, `kx.grammar('area')`, `kx.show('dark')`, `kx.source('scatter')`.
+Unknown tokens raise an error instead of being guessed, with the closest valid tokens as a hint.
+Everything is inspectable: `kx.grammar()`, `kx.grammar('area')`, `kx.parse('leg-scatter')`, `kx.show('dark')`,
+`kx.source('scatter')`.
 
 rcParams can be overridden in `kx.use` with `__` for dots: `kx.use('dark', figure__figsize=(8, 4))`.
 
