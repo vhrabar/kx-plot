@@ -1,4 +1,6 @@
-"""Themes, palettes and colormaps: discovery and kx.use."""
+"""Themes, palettes and colormaps: discovery, kx.use and kx.context."""
+import contextlib
+from collections.abc import Iterator
 from typing import Any
 
 import matplotlib as mpl
@@ -92,3 +94,13 @@ def use(name: str = "dark", palette: str | list[str] | None = None, cmap: str | 
         plt.rcParams["axes.prop_cycle"] = plt.cycler(
             color=colors, **{k: [v[i % len(v)] for i in range(len(colors))] for k, v in rest.items()})
     plt.rcParams.update({k.replace("__", "."): v for k, v in rc.items()})
+
+
+@contextlib.contextmanager
+def context(name: str = "dark", palette: str | list[str] | None = None, cmap: str | None = None,
+            **rc: Any) -> Iterator[None]:
+    """kx.use for one with block:  with kx.context('paper', palette='okabe'): ...
+    Same arguments as kx.use; the previous rcParams come back on exit, also after an error."""
+    with mpl.rc_context():
+        use(name, palette, cmap, **rc)
+        yield

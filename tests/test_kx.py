@@ -550,6 +550,28 @@ def test_use_resets_before_applying() -> None:
     assert mpl.rcParams["axes.titleweight"] == "normal"
 
 
+def test_context_applies_inside_and_restores_after() -> None:
+    kx.use("light", palette="okabe")
+    before = dict(mpl.rcParams)
+    with kx.context("dark", palette=["#264653", "#e9c46a"], cmap="magma", figure__figsize=(5, 2)):
+        assert to_hex(mpl.rcParams["axes.facecolor"]) == "#111418"
+        assert mpl.rcParams["axes.prop_cycle"].by_key()["color"] == ["#264653", "#e9c46a"]
+        assert mpl.rcParams["image.cmap"] == "magma"
+        ax = kx.plot(X, Y, "line")
+    assert to_hex(ax.get_facecolor()) == "#111418"          # the plot keeps the theme it was drawn in
+    assert {k for k in before if str(before[k]) != str(mpl.rcParams[k])} == set()
+
+
+def test_context_restores_after_an_error() -> None:
+    kx.use("light")
+    with pytest.raises(RuntimeError), kx.context("dark"):
+        raise RuntimeError
+    assert to_hex(mpl.rcParams["axes.facecolor"]) == "#ffffff"
+    with pytest.raises(ValueError, match="unknown theme"), kx.context("nope"):
+        pass
+    assert to_hex(mpl.rcParams["axes.facecolor"]) == "#ffffff"
+
+
 def test_use_palette_and_rc_overrides() -> None:
     kx.use("light", palette=["#264653", "#e9c46a"], figure__figsize=(5, 2))
     assert mpl.rcParams["axes.prop_cycle"].by_key()["color"] == ["#264653", "#e9c46a"]
