@@ -12,6 +12,7 @@ by=    : group labels for x, one curve/box/violin per group (kde, ecdf, box, vio
 Palettes (kx.use(theme, palette="okabe")): any file name in styles/palettes/
 Colormaps (kx.use(theme, cmap="magma")):  kx.cmaps()
 with kx.context(theme, ...): the same as kx.use, for one block only.
+kx.save("fig.png"): saves to /kaggle/working on Kaggle, the current folder elsewhere.
 kx.grammar("area") and kx.source("area") explain one kind; kx.parse(spec) shows how a spec is read.
 """
 import glob
@@ -22,11 +23,12 @@ import re
 
 from ._data import datasets, load
 from ._plot import plot
+from ._save import save
 from ._spec import COMMON_FLAGS, KINDS, Spec, all_flags, parse
 from ._theme import BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
 
 __all__ = ["BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "datasets", "grammar",
-           "load", "palette", "palettes", "parse", "plot", "show", "source", "styles", "use"]
+           "load", "palette", "palettes", "parse", "plot", "save", "show", "source", "styles", "use"]
 
 
 def _version() -> str:

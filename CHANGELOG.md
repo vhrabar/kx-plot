@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `kx.save('fig.png')` saves the current figure (or the one of a given `ax` or figure) and returns the path.
+  A relative name goes to `/kaggle/working` on Kaggle and to the current folder elsewhere; missing folders are
+  created. Without an extension the theme's format is used, so `thesis` saves a PDF.
 - `with kx.context(theme, palette=..., cmap=..., **rc):` takes the same arguments as `kx.use` and puts the
   previous settings back when the block ends, also after an error.
 - `kx.parse(spec)` returns a `Spec` with `kind`, `theme` and `flags`. Printed, it is the canonical spec string

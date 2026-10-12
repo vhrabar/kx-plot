@@ -33,6 +33,7 @@ kx.use('light', palette='okabe', cmap='cividis')   # notebook default: theme, pa
 kx.plot(x, y, z, 'scatter-grid-leg')               # spec: kind-theme-flag-...
 kx.plot(x, y, 'bar-paper')                         # a theme in the spec applies to this plot only
 with kx.context('paper'): ...                      # or to every plot in the block
+kx.save('fig.png')                                 # to /kaggle/working on Kaggle, else the current folder
 kx.plot(df, 'month', 'y2025', 'bar')               # DataFrame columns by name
 kx.plot(x, y, 'line', linewidth=3)                 # other keywords go to matplotlib
 kx.plot(df, 'value', spec='kde', by='group')       # one density curve per group
