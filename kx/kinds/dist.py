@@ -1,4 +1,5 @@
 """Distribution kinds."""
+from statistics import NormalDist
 from typing import Any
 
 import matplotlib as mpl
@@ -242,3 +243,32 @@ def strip(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flag
         ax.scatter(i + 1 + rng.uniform(-jitter, jitter, len(v)), v,
                    **{"s": size, "color": f"C{i}", "alpha": 0.6, "linewidth": 0, "label": n, **kw})
     _per_group(ax, series, flags, by)
+
+
+@kind("qq", needs_y=False, takes_by=True)
+def qq(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
+       by: ArrayLike | None = None, **kw: Any) -> None:
+    """Quantile-quantile plot of x, y, z against a normal distribution: sorted values against the normal
+    quantiles at (i - 0.5) / n. A dashed line through the quartiles marks where a normal sample would lie;
+    curving away at the ends means heavy or light tails, a bend means skew.
+    by= splits x into one series per group. kw: the points (ax.scatter)."""
+    series = _split(x, y, z, by)
+    _need(series, "qq", 2)
+    size = 0.5 * plt.rcParams["lines.markersize"] ** 2
+    normal = NormalDist()
+    z1, z3 = normal.inv_cdf(0.25), normal.inv_cdf(0.75)
+    for i, (v, n) in enumerate(series):
+        v = np.sort(v)
+        theory = np.array([normal.inv_cdf((k - 0.5) / len(v)) for k in range(1, len(v) + 1)])
+        ax.scatter(theory, v, **{"s": size, "color": f"C{i}", "label": n, "zorder": 3, **kw})
+        q1, q3 = np.percentile(v, [25, 75])
+        slope = (q3 - q1) / (z3 - z1)
+        ends = theory[[0, -1]]
+        ax.plot(ends, q1 + slope * (ends - z1), color=f"C{i}", linestyle="--", linewidth=1.2)
+    lo, hi = min(v.min() for v, _ in series), max(v.max() for v, _ in series)
+    pad = 0.05 * (hi - lo)
+    ax.set_ylim(lo - pad, hi + pad)             # fit the points; a steep reference line runs off the edge
+    ax.set_xlabel("normal quantiles")
+    ax.set_ylabel("sample quantiles")
+    if by is not None:
+        ax.legend(title=label(by, "by"))

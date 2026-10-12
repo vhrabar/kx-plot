@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- **Plot kind** `qq`: sorted values against normal quantiles, one series per array or `by=` group, with a dashed
+  line through each one's quartiles. The quantiles come from Python's `statistics`, so no scipy is needed.
 - **Plot kind** `ridge`: density curves stacked top to bottom, one per array or `by=` group, on one shared height
   scale; `overlap=` sets the tallest ridge's height in rows. `mean` and `median` mark each ridge.
 - **Plot kind** `strip`: every value as a point, one column per array or `by=` group, jittered sideways so ties

@@ -1,6 +1,7 @@
 import re
 from collections.abc import Callable
 from pathlib import Path
+from statistics import NormalDist
 
 import matplotlib as mpl
 import numpy as np
@@ -153,6 +154,7 @@ def test_band_is_y_plus_minus_z() -> None:
     ("violin", lambda s: kx.plot(np.ones(5), spec=s), "at least 2 distinct"),
     ("strip", lambda s: kx.plot([np.nan], spec=s), "needs a finite value"),
     ("ridge", lambda s: kx.plot(np.ones(5), spec=s), "at least 2 distinct"),
+    ("qq", lambda s: kx.plot(np.ones(5), spec=s), "at least 2 distinct"),
     ("ridge-ann", lambda s: kx.plot(X, spec=s), "only works with kind"),
     ("box-stack", lambda s: kx.plot(X, spec=s), "only works with kind"),
 ])
@@ -345,6 +347,31 @@ def test_strip_draws_every_value_jittered_around_its_column() -> None:
     assert np.array_equal(first, again)         # same data, same picture
     faces = [to_hex(c.get_facecolor()[0], keep_alpha=False) for c in ax.collections]
     assert faces[0] != faces[1]
+
+
+def test_qq_against_normal_quantiles_with_quartile_line() -> None:
+    v = np.array([3.0, 1.0, np.nan, 2.0, 4.0])
+    ax = kx.plot(v, spec="qq")
+    pts = ax.collections[0].get_offsets()
+    expected = [NormalDist().inv_cdf((k - 0.5) / 4) for k in range(1, 5)]
+    assert list(pts[:, 0]) == pytest.approx(expected)
+    assert list(pts[:, 1]) == [1, 2, 3, 4]      # sorted, NaN dropped
+    (x0, x1), (y0, y1) = ax.lines[0].get_data()
+    q1, q3 = np.percentile([1, 2, 3, 4], [25, 75])
+    z1, z3 = NormalDist().inv_cdf(0.25), NormalDist().inv_cdf(0.75)
+    assert (y1 - y0) / (x1 - x0) == pytest.approx((q3 - q1) / (z3 - z1))
+    assert ax.get_xlabel() == "normal quantiles"
+
+
+def test_qq_normal_sample_lies_on_its_line_and_by_groups() -> None:
+    v = np.array([NormalDist(5, 2).inv_cdf(p) for p in (np.arange(1, 201) - 0.5) / 200])
+    ax = kx.plot(v, spec="qq")
+    (x0, x1), (y0, y1) = ax.lines[0].get_data()
+    assert (y1 - y0) / (x1 - x0) == pytest.approx(2, rel=0.01)
+    df = pd.DataFrame({"v": np.r_[X, X * 3], "g": ["a"] * 20 + ["b"] * 20})
+    ax = kx.plot(df, "v", spec="qq", by="g")
+    assert len(ax.collections) == 2
+    assert ax.get_legend().get_title().get_text() == "g"
 
 
 def test_violin_marks_median() -> None:
