@@ -22,7 +22,7 @@ def render(theme: str, out_dir: str) -> str:
     spread = (0.1 + waves.x / 40).rename("std")
     samples = (dists.normal, dists.skewed, dists.bimodal)
     kx.use(theme)
-    a = iter(axs := kx.grid(13, cols=5))
+    a = iter(axs := kx.grid(14, cols=5))
     fig = axs[0].figure
     kx.plot(waves.x, waves.y, waves.z, "line-leg", title="line", ax=next(a))
     kx.plot(monthly.month, monthly.y2025, monthly.y2026, "step-leg", title="step", ax=next(a))
@@ -33,6 +33,7 @@ def render(theme: str, out_dir: str) -> str:
     kx.plot(monthly.month, monthly.y2025, monthly.y2026, "barh-stack-leg", title="barh-stack", ax=next(a))
     kx.plot(*samples, spec="hist-leg", title="hist", ax=next(a))
     kx.plot(*samples, spec="kde-leg", title="kde", ax=next(a))
+    kx.plot(*samples, spec="ridge", title="ridge", ax=next(a))
     kx.plot(*samples, spec="ecdf-leg", title="ecdf", ax=next(a))
     kx.plot(*samples, spec="box", title="box", ax=next(a))
     kx.plot(*samples, spec="violin", title="violin", ax=next(a))

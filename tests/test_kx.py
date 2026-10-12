@@ -152,6 +152,8 @@ def test_band_is_y_plus_minus_z() -> None:
     ("box", lambda s: kx.plot([np.nan], spec=s), "needs a finite value"),
     ("violin", lambda s: kx.plot(np.ones(5), spec=s), "at least 2 distinct"),
     ("strip", lambda s: kx.plot([np.nan], spec=s), "needs a finite value"),
+    ("ridge", lambda s: kx.plot(np.ones(5), spec=s), "at least 2 distinct"),
+    ("ridge-ann", lambda s: kx.plot(X, spec=s), "only works with kind"),
     ("box-stack", lambda s: kx.plot(X, spec=s), "only works with kind"),
 ])
 def test_new_kind_errors(spec: str, call: Callable[[str], Axes], match: str) -> None:
@@ -260,6 +262,30 @@ def test_kde_by_groups() -> None:
 def test_kde_by_numeric_groups_sorted() -> None:
     ax = kx.plot(np.r_[X, X], spec="kde", by=[2] * len(X) + [1] * len(X))
     assert [t.get_text() for t in ax.get_legend().get_texts()] == ["1", "2"]
+
+
+def test_ridge_stacks_first_series_on_top_on_one_scale() -> None:
+    ax = kx.plot(X, X + 20, np.r_[X, X], spec="ridge-leg", overlap=2)
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["x", "y", "z"]
+    assert list(ax.get_yticks()) == [2, 1, 0]                # x on the top row
+    bases = [ln.get_ydata().min() for ln in ax.lines]
+    assert bases == pytest.approx([2, 1, 0], abs=1e-3)
+    heights = [ln.get_ydata().max() - b for ln, b in zip(ax.lines, bases, strict=True)]
+    assert max(heights) == pytest.approx(2)     # overlap= is the tallest ridge in rows
+    assert heights[0] == pytest.approx(heights[1])           # same shape, same scale
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["x", "y", "z"]
+
+
+def test_ridge_by_groups_and_marks() -> None:
+    df = pd.DataFrame({"v": np.r_[X, X + 20], "g": ["a"] * 20 + ["b"] * 20})
+    ax = kx.plot(df, "v", spec="ridge-mean-median", by="g")
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["a", "b"]
+    assert list(ax.get_yticks()) == [1, 0]
+    assert ax.get_ylabel() == "g"
+    lines = [c for c in ax.collections if isinstance(c, mpl.collections.LineCollection)]
+    marks = [seg[0] for c in lines for seg in c.get_segments()]
+    assert sorted(m[0] for m in marks) == pytest.approx(sorted([X.mean(), np.median(X), X.mean() + 20,
+                                                                 np.median(X) + 20]))
 
 
 @pytest.mark.parametrize("arrays", [1, 2, 3])

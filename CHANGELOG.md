@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- **Plot kind** `ridge`: density curves stacked top to bottom, one per array or `by=` group, on one shared height
+  scale; `overlap=` sets the tallest ridge's height in rows. `mean` and `median` mark each ridge.
 - **Plot kind** `strip`: every value as a point, one column per array or `by=` group, jittered sideways so ties
   stay visible (the same way every run; `jitter=` sets the spread). Takes `mean` and `ann` like `box`.
 - `kx.grid(n, cols=3)` makes a figure of `n` panels and returns them as a flat array of axes. Each panel gets

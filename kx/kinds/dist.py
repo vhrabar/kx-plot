@@ -101,6 +101,15 @@ def bandwidth(v: np.ndarray) -> float:
     return 0.9 * spread * len(v) ** -0.2
 
 
+def _densities(series: list[tuple[np.ndarray, str]]) -> tuple[np.ndarray, list[np.ndarray]]:
+    """One shared grid reaching 3 bandwidths past every series, and each series' KDE on it."""
+    bws = [bandwidth(v) for v, _ in series]
+    lo = min(v.min() - 3 * bw for (v, _), bw in zip(series, bws, strict=True))
+    hi = max(v.max() + 3 * bw for (v, _), bw in zip(series, bws, strict=True))
+    grid = np.linspace(lo, hi, 256)
+    return grid, [density(v, grid, bw) for (v, _), bw in zip(series, bws, strict=True)]
+
+
 @kind("kde", flags=STATS, needs_y=False, takes_by=True, check=_check_stats)
 def kde(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
         by: ArrayLike | None = None, **kw: Any) -> None:
@@ -108,18 +117,43 @@ def kde(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags:
     by= splits x into one curve per group: kx.plot(df.value, spec='kde', by=df.group). kw: the curves (ax.plot)."""
     series = _split(x, y, z, by)
     _need(series, "kde", 2)
-    bws = [bandwidth(v) for v, _ in series]
-    lo = min(v.min() - 3 * bw for (v, _), bw in zip(series, bws, strict=True))
-    hi = max(v.max() + 3 * bw for (v, _), bw in zip(series, bws, strict=True))
-    grid = np.linspace(lo, hi, 256)
-    for (v, n), bw in zip(series, bws, strict=True):
-        d = density(v, grid, bw)
+    grid, curves = _densities(series)
+    for (_, n), d in zip(series, curves, strict=True):
         ln, = ax.plot(grid, d, **{"label": n, **kw})
         ax.fill_between(grid, d, color=ln.get_color(), alpha=0.15, linewidth=0)
     ax.set_ylim(bottom=0)
     _vlines(ax, series, flags)
     if by is not None:
         ax.legend(title=label(by, "by"))
+
+
+@kind("ridge", flags=("mean", "median"), needs_y=False, takes_by=True)
+def ridge(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
+          by: ArrayLike | None = None, **kw: Any) -> None:
+    """Density curves of x, y, z stacked top to bottom, each on its own baseline (a ridgeline).
+    by= splits x into one ridge per group. All ridges share one height scale, so they compare like kde.
+    mean / median = a dashed / dotted mark under each curve.
+    kw: the curves (ax.plot); overlap= is the tallest ridge's height in rows, 1.5 by default."""
+    series = _split(x, y, z, by)
+    _need(series, "ridge", 2)
+    overlap = kw.pop("overlap", 1.5)
+    grid, curves = _densities(series)
+    scale = overlap / max(d.max() for d in curves)
+    ink = plt.rcParams["text.color"]
+    for i, ((v, n), d) in enumerate(zip(series, curves, strict=True)):
+        base = len(series) - 1 - i              # first series on top; lower ridges drawn in front
+        top = base + d * scale
+        ax.fill_between(grid, base, top, color=f"C{i}", alpha=0.7, linewidth=0, zorder=2 * i + 1)
+        ax.plot(grid, top, **{"color": f"C{i}", "label": n, "zorder": 2 * i + 2, **kw})
+        for stat, fn, style in (("mean", np.mean, "--"), ("median", np.median, ":")):
+            if stat in flags:
+                at = fn(v)
+                ax.vlines(at, base, np.interp(at, grid, top), color=ink, linestyle=style, linewidth=1.2,
+                          zorder=2 * i + 2)
+    ax.set_yticks(range(len(series) - 1, -1, -1), [n for _, n in series])
+    ax.set_ylim(-0.05, len(series) - 1 + overlap * 1.05)
+    if by is not None:
+        ax.set_ylabel(label(by, "by"))
 
 
 @kind("ecdf", flags=STATS, needs_y=False, takes_by=True, check=_check_stats)

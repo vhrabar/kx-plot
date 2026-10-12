@@ -39,12 +39,13 @@ for ax, col in zip(kx.grid(3), df.columns):        # a figure of 3 panels, a fla
 kx.plot(df, 'month', 'y2025', 'bar')               # DataFrame columns by name
 kx.plot(x, y, 'line', linewidth=3)                 # other keywords go to matplotlib
 kx.plot(df, 'value', spec='kde', by='group')       # one density curve per group
-kx.plot(df.value, spec='box', by=df.group)         # one box per group (also ecdf, violin, strip)
+kx.plot(df.value, spec='box', by=df.group)         # one box per group (also ridge, violin, strip)
 ```
 
 | Token | Values                                                                                        |
 |-------|-----------------------------------------------------------------------------------------------|
-| kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ecdf` `box` `violin` `strip` |
+| kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
+|       | `strip`                                                                                       |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
 | flags | `grid` `leg` `legout` `tight` `rot` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct` `si`    |
 |       | per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb` `sym` `logc`   |
