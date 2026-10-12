@@ -32,22 +32,31 @@ import kx; kx.use('dark')
 kx.use('light', palette='okabe', cmap='cividis')   # notebook default: theme, palette, colormap
 kx.plot(x, y, z, 'scatter-grid-leg')               # spec: kind-theme-flag-...
 kx.plot(x, y, 'bar-paper')                         # a theme in the spec applies to this plot only
-kx.plot(df.value, spec='kde', by=df.group)         # one density curve per group
-kx.plot(df.value, spec='box', by=df.group)         # one box per group (also ecdf, violin)
+with kx.context('paper'): ...                      # or to every plot in the block
+kx.save('fig.png')                                 # to /kaggle/working on Kaggle, else the current folder
+for ax, col in zip(kx.grid(3), df.columns):        # a figure of 3 panels, a flat array of axes
+    kx.plot(df, col, spec='hist', ax=ax)
+kx.plot(df, 'month', 'y2025', 'bar')               # DataFrame columns by name
+kx.plot(x, y, 'line', linewidth=3)                 # other keywords go to matplotlib
+kx.plot(df, 'value', spec='kde', by='group')       # one density curve per group
+kx.plot(df.value, spec='box', by=df.group)         # one box per group (also ridge, violin, qq)
 ```
 
-| Token | Values                                                                                |
-|-------|---------------------------------------------------------------------------------------|
-| kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ecdf` `box` `violin` |
-| theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                             |
-| flags | `grid` `leg` `logx` `logy` `tight`, plus `stack` `norm` `cum` (below)                 |
+| Token | Values                                                                                        |
+|-------|-----------------------------------------------------------------------------------------------|
+| kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
+|       | `strip` `qq`                                                                                  |
+| theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
+| flags | `grid` `leg` `legout` `tight` `rot` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct` `si`    |
+|       | per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb` `sym` `logc`   |
 
 `stack` works with `area`, `bar`, `barh` and `hist`. `norm` is a 100% stack for `area` and a
 density (area 1) for `hist`. `cum` makes `hist` cumulative; `hist-norm-cum` is the CDF.
 `hist` puts every series on the same bins, so the bars line up.
 
-Unknown tokens raise an error instead of being guessed. Everything is inspectable:
-`kx.grammar()`, `kx.grammar('area')`, `kx.show('dark')`, `kx.source('scatter')`.
+Unknown tokens raise an error instead of being guessed, with the closest valid tokens as a hint.
+Everything is inspectable: `kx.grammar()`, `kx.grammar('area')`, `kx.parse('leg-scatter')`, `kx.show('dark')`,
+`kx.source('scatter')`.
 
 rcParams can be overridden in `kx.use` with `__` for dots: `kx.use('dark', figure__figsize=(8, 4))`.
 

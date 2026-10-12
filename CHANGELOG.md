@@ -6,6 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Plot kind** `qq`: sorted values against normal quantiles, one series per array or `by=` group, with a dashed
+  line through each one's quartiles. The quantiles come from Python's `statistics`, so no scipy is needed.
+- **Plot kind** `ridge`: density curves stacked top to bottom, one per array or `by=` group, on one shared height
+  scale; `overlap=` sets the tallest ridge's height in rows. `mean` and `median` mark each ridge.
+- **Plot kind** `strip`: every value as a point, one column per array or `by=` group, jittered sideways so ties
+  stay visible (the same way every run; `jitter=` sets the spread). Takes `mean` and `ann` like `box`.
+- `kx.grid(n, cols=3)` makes a figure of `n` panels and returns them as a flat array of axes. Each panel gets
+  the theme's figure size, empty cells are removed, and constrained layout leaves room for colorbars and outside
+  legends. Other keywords go to `plt.subplots`.
+- `kx.save('fig.png')` saves the current figure (or the one of a given `ax` or figure) and returns the path.
+  A relative name goes to `/kaggle/working` on Kaggle and to the current folder elsewhere; missing folders are
+  created. Without an extension the theme's format is used, so `thesis` saves a PDF.
+- `with kx.context(theme, palette=..., cmap=..., **rc):` takes the same arguments as `kx.use` and puts the
+  previous settings back when the block ends, also after an error.
+- `kx.parse(spec)` returns a `Spec` with `kind`, `theme` and `flags`. Printed, it is the canonical spec string
+  (kind, theme, then flags A–Z), and `kx.plot` takes a `Spec` wherever it takes a spec string. Mistyped tokens get
+  the closest valid ones as a hint.
+- `kx.plot(df, 'x', 'y', 'z', spec)` names DataFrame columns, and `by=` can name a column. A mistyped column
+  gets the closest names as a hint.
+- `kx.plot(..., **kwargs)` passes other keywords to the matplotlib call that draws the kind, over kx's defaults:
+  `kx.plot(x, y, 'line', linewidth=3)`. `bins=` sets the shared `hist` bins and `width=` (`height=` for
+  `barh`) the space each category's bars fill.
+- **Flags for every kind**
+  - Layout: `legout` puts the legend outside on the right, keeping a kind's legend title. `rot` rotates the x tick
+    labels 45°.
+  - Axes: `logxy` (log on both), `symlogy` (symmetric log y, so negatives work), `zero` (the value axis includes 0)
+    and `eq` (equal aspect).
+  - Number format: `pct` (0.25 → 25%) and `si` (1500 → 1.5k) on the value axis, which is x for `barh` and y
+    otherwise.
+- **Flags for some kinds**
+  - `date` for `line`, `step`, `area`, `band` and `scatter`: `x` is read as dates (text works too) and gets compact
+    date ticks.
+  - `mk` for `line`, `step`, `area` and `band`: a marker on every point.
+  - `sort` for `bar` and `barh`: largest first, by `y`, or by the total with `stack`.
+  - `ann` for `bar` and `barh`: the value on each bar, inside each segment with `stack`.
+  - `mean` and `median` for `hist`, `kde` and `ecdf`: a dashed / dotted line at each series' mean / median.
+    `mean` for `box` and `violin`: a diamond at each mean. `ann` writes the values.
+  - `nocb`, `sym` and `logc` for `scatter` with a numeric `z`: no colorbar, colour limits symmetric around 0,
+    log colour scale.
+- Flags that ask for opposite things (`pct` and `si`, `logy` and `logxy`, `zero` and a log y, `sym` and `logc`)
+  raise an error.
+
+### Changed
+
+- The `tight` flag leaves a figure with constrained layout (such as `kx.grid`'s) alone instead of failing
+  when it has a colorbar.
+
+### Fixed
+
+- `leg` and `legout` on a plot with nothing to label, such as `scatter` with a numeric `z`, no longer warn
+  "No artists with labels found"; the plot just has no legend.
+
 ## [0.2.0] - 2026-10-09
 
 ### Added

@@ -2,15 +2,20 @@
 kx: tiny matplotlib helper.
 
 Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
-  kind  : line | step | area | band | scatter | bar | barh | hist | kde | ecdf | box | violin
+  kind  : line | step | area | band | scatter | bar | barh | hist | kde | ridge | ecdf | box | violin | strip
+          | qq
   theme : any file name in styles/
-  flags : grid | leg | logx | logy | tight | stack | norm | cum
-          (stack: area, bar, barh, hist; norm: area, hist; cum: hist)
-by=    : group labels for x, one curve/box/violin per group (kde, ecdf, box, violin)
+  flags : grid | leg | legout | tight | rot | logx | logy | logxy | symlogy | zero | eq | pct | si
+          and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars),
+          mean median ann (distributions), nocb sym logc (scatter). kx.grammar(kind) lists them.
+by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq)
 
 Palettes (kx.use(theme, palette="okabe")): any file name in styles/palettes/
 Colormaps (kx.use(theme, cmap="magma")):  kx.cmaps()
-kx.grammar("area") and kx.source("area") explain one kind.
+with kx.context(theme, ...): the same as kx.use, for one block only.
+kx.save("fig.png"): saves to /kaggle/working on Kaggle, the current folder elsewhere.
+kx.grid(5): a figure of 5 panels as a flat array of axes, for kx.plot(..., ax=).
+kx.grammar("area") and kx.source("area") explain one kind; kx.parse(spec) shows how a spec is read.
 """
 import glob
 import importlib.metadata
@@ -19,13 +24,14 @@ import os
 import re
 
 from ._data import datasets, load
+from ._grid import grid
 from ._plot import plot
-from ._spec import COMMON_FLAGS, KINDS, all_flags
-from ._spec import parse as _parse  # noqa: F401  (tests)
-from ._theme import BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, palette, palettes, show, styles, use
+from ._save import save
+from ._spec import COMMON_FLAGS, KINDS, Spec, all_flags, parse
+from ._theme import BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
 
-__all__ = ["BUILTIN_CMAPS", "VENDORED_CMAPS", "__version__", "cmaps", "datasets", "grammar", "load", "palette",
-           "palettes", "plot", "show", "source", "styles", "use"]
+__all__ = ["BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "datasets", "grammar",
+           "grid", "load", "palette", "palettes", "parse", "plot", "save", "show", "source", "styles", "use"]
 
 
 def _version() -> str:
