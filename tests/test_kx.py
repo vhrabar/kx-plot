@@ -493,6 +493,15 @@ def test_flag_errors(spec: str, call: Callable[[str], Axes], match: str) -> None
         call(spec)
 
 
+def test_leg_without_labelled_artists_is_quiet() -> None:
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        ax = kx.plot(X, Y, Z, "scatter-leg")    # numeric z is a colorbar: nothing for a legend
+        assert ax.get_legend() is None
+        assert kx.plot(X, Y, Z, "scatter-legout").get_legend() is None
+
+
 def test_series_names_become_labels() -> None:
     df = pd.DataFrame({"x": X, "speed": Y, "accel": Z})
     ax = kx.plot(df.x, df.speed, df.accel, "line-leg")

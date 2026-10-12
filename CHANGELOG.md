@@ -55,6 +55,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The `tight` flag leaves a figure with constrained layout (such as `kx.grid`'s) alone instead of failing
   when it has a colorbar.
 
+### Fixed
+
+- `leg` and `legout` on a plot with nothing to label, such as `scatter` with a numeric `z`, no longer warn
+  "No artists with labels found"; the plot just has no legend.
+
 ## [0.2.0] - 2026-10-09
 
 ### Added

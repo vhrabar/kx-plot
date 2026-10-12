@@ -97,9 +97,9 @@ def _common(ax: Axes, name: str, value_axis: str, flags: set[str]) -> None:
     """Flags every kind takes: legend, scales, value-axis format, ticks."""
     values = ax.xaxis if value_axis == "x" else ax.yaxis
     if "grid" in flags:  ax.grid(True)
-    if flags & {"leg", "legout"}:               # a 100% stack has no free corner: legend goes right
+    if flags & {"leg", "legout"} and ax.get_legend_handles_labels()[0]:   # nothing labelled (scatter z): none
         old = ax.get_legend()
-        outside = "legout" in flags or (name == "area" and "norm" in flags)
+        outside = "legout" in flags or (name == "area" and "norm" in flags)  # a 100% stack has no free corner
         if old is None or outside:              # moving a kind's own legend keeps its title
             ax.legend(title=old.get_title().get_text() if old else None, **(OUTSIDE if outside else {}))
     if flags & {"logx", "logxy"}: ax.set_xscale("log")
