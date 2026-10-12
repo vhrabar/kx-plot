@@ -191,3 +191,20 @@ def violin(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, fla
     ax.vlines(pos, q1, q3, color=ink, linewidth=3)
     ax.scatter(pos, med, color=plt.rcParams["axes.facecolor"], edgecolor=ink, zorder=3)
     _per_group(ax, series, flags, by)
+
+
+@kind("strip", flags=("mean", "ann"), needs_y=False, takes_by=True)
+def strip(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
+          by: ArrayLike | None = None, **kw: Any) -> None:
+    """Every value as a point, one column per x, y, z, jittered sideways so ties stay visible.
+    by= splits x into one column per group. mean = a diamond at the mean, ann = the median (and mean) as text.
+    kw: ax.scatter; jitter= is the half-width of the sideways spread, 0.15 by default."""
+    series = _split(x, y, z, by)
+    _need(series, "strip", 1)
+    jitter = kw.pop("jitter", 0.15)
+    rng = np.random.default_rng(0)              # the same data always gets the same picture
+    size = 0.5 * plt.rcParams["lines.markersize"] ** 2
+    for i, (v, n) in enumerate(series):
+        ax.scatter(i + 1 + rng.uniform(-jitter, jitter, len(v)), v,
+                   **{"s": size, "color": f"C{i}", "alpha": 0.6, "linewidth": 0, "label": n, **kw})
+    _per_group(ax, series, flags, by)

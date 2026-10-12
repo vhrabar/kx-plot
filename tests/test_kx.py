@@ -151,6 +151,7 @@ def test_band_is_y_plus_minus_z() -> None:
     ("ecdf", lambda s: kx.plot(X, Y, spec=s, by=X > 5), "pass only x"),
     ("box", lambda s: kx.plot([np.nan], spec=s), "needs a finite value"),
     ("violin", lambda s: kx.plot(np.ones(5), spec=s), "at least 2 distinct"),
+    ("strip", lambda s: kx.plot([np.nan], spec=s), "needs a finite value"),
     ("box-stack", lambda s: kx.plot(X, spec=s), "only works with kind"),
 ])
 def test_new_kind_errors(spec: str, call: Callable[[str], Axes], match: str) -> None:
@@ -285,13 +286,13 @@ def test_ecdf_by_groups() -> None:
     assert ax.get_legend().get_title().get_text() == "g"
 
 
-@pytest.mark.parametrize("kind", ["box", "violin"])
+@pytest.mark.parametrize("kind", ["box", "violin", "strip"])
 def test_box_and_violin_one_per_array(kind: str) -> None:
     ax = kx.plot(X, pd.Series(Y, name="sin"), Z, spec=kind)
     assert [t.get_text() for t in ax.get_xticklabels()] == ["x", "sin", "z"]
 
 
-@pytest.mark.parametrize("kind", ["box", "violin"])
+@pytest.mark.parametrize("kind", ["box", "violin", "strip"])
 def test_box_and_violin_by_groups(kind: str) -> None:
     df = pd.DataFrame({"v": np.r_[X, X + 20], "g": pd.Categorical(["b"] * 20 + ["a"] * 20, ["b", "a"])})
     ax = kx.plot(df.v, spec=kind, by=df.g)
@@ -303,6 +304,20 @@ def test_box_median_and_colours() -> None:
     ax = kx.plot(X, X + 5, spec="box")
     assert ax.lines[4].get_ydata()[0] == pytest.approx(np.median(X))     # whiskers, caps, then median
     faces = [to_hex(p.get_facecolor(), keep_alpha=False) for p in ax.patches]
+    assert faces[0] != faces[1]
+
+
+def test_strip_draws_every_value_jittered_around_its_column() -> None:
+    ax = kx.plot(np.r_[X, np.nan], np.ones(5), spec="strip", jitter=0.1)
+    first, second = (c.get_offsets() for c in ax.collections)
+    assert len(first) == len(X)                 # NaN dropped
+    assert sorted(first[:, 1]) == pytest.approx(sorted(X))
+    assert np.all(np.abs(first[:, 0] - 1) <= 0.1)
+    assert np.all(np.abs(second[:, 0] - 2) <= 0.1)
+    assert np.ptp(second[:, 0]) > 0             # ties spread sideways
+    again = kx.plot(np.r_[X, np.nan], np.ones(5), spec="strip", jitter=0.1).collections[0].get_offsets()
+    assert np.array_equal(first, again)         # same data, same picture
+    faces = [to_hex(c.get_facecolor()[0], keep_alpha=False) for c in ax.collections]
     assert faces[0] != faces[1]
 
 
@@ -392,7 +407,7 @@ def test_mean_and_median_lines(name: str) -> None:
     assert [t.get_text() for t in ax.texts] == [f"{v.mean():.3g}", f"{np.median(v):.3g}"]
 
 
-@pytest.mark.parametrize("name", ["box", "violin"])
+@pytest.mark.parametrize("name", ["box", "violin", "strip"])
 def test_box_and_violin_mean_and_ann(name: str) -> None:
     ax = kx.plot(X, X + 5, spec=f"{name}-mean-ann")
     assert list(ax.collections[-1].get_offsets()[:, 1]) == pytest.approx([X.mean(), X.mean() + 5])
