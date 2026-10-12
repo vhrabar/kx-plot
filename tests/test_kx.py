@@ -743,6 +743,37 @@ def test_kind_names_stay_unique_tokens(name: str) -> None:
     with pytest.raises(ValueError, match="taken"):
         kx._spec.kind(name)(lambda *a: None)
 
+# ---------- grid ----------
+@pytest.mark.parametrize(("n", "cols", "shape"), [(5, 3, (2, 3)), (2, 3, (1, 2)), (12, 4, (3, 4)), (1, 3, (1, 1))])
+def test_grid_is_flat_with_n_panels(n: int, cols: int, shape: tuple[int, int]) -> None:
+    mpl.rcParams["figure.figsize"] = (4, 3)
+    axs = kx.grid(n, cols=cols)
+    assert isinstance(axs, np.ndarray)
+    assert axs.shape == (n,)
+    fig = axs[0].figure
+    assert fig.axes == list(axs)                # unused cells are gone
+    assert tuple(fig.get_size_inches()) == (4 * shape[1], 3 * shape[0])
+
+
+def test_grid_passes_subplots_keywords() -> None:
+    axs = kx.grid(4, cols=2, sharex=True, figsize=(6, 6))
+    assert axs[0].get_shared_x_axes().joined(axs[0], axs[3])
+    assert tuple(axs[0].figure.get_size_inches()) == (6, 6)
+
+
+def test_grid_panels_take_kx_plots_with_tight_and_colorbars() -> None:
+    a, b = kx.grid(2)
+    kx.plot(X, Y, Z, "scatter", ax=a)           # a colorbar, then tight: no layout-engine clash
+    kx.plot(X, Y, "line-tight", ax=b)
+    assert len(a.figure.axes) == 3
+
+
+@pytest.mark.parametrize(("n", "cols"), [(0, 3), (3, 0)])
+def test_grid_rejects_empty(n: int, cols: int) -> None:
+    with pytest.raises(ValueError, match="n >= 1 and cols >= 1"):
+        kx.grid(n, cols=cols)
+
+
 # ---------- saving ----------
 @pytest.fixture
 def kaggle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:

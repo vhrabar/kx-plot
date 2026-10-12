@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `kx.grid(n, cols=3)` makes a figure of `n` panels and returns them as a flat array of axes. Each panel gets
+  the theme's figure size, empty cells are removed, and constrained layout leaves room for colorbars and outside
+  legends. Other keywords go to `plt.subplots`.
 - `kx.save('fig.png')` saves the current figure (or the one of a given `ax` or figure) and returns the path.
   A relative name goes to `/kaggle/working` on Kaggle and to the current folder elsewhere; missing folders are
   created. Without an extension the theme's format is used, so `thesis` saves a PDF.
@@ -40,6 +43,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     log colour scale.
 - Flags that ask for opposite things (`pct` and `si`, `logy` and `logxy`, `zero` and a log y, `sym` and `logc`)
   raise an error.
+
+### Changed
+
+- The `tight` flag leaves a figure with constrained layout (such as `kx.grid`'s) alone instead of failing
+  when it has a colorbar.
 
 ## [0.2.0] - 2026-10-09
 

@@ -8,6 +8,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.layout_engine import ConstrainedLayoutEngine
 from numpy.typing import ArrayLike
 
 from . import kinds  # noqa: F401  (registers every kind)
@@ -48,7 +49,8 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, 
         kind.draw(ax, x, y, z, flags, **({"by": by} if by is not None else {}), **kwargs)
         _common(ax, name, kind.value_axis, flags)
         if title:            ax.set_title(title)
-        if "tight" in flags: ax.figure.tight_layout()
+        if "tight" in flags and not isinstance(ax.figure.get_layout_engine(), ConstrainedLayoutEngine):
+            ax.figure.tight_layout()            # a constrained figure (kx.grid) is laid out already
     return ax
 
 
