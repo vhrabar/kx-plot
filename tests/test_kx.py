@@ -479,6 +479,59 @@ def test_crosstab_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+def _heights(ax: Axes) -> list[list[float]]:
+    return [[p.get_height() for p in c] for c in ax.containers]
+
+
+def test_count_matches_value_counts_with_nan_as_a_bar() -> None:
+    ax = kx.plot(PASSENGERS, "deck", "count-ann")
+    want = PASSENGERS.deck.value_counts(dropna=False)
+    ticks = [t.get_text() for t in ax.get_xticklabels()]
+    assert ticks == [*"ABCDEFG", "NaN"]
+    assert _heights(ax) == [[want[np.nan if t == "NaN" else t] for t in ticks]]
+    assert [t.get_text() for t in ax.texts] == [str(want[np.nan if t == "NaN" else t]) for t in ticks]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("deck", "count")
+
+
+def test_count_sort_puts_the_most_common_first() -> None:
+    ax = kx.plot(PASSENGERS, "port", "count-sort")
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["Southampton", "Cherbourg", "Queenstown", "NaN"]
+    assert _heights(ax)[0] == sorted(_heights(ax)[0], reverse=True)
+
+
+def test_count_numeric_categories_in_order() -> None:
+    ax = kx.plot([3, 1, 10, 1, 3, 3], spec="count")
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["1", "3", "10"]
+    assert _heights(ax) == [[2, 3, 1]]
+
+
+def test_count_by_gives_one_container_per_group() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", spec="count", by="port")
+    assert len(ax.containers) == 4                  # 3 ports and NaN
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["Cherbourg", "Queenstown", "Southampton", "NaN"]
+    assert ax.get_legend().get_title().get_text() == "port"
+    want = pd.crosstab(PASSENGERS.port, PASSENGERS.pclass)
+    assert _heights(ax)[:3] == want.to_numpy().tolist()
+    assert [p.get_width() for p in ax.patches] == pytest.approx([0.2] * 12)      # 0.8 shared by 4 groups
+
+
+def test_count_norm_shares() -> None:
+    ax = kx.plot(PASSENGERS, "sex", "count-norm-ann")
+    assert sum(_heights(ax)[0]) == pytest.approx(1)
+    assert all(t.get_text().endswith("%") for t in ax.texts)
+    assert isinstance(ax.yaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+    stacked = kx.plot(PASSENGERS, "pclass", "count-stack-norm", by="survived")
+    assert np.allclose(np.sum(_heights(stacked), axis=0), 1)           # each category's bar is 100%
+    assert stacked.get_legend().get_bbox_to_anchor().x0 > stacked.get_position().x1 - 0.01    # outside
+    grouped = kx.plot(PASSENGERS, "pclass", "count-norm", by="survived")
+    assert np.allclose(np.sum(_heights(grouped), axis=1), 1)           # each group's bars are 100%
+
+
+def test_count_errors() -> None:
+    with pytest.raises(ValueError, match="split them with by="):
+        kx.plot(PASSENGERS, "sex", "pclass", "count")
+
+
 # ---------- flags, title, labels ----------
 def test_flags() -> None:
     ax = kx.plot(X, Y, Z, "line-grid-leg-logx-logy-tight", title="t")

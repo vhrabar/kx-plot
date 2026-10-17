@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Plot kind** `crosstab`: how often each pair of categories occurs, as a heat map with `x` along the x axis and
   `y` down the y axis: `kx.plot(df, 'sex', 'pclass', 'crosstab-ann')`. `norm` shows shares within each `x`
   category (each column sums to 100%), and `logc` leaves pairs that never occur blank.
+- **Plot kind** `count`: how often each category of `x` occurs, with missing values as their own `NaN` bar.
+  `by=` splits each bar into one per group (`kx.plot(df, 'pclass', spec='count', by='survived')`). `stack` puts the
+  groups on top of each other, `sort` puts the most common first and `ann` writes the counts. `norm` shows shares:
+  within each category with `by=` and `stack`, and within each group otherwise.
 
 - `kx.plot(df, spec)` and `kx.plot(matrix, spec)` hand the whole table to a table kind, with no column names. A
   2-D array becomes a DataFrame labelled `0..n`. A table kind given columns, `y`, `z` or `by=` raises, and
