@@ -6,6 +6,7 @@ from typing import Any
 import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.layout_engine import ConstrainedLayoutEngine
@@ -22,6 +23,7 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, 
          ax: Axes | None = None, by: ArrayLike | str | None = None, **kwargs: Any) -> Axes:
     """kx.plot(x, y, z, 'scatter-dark-grid-leg')   or   kx.plot(x, y, 'bar-light')
     kx.plot(df, 'month', 'y2025', 'y2026', 'bar')   names columns of a DataFrame.
+    kx.plot(df, 'heat')   a table kind takes the whole DataFrame (or a 2-D array) instead.
 
     Up to three arrays x, y, z, then the spec (or spec=). by= gives a group label per x value,
     one curve, box or violin per group: kx.plot(df, 'value', spec='kde', by='group').
@@ -33,6 +35,9 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, 
     x, y, z, spec, by = _arrays(data, spec, by)
     name, theme, flags = parse(spec or "line")
     kind = KINDS[name]
+    if kind.takes_table and not (isinstance(x, pd.DataFrame) and y is None and by is None):
+        raise TypeError(f"kind {name!r} takes a whole table and no columns, y, z or by=: kx.plot(df, {name!r}), "
+                        f"or kx.plot(df[cols], {name!r}) for some columns")
     if kind.needs_y and y is None:
         raise ValueError(f"kind {name!r} needs both x and y")
     if by is not None and not kind.takes_by:
@@ -70,9 +75,16 @@ def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None) ->
                     _column(df, data[-1])
                 raise
         spec = data.pop()
+    table = KINDS[parse(spec or "line").kind].takes_table
+    if table and df is None and len(data) == 1 and np.ndim(data[0]) == 2:
+        df, data = pd.DataFrame(data[0]), []    # a 2-D array is a table with 0..n labels
     if df is not None:
+        if not data and table:
+            return df, None, None, spec, by
         if not data:
-            raise TypeError("kx.plot(df, ...) needs the column names to plot: kx.plot(df, 'x', 'y')")
+            tables = ", ".join(sorted(k.name for k in KINDS.values() if k.takes_table))
+            raise TypeError("kx.plot(df, ...) needs the column names to plot: kx.plot(df, 'x', 'y')"
+                            + (f", or a table kind: {tables}" if tables else ""))
         data = [_column(df, c) for c in data]
         by = _column(df, by) if isinstance(by, str) else by
     elif isinstance(by, str):

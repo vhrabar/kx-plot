@@ -65,6 +65,8 @@ def grammar(kind: str | None = None) -> None:
         k = _kind(kind)
         print(f"{k.name}: {inspect.getdoc(k.draw)}")
         print("flags:", sorted(COMMON_FLAGS), "+", sorted(k.flags) or "none of its own")
+        if k.takes_table:
+            print("data : takes a DataFrame or 2-D array")
         if k.takes_by:
             print("by=  : group labels for x, one per group")
         return

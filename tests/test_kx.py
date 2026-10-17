@@ -1,5 +1,5 @@
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from statistics import NormalDist
 
@@ -554,6 +554,58 @@ def test_dataframe_column_named_like_a_kind_is_a_column() -> None:
 def test_call_shape_errors(call: Callable[[], Axes], error: type, match: str) -> None:
     with pytest.raises(error, match=match):
         call()
+
+
+@pytest.fixture
+def table_kind() -> Iterator[list]:
+    """A dummy table kind 'tbl' that records what draw gets, removed after the test."""
+    seen = []
+    kx._spec.kind("tbl", table=True)(lambda ax, x, y, z, flags, **kw: seen.append((x, y, z)))
+    yield seen
+    del kx._spec.KINDS["tbl"]
+
+
+def test_table_kind_gets_the_whole_frame(table_kind: list) -> None:
+    assert not kx._spec.KINDS["tbl"].needs_y
+    kx.plot(DF, "tbl")
+    kx.plot(DF, spec="tbl")
+    for x, y, z in table_kind:
+        assert x is DF
+        assert y is None
+        assert z is None
+
+
+def test_table_kind_takes_a_2d_array_with_numbered_labels(table_kind: list) -> None:
+    m = np.arange(6).reshape(2, 3)
+    kx.plot(m, "tbl")
+    x = table_kind[0][0]
+    assert isinstance(x, pd.DataFrame)
+    assert (x.to_numpy() == m).all()
+    assert list(x.columns) == [0, 1, 2]
+    assert list(x.index) == [0, 1]
+
+
+@pytest.mark.parametrize("call", [
+    lambda: kx.plot(DF, "t", "speed", "tbl"),
+    lambda: kx.plot(DF, "t", "tbl"),
+    lambda: kx.plot(DF, "tbl", by="group"),
+    lambda: kx.plot(X, "tbl"),
+])
+def test_table_kind_rejects_columns_y_z_and_by(table_kind: list, call: Callable[[], Axes]) -> None:
+    with pytest.raises(TypeError, match=r"takes a whole table.*kx.plot\(df\[cols\], 'tbl'\)"):
+        call()
+
+
+def test_frame_without_columns_hints_table_kinds(table_kind: list) -> None:
+    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: tbl"):
+        kx.plot(DF, "line")
+
+
+def test_grammar_says_a_table_kind_takes_a_frame(table_kind: list, capsys: pytest.CaptureFixture[str]) -> None:
+    kx.grammar("tbl")
+    assert "takes a DataFrame or 2-D array" in capsys.readouterr().out
+    kx.grammar("line")
+    assert "DataFrame" not in capsys.readouterr().out
 
 
 def test_kwargs_reach_matplotlib_and_win_over_defaults() -> None:
