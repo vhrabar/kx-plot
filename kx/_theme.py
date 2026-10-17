@@ -62,7 +62,11 @@ def _register_cmaps() -> None:
             mpl.colormaps.register(cmap)
     for name, brewer in BREWER_CMAPS.items():
         if name not in mpl.colormaps:
-            mpl.colormaps.register(mpl.colormaps[brewer], name=name)
+            # mpl.colormaps.register(mpl.colormaps[brewer], name=name)
+            # older mpl syntax
+            cmap = mpl.colormaps[brewer]
+            cmap.name = name
+            mpl.colormaps.register(cmap)
 
 
 _register_cmaps()
