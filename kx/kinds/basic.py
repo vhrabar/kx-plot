@@ -8,7 +8,7 @@ from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
 from .._spec import kind
-from .._util import categories, label
+from .._util import COLOUR, categories, colorbar, label, norm
 
 LINES = ("date", "mk")                          # flags of the kinds that draw lines against x
 
@@ -73,25 +73,9 @@ def band(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike, flags: set[str], **
                     linewidth=0, label=f"± {label(z, 'z')}")
 
 
-COLOUR = ("nocb", "sym", "logc")               # flags for a numeric z on a colour scale
-
-
 def _check_scatter(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
     if flags & set(COLOUR) and (z is None or categories(z) is not None):
         raise ValueError(f"flags {sorted(flags & set(COLOUR))} colour a numeric z; this scatter has none")
-
-
-def _norm(z: ArrayLike, flags: set[str]) -> mpl.colors.Normalize | None:
-    """sym = limits ±max|z| so 0 sits mid-colormap, logc = log colour scale. None = matplotlib's linear default."""
-    v = np.asarray(z, dtype=float)
-    if "sym" in flags:
-        top = np.nanmax(np.abs(v))
-        return mpl.colors.Normalize(-top, top)
-    if "logc" in flags:
-        if np.nanmin(v) <= 0:
-            raise ValueError("flag 'logc' needs z > 0; use 'sym' for values around 0")
-        return mpl.colors.LogNorm()
-    return None
 
 
 @kind("scatter", flags=("date", *COLOUR), check=_check_scatter)
@@ -101,9 +85,9 @@ def scatter(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: se
     size = 0.5 * plt.rcParams["lines.markersize"] ** 2
     cats = None if z is None else categories(z)
     if cats is None:
-        sc = ax.scatter(x, y, **{"c": z, "s": size, "norm": None if z is None else _norm(z, flags), **kw})
-        if z is not None and "nocb" not in flags:
-            ax.figure.colorbar(sc, ax=ax, label=label(z, "z"))
+        sc = ax.scatter(x, y, **{"c": z, "s": size, "norm": None if z is None else norm(z, flags), **kw})
+        if z is not None:
+            colorbar(ax, sc, label(z, "z"), flags)
     else:
         xs, ys, zs = np.asarray(x), np.asarray(y), np.asarray(z, dtype=object)
         for c in cats:
