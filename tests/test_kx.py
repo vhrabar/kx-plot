@@ -438,6 +438,47 @@ def test_heat_errors(spec: str, data: pd.DataFrame, match: str) -> None:
         kx.plot(data, spec)
 
 
+PASSENGERS = kx.load("passengers")
+
+
+def test_crosstab_counts_match_pandas() -> None:
+    ax = kx.plot(PASSENGERS, "sex", "pclass", "crosstab-ann")
+    want = pd.crosstab(PASSENGERS.pclass, PASSENGERS.sex)
+    assert (ax.images[0].get_array() == want.to_numpy()).all()
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["female", "male"]
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["1", "2", "3"]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("sex", "pclass")
+    assert [t.get_text() for t in ax.texts] == [str(v) for v in want.to_numpy().ravel()]
+    assert ax.figure.axes[1].get_ylabel() == "count"
+
+
+def test_crosstab_norm_gives_shares_within_each_x() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "deck", "crosstab-norm-ann")
+    shares = ax.images[0].get_array()
+    assert np.allclose(shares.sum(axis=0), 1)
+    assert all(t.get_text().endswith("%") for t in ax.texts)
+    cb = ax.figure.axes[1]
+    assert cb.get_ylabel() == "share"
+    assert isinstance(cb.yaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+
+
+def test_crosstab_logc_leaves_empty_pairs_blank() -> None:
+    x, y = ["a", "a", "b"], ["u", "v", "u"]     # (b, v) never occurs
+    ax = kx.plot(x, y, "crosstab-logc-ann-nocb")
+    assert np.ma.is_masked(ax.images[0].get_array()[1, 1])
+    assert len(ax.texts) == 3
+    assert len(ax.figure.axes) == 1
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(PASSENGERS, "sex", spec="crosstab"), "needs both x and y"),
+    (lambda: kx.plot(PASSENGERS, "sex", "pclass", "port", "crosstab"), "takes no z"),
+])
+def test_crosstab_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
 # ---------- flags, title, labels ----------
 def test_flags() -> None:
     ax = kx.plot(X, Y, Z, "line-grid-leg-logx-logy-tight", title="t")

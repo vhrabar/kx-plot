@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
+from matplotlib.colorbar import Colorbar
 from numpy.typing import ArrayLike
 
 COLOUR = ("nocb", "sym", "logc")               # flags for numeric values on a colour scale
@@ -40,7 +41,6 @@ def norm(values: ArrayLike, flags: set[str]) -> mpl.colors.Normalize | None:
     return None
 
 
-def colorbar(ax: Axes, mappable: ScalarMappable, label: str, flags: set[str]) -> None:
+def colorbar(ax: Axes, mappable: ScalarMappable, label: str, flags: set[str]) -> Colorbar | None:
     """A colorbar for mappable next to ax, unless nocb."""
-    if "nocb" not in flags:
-        ax.figure.colorbar(mappable, ax=ax, label=label)
+    return None if "nocb" in flags else ax.figure.colorbar(mappable, ax=ax, label=label)

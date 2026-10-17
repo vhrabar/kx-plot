@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Plot kind** `heat`: a DataFrame or 2-D array as coloured cells, columns along x and index labels down y.
   `corr` draws the correlations of the numeric columns on `rdbu` from -1 to 1, and `ann` writes each cell's value
   in black or white, whichever reads on that cell. Takes `nocb`, `sym` and `logc` like `scatter`.
+- **Plot kind** `crosstab`: how often each pair of categories occurs, as a heat map with `x` along the x axis and
+  `y` down the y axis: `kx.plot(df, 'sex', 'pclass', 'crosstab-ann')`. `norm` shows shares within each `x`
+  category (each column sums to 100%), and `logc` leaves pairs that never occur blank.
 
 - `kx.plot(df, spec)` and `kx.plot(matrix, spec)` hand the whole table to a table kind, with no column names. A
   2-D array becomes a DataFrame labelled `0..n`. A table kind given columns, `y`, `z` or `by=` raises, and
