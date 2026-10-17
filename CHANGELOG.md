@@ -21,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Plot kind** `missing`: the share of missing values in each column of a DataFrame, as bars lying down with
   the most missing on top: `kx.plot(df, 'missing-ann')`. Columns without missing values show only with `all`,
   and a frame with none shows "no missing values" instead of raising.
+- `kx.missing(df)`: the same as `kx.plot(df, 'missing-ann')`. A spec adds a theme and flags,
+  `kx.missing(df, 'dark-wrap')`, and other keywords such as `title=` and `ax=` go to `kx.plot`.
 - **Flag for every kind** `wrap`: long text tick labels break into lines of at most 12 characters at spaces,
   on both axes. Numbers, dates and single long words are left as they are. Works together with `rot`.
 

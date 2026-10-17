@@ -558,6 +558,26 @@ def test_missing_without_nans_says_so() -> None:
     assert [t.get_text() for t in ax.texts] == ["no missing values"]
 
 
+def _bars_and_texts(ax: Axes) -> tuple:
+    return ([t.get_text() for t in ax.get_yticklabels()], [p.get_width() for p in ax.patches],
+            [t.get_text() for t in ax.texts])
+
+
+def test_missing_shortcut_is_the_long_form() -> None:
+    assert _bars_and_texts(kx.missing(PASSENGERS)) == _bars_and_texts(kx.plot(PASSENGERS, "missing-ann"))
+    assert "missing" in kx.__all__
+
+
+def test_missing_shortcut_passes_theme_flags_and_keywords() -> None:
+    ax = kx.missing(PASSENGERS, "dark-all-wrap", title="gaps", color="red")
+    assert len(ax.patches) == PASSENGERS.shape[1]
+    assert ax.get_title() == "gaps"
+    assert to_hex(ax.patches[0].get_facecolor()) == "#ff0000"
+    assert to_hex(ax.get_facecolor()) == "#111418"          # the dark theme, for this plot only
+    with pytest.raises(ValueError, match="unknown tokens"):
+        kx.missing(PASSENGERS, "dakr")
+
+
 # ---------- flags, title, labels ----------
 def test_flags() -> None:
     ax = kx.plot(X, Y, Z, "line-grid-leg-logx-logy-tight", title="t")
