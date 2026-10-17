@@ -960,7 +960,7 @@ def test_save_without_extension_uses_theme_format(kaggle: Path) -> None:
 
 # ---------- data ----------
 def test_datasets_and_load() -> None:
-    assert {"waves", "cloud", "monthly", "dists", "daily"} <= set(kx.datasets())
+    assert {"waves", "cloud", "monthly", "dists", "daily", "passengers"} <= set(kx.datasets())
     assert list(kx.load("waves").columns) == ["x", "y", "z"]
 
 
@@ -970,6 +970,27 @@ def test_daily_is_two_full_years_of_days() -> None:
     days = pd.to_datetime(daily.date)
     assert days.diff().iloc[1:].eq(pd.Timedelta("1D")).all()
     assert (days.iloc[0], days.iloc[-1]) == (pd.Timestamp("2025-01-01"), pd.Timestamp("2026-12-31"))
+
+
+def test_passengers_has_categories_and_nans() -> None:
+    p = kx.load("passengers")
+    assert p.shape == (500, 8)
+    assert list(p.columns) == ["age", "fare", "sex", "pclass", "port", "deck", "ticket_type", "survived"]
+    assert all(pd.api.types.is_float_dtype(p[c]) for c in ("age", "fare"))
+    assert all(pd.api.types.is_integer_dtype(p[c]) for c in ("pclass", "survived"))
+    assert all(pd.api.types.is_string_dtype(p[c]) for c in ("sex", "port", "deck", "ticket_type"))
+    assert set(p.pclass) == {1, 2, 3}
+    assert set(p.survived) == {0, 1}
+    assert p.sex.nunique() == 2
+    assert p.port.nunique() == 3
+    assert set(p.deck.dropna()) == set("ABCDEFG")
+    assert p.ticket_type.str.len().min() > 12
+    assert p.fare.mean() > p.fare.median()
+    nans = p.isna().mean()
+    assert nans.age == pytest.approx(0.2, abs=0.05)
+    assert nans.deck == pytest.approx(0.75, abs=0.05)
+    assert 0 < nans.port < 0.03
+    assert (nans.drop(["age", "deck", "port"]) == 0).all()
 
 
 def test_load_unknown() -> None:
