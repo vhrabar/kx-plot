@@ -18,6 +18,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `by=` splits each bar into one per group (`kx.plot(df, 'pclass', spec='count', by='survived')`). `stack` puts the
   groups on top of each other, `sort` puts the most common first and `ann` writes the counts. `norm` shows shares:
   within each category with `by=` and `stack`, and within each group otherwise.
+- **Plot kind** `missing`: the share of missing values in each column of a DataFrame, as bars lying down with
+  the most missing on top: `kx.plot(df, 'missing-ann')`. Columns without missing values show only with `all`,
+  and a frame with none shows "no missing values" instead of raising.
 - **Flag for every kind** `wrap`: long text tick labels break into lines of at most 12 characters at spaces,
   on both axes. Numbers, dates and single long words are left as they are. Works together with `rot`.
 

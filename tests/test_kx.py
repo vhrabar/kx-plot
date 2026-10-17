@@ -532,6 +532,32 @@ def test_count_errors() -> None:
         kx.plot(PASSENGERS, "sex", "pclass", "count")
 
 
+def test_missing_shows_columns_with_nans_most_missing_on_top() -> None:
+    ax = kx.plot(PASSENGERS, "missing")
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["deck", "age", "port"]
+    assert ax.yaxis_inverted()                      # deck, the first label, is drawn on top
+    want = PASSENGERS.isna().mean()
+    assert [p.get_width() for p in ax.patches] == pytest.approx([want.deck, want.age, want.port])
+    assert isinstance(ax.xaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+
+
+def test_missing_all_and_ann() -> None:
+    ax = kx.plot(PASSENGERS, "missing-all-ann")
+    labels = [t.get_text() for t in ax.get_yticklabels()]
+    assert len(labels) == PASSENGERS.shape[1]
+    assert labels[:3] == ["deck", "age", "port"]
+    assert labels[3:] == ["fare", "sex", "pclass", "ticket_type", "survived"]   # ties keep column order
+    texts = [t.get_text() for t in ax.texts]
+    assert texts[0] == f"{PASSENGERS.deck.isna().mean():.1%}"
+    assert all(t.endswith("%") for t in texts)
+
+
+def test_missing_without_nans_says_so() -> None:
+    ax = kx.plot(HEAT, "missing-ann")
+    assert not ax.patches
+    assert [t.get_text() for t in ax.texts] == ["no missing values"]
+
+
 # ---------- flags, title, labels ----------
 def test_flags() -> None:
     ax = kx.plot(X, Y, Z, "line-grid-leg-logx-logy-tight", title="t")
@@ -774,7 +800,7 @@ def test_table_kind_rejects_columns_y_z_and_by(table_kind: list, call: Callable[
 
 
 def test_frame_without_columns_hints_table_kinds(table_kind: list) -> None:
-    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: heat, tbl"):
+    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: heat, missing, tbl"):
         kx.plot(DF, "line")
 
 
@@ -1155,7 +1181,8 @@ def test_passengers_has_categories_and_nans() -> None:
     assert list(p.columns) == ["age", "fare", "sex", "pclass", "port", "deck", "ticket_type", "survived"]
     assert all(pd.api.types.is_float_dtype(p[c]) for c in ("age", "fare"))
     assert all(pd.api.types.is_integer_dtype(p[c]) for c in ("pclass", "survived"))
-    assert all(pd.api.types.is_string_dtype(p[c]) for c in ("sex", "port", "deck", "ticket_type"))
+    for c in ("sex", "port", "deck", "ticket_type"):
+        assert all(isinstance(v, str) for v in p[c].dropna())
     assert set(p.pclass) == {1, 2, 3}
     assert set(p.survived) == {0, 1}
     assert p.sex.nunique() == 2

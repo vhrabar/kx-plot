@@ -11,6 +11,7 @@ from numpy.typing import ArrayLike
 
 from .._spec import kind
 from .._util import COLOUR, colorbar, label, norm
+from .basic import _bars
 
 
 def _ink(rgba: tuple[float, ...]) -> str:
@@ -53,6 +54,25 @@ def crosstab(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **k
     share = "norm" in flags
     _matrix(ax, counts, flags, "share" if share else "count", "{:.0%}" if share else "{:g}",
             **{"norm": norm(counts.to_numpy(dtype=float), flags), "aspect": "auto", **kw})
+
+
+@kind("missing", flags=("ann", "all"), table=True, value_axis="x")
+def missing(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any) -> None:
+    """The share of missing values in each column, as bars lying down, the most missing on top.
+    Only columns with missing values, unless all; ann = the share on each bar. kw: ax.barh."""
+    share = x.isna().mean()
+    if "all" not in flags:
+        share = share[share > 0]
+    if share.empty:                             # nothing to draw is an answer too, not an error
+        ax.text(0.5, 0.5, "no missing values", ha="center", va="center", transform=ax.transAxes)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        return
+    _bars(ax, np.array([str(c) for c in share.index], dtype=object), [("missing", share.to_numpy(dtype=float))],
+          {"sort", *(flags & {"ann"})}, True, fmt="{:.1%}", **kw)
+    ax.invert_yaxis()                           # largest on top
+    ax.xaxis.set_major_formatter(mpl.ticker.PercentFormatter(1))
+    ax.set_xlabel("missing")
 
 
 def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: str = "{:.2g}", **kw: Any) -> None:
