@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `kx.plot(df, spec)` and `kx.plot(matrix, spec)` hand the whole table to a table kind, with no column names. A
   2-D array becomes a DataFrame labelled `0..n`. A table kind given columns, `y`, `z` or `by=` raises, and
   `kx.grammar(kind)` says it takes a DataFrame or 2-D array.
+- **Colourmaps** `blues`, `greys` and `rdbu`: lowercase names for matplotlib's ColorBrewer `Blues`, `Greys` and
+  `RdBu`, for `kx.use(cmap=...)` and in `kx.cmaps()`. `_r` reverses them like the others.
 
 ## [0.3.0] - 2026-10-12
 

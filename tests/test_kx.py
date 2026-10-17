@@ -761,13 +761,15 @@ def test_palettes_discovers_new_files(tmp_path: Path, monkeypatch: pytest.Monkey
 
 # ---------- colormaps ----------
 def test_cmaps_lists_matplotlib_builtins() -> None:
-    assert kx.cmaps() == sorted(n for n in kx.BUILTIN_CMAPS + kx.VENDORED_CMAPS if n in mpl.colormaps)
+    names = (*kx.BUILTIN_CMAPS, *kx.BREWER_CMAPS, *kx.VENDORED_CMAPS)
+    assert kx.cmaps() == sorted(n for n in names if n in mpl.colormaps)
     assert set(kx.BUILTIN_CMAPS) - {"berlin", "managua", "vanimo"} <= set(kx.cmaps())   # only these need 3.10
 
 
 def test_cmaps_skips_names_missing_from_matplotlib(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(kx._theme, "BUILTIN_CMAPS", ("viridis", "notacmap"))
     monkeypatch.setattr(kx._theme, "VENDORED_CMAPS", ())
+    monkeypatch.setattr(kx._theme, "BREWER_CMAPS", {})
     assert kx.cmaps() == ["viridis"]
 
 
@@ -777,7 +779,16 @@ def test_vendored_cmaps_are_registered(name: str) -> None:
     assert name in kx.cmaps()
 
 
-@pytest.mark.parametrize("name", ["viridis", *kx.VENDORED_CMAPS])
+@pytest.mark.parametrize(("name", "brewer"), kx.BREWER_CMAPS.items())
+def test_brewer_cmaps_are_lowercase_copies(name: str, brewer: str) -> None:
+    assert name in mpl.colormaps
+    assert name in kx.cmaps()
+    assert mpl.colormaps[name].name == name
+    for v in (0, 0.5, 1):
+        assert to_hex(mpl.colormaps[name](v)) == to_hex(mpl.colormaps[brewer](v))
+
+
+@pytest.mark.parametrize("name", ["viridis", *kx.BREWER_CMAPS, *kx.VENDORED_CMAPS])
 def test_use_reversed_cmap(name: str) -> None:
     kx.use("light", cmap=f"{name}_r")
     rev = kx.plot(X, Y, Z, "scatter").collections[0].get_cmap()
@@ -785,11 +796,12 @@ def test_use_reversed_cmap(name: str) -> None:
     assert to_hex(rev(1.0)) == to_hex(mpl.colormaps[name](0.0))
 
 
-@pytest.mark.parametrize("name", kx.BUILTIN_CMAPS + kx.VENDORED_CMAPS)
+@pytest.mark.parametrize("name", [*kx.BUILTIN_CMAPS, *kx.BREWER_CMAPS, *kx.VENDORED_CMAPS])
 def test_use_cmap_colours_scatter(name: str) -> None:
     if name not in mpl.colormaps:
         pytest.skip(f"{name} needs a newer matplotlib")
     kx.use("light", cmap=name)
+    assert mpl.rcParams["image.cmap"] == name
     assert kx.plot(X, Y, Z, "scatter").collections[0].get_cmap().name == name
 
 

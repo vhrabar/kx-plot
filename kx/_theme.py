@@ -11,6 +11,8 @@ from . import _files
 
 BUILTIN_CMAPS = ("viridis", "magma", "plasma", "inferno", "cividis", "turbo",
                  "twilight", "coolwarm", "berlin", "managua", "vanimo")
+# lowercase names for matplotlib's ColorBrewer maps, registered as copies
+BREWER_CMAPS = {"blues": "Blues", "greys": "Greys", "rdbu": "RdBu"}
 # styles/cmaps/<name>.txt: cmocean, then Crameri's Scientific colour maps 8
 VENDORED_CMAPS = ("thermal", "haline", "deep", "balance",
                   "batlow", "lipari", "hawaii", "oslo", "davos", "vik", "roma", "bam", "cork", "romaO")
@@ -53,11 +55,14 @@ def _read_hex(path: str) -> list[str]:
 
 
 def _register_cmaps() -> None:
-    """Add the vendored colormaps to matplotlib, once."""
+    """Add the vendored colormaps and the lowercase ColorBrewer names to matplotlib, once."""
     for name in VENDORED_CMAPS:
         if name not in mpl.colormaps:
             cmap = ListedColormap(_read_hex(_files.path("styles", "cmaps", f"{name}.txt")), name=name)
             mpl.colormaps.register(cmap)
+    for name, brewer in BREWER_CMAPS.items():
+        if name not in mpl.colormaps:
+            mpl.colormaps.register(mpl.colormaps[brewer], name=name)
 
 
 _register_cmaps()
@@ -65,7 +70,7 @@ _register_cmaps()
 
 def cmaps() -> list[str]:
     """List supported colormap names that this matplotlib version has, plus the vendored ones."""
-    return sorted(n for n in BUILTIN_CMAPS + VENDORED_CMAPS if n in mpl.colormaps)
+    return sorted(n for n in (*BUILTIN_CMAPS, *BREWER_CMAPS, *VENDORED_CMAPS) if n in mpl.colormaps)
 
 
 def show(name: str) -> None:

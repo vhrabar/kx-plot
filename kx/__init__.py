@@ -28,10 +28,10 @@ from ._grid import grid
 from ._plot import plot
 from ._save import save
 from ._spec import COMMON_FLAGS, KINDS, Spec, all_flags, parse
-from ._theme import BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
+from ._theme import BREWER_CMAPS, BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
 
-__all__ = ["BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "datasets", "grammar",
-           "grid", "load", "palette", "palettes", "parse", "plot", "save", "show", "source", "styles", "use"]
+__all__ = ["BREWER_CMAPS", "BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "datasets",
+           "grammar", "grid", "load", "palette", "palettes", "parse", "plot", "save", "show", "source", "styles", "use"]
 
 
 def _version() -> str:

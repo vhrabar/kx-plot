@@ -90,7 +90,9 @@ Add `_r` to any name to reverse it, e.g. `cmap="thermal_r"`.
 |------------------------------------------------|----------------------------------|
 | `viridis` `magma` `plasma` `inferno` `cividis` | Sequential, perceptually uniform |
 | `turbo`                                        | Sequential, rainbow              |
+| `blues` `greys`                                | Sequential, ColorBrewer          |
 | `coolwarm`                                     | Diverging                        |
+| `rdbu`                                         | Diverging, ColorBrewer           |
 | `berlin` `managua` `vanimo`                    | Diverging, dark centre           |
 | `twilight`                                     | Cyclic, for angles and phases    |
 | `thermal` `haline` `deep`                      | Sequential, cmocean (vendored)   |
