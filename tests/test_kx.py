@@ -580,6 +580,30 @@ def test_rot_turns_x_tick_labels() -> None:
     assert {t.get_rotation() for t in ax.get_xticklabels()} == {45}
 
 
+LONG = ["standard single journey", "short", "first class saloon pass"]
+
+
+@pytest.mark.parametrize(("spec", "axis"), [("bar-wrap", "x"), ("barh-wrap", "y"), ("line-wrap", "x")])
+def test_wrap_breaks_long_tick_labels_at_spaces(spec: str, axis: str) -> None:
+    ax = kx.plot(LONG, [1, 2, 3], spec)
+    ax.figure.canvas.draw()
+    labels = [t.get_text() for t in getattr(ax, f"get_{axis}ticklabels")()]
+    assert labels == ["standard\nsingle\njourney", "short", "first class\nsaloon pass"]
+    assert all(len(line) <= 12 for t in labels for line in t.split("\n"))
+
+
+def test_wrap_keeps_fixed_ticks_and_numbers() -> None:
+    ax = kx.plot(LONG, [1e6, 2e6, 3e6], "bar-wrap-rot-si")
+    assert isinstance(ax.xaxis.get_major_locator(), mpl.ticker.FixedLocator)
+    assert list(ax.get_xticks()) == [0, 1, 2]
+    assert {t.get_rotation() for t in ax.get_xticklabels()} == {45}
+    ax.figure.canvas.draw()
+    assert all("\n" not in t.get_text() for t in ax.get_yticklabels())
+    assert "1M" in [t.get_text() for t in ax.get_yticklabels()]
+    words = kx.plot(["supercalifragilistic", "b"], [1, 2], "bar-wrap")      # one long word stays whole
+    assert words.get_xticklabels()[0].get_text() == "supercalifragilistic"
+
+
 def test_date_reads_text_as_dates() -> None:
     days = pd.Series(pd.date_range("2026-01-01", periods=len(X)).strftime("%Y-%m-%d"))
     ax = kx.plot(days, Y, "line-date")

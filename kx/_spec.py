@@ -6,7 +6,7 @@ from typing import Any, NamedTuple
 
 from ._theme import styles
 
-COMMON_FLAGS = {"grid", "leg", "legout", "tight", "rot",                   # handled by kx.plot for every kind
+COMMON_FLAGS = {"grid", "leg", "legout", "tight", "rot", "wrap",           # handled by kx.plot for every kind
                 "logx", "logy", "logxy", "symlogy", "zero", "eq", "pct", "si"}
 EXCLUSIVE = ({"logy", "logxy", "symlogy"}, {"logx", "logxy"}, {"zero", "logy"}, {"zero", "logxy"},
              {"pct", "si"}, {"sym", "logc"}, {"corr", "logc"})          # pairs that ask for opposite things

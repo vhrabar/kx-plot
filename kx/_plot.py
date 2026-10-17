@@ -1,6 +1,7 @@
 """kx.plot: the one-liner. Kinds live in kx/kinds/; this file checks input and applies common flags."""
 import contextlib
 import difflib
+import textwrap
 from typing import Any
 
 import matplotlib as mpl
@@ -9,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.category import StrCategoryFormatter
 from matplotlib.layout_engine import ConstrainedLayoutEngine
 from numpy.typing import ArrayLike
 
@@ -17,6 +19,7 @@ from ._spec import KINDS, Spec, parse
 from ._theme import style_path
 
 OUTSIDE = {"loc": "center left", "bbox_to_anchor": (1, 0.5)}       # legend right of the axes
+WRAP = 12                                                           # wrap: characters per tick label line
 
 
 def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, title: str | None = None,
@@ -128,6 +131,20 @@ def _common(ax: Axes, name: str, value_axis: str, flags: set[str]) -> None:
         loc = mdates.AutoDateLocator()
         ax.xaxis.set_major_locator(loc)
         ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(loc))
+    if "wrap" in flags:
+        for axis in (ax.xaxis, ax.yaxis):
+            _wrap(axis)
     if "rot" in flags:                          # rotation stays for ticks matplotlib adds later
         ax.tick_params(axis="x", labelrotation=45)
         plt.setp(ax.get_xticklabels(), ha="right", rotation_mode="anchor")
+
+
+def _wrap(axis: mpl.axis.Axis) -> None:
+    """Text tick labels broken into lines of WRAP characters at spaces; numbers and dates are left alone."""
+    def fill(text: str) -> str:
+        return textwrap.fill(text, WRAP, break_long_words=False)
+    old = axis.get_major_formatter()
+    if isinstance(old, StrCategoryFormatter):               # text plotted directly: matplotlib's categories
+        axis.set_major_formatter(mpl.ticker.FuncFormatter(lambda v, pos: fill(old(v, pos))))
+    elif isinstance(axis.get_major_locator(), mpl.ticker.FixedLocator):    # set_xticks(ticks, labels): stay fixed
+        axis.set_ticks(axis.get_majorticklocs(), [fill(t.get_text()) for t in axis.get_majorticklabels()])
