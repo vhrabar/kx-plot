@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- **Plot kind** `heat`: a DataFrame or 2-D array as coloured cells, columns along x and index labels down y.
+  `corr` draws the correlations of the numeric columns on `rdbu` from -1 to 1, and `ann` writes each cell's value
+  in black or white, whichever reads on that cell. Takes `nocb`, `sym` and `logc` like `scatter`.
+
 - `kx.plot(df, spec)` and `kx.plot(matrix, spec)` hand the whole table to a table kind, with no column names. A
   2-D array becomes a DataFrame labelled `0..n`. A table kind given columns, `y`, `z` or `by=` raises, and
   `kx.grammar(kind)` says it takes a DataFrame or 2-D array.

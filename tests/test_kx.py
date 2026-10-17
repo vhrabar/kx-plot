@@ -379,6 +379,65 @@ def test_violin_marks_median() -> None:
     assert ax.collections[-1].get_offsets()[0][1] == pytest.approx(np.median(X))
 
 
+# ---------- table kinds ----------
+HEAT = pd.DataFrame({"a": [1.0, 2, 3], "b": [4.0, 5, 6], "c": [9.0, 7, 8]}, index=["r1", "r2", "r3"])
+
+
+def test_heat_draws_the_frame_with_its_labels() -> None:
+    ax = kx.plot(HEAT, "heat")
+    im = ax.images[0]
+    assert im.get_array().shape == HEAT.shape
+    assert (im.get_array() == HEAT.to_numpy()).all()
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["a", "b", "c"]
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["r1", "r2", "r3"]
+    assert len(ax.figure.axes) == 2             # the colorbar
+
+
+def test_heat_takes_a_2d_array() -> None:
+    ax = kx.plot(np.arange(6).reshape(2, 3), "heat")
+    assert ax.images[0].get_array().shape == (2, 3)
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["0", "1", "2"]
+
+
+def test_heat_corr_is_symmetric_from_minus_one_to_one() -> None:
+    p = kx.load("passengers")
+    ax = kx.plot(p, "heat-corr")
+    r = ax.images[0].get_array()
+    assert r.shape == (4, 4)                    # the numeric columns only
+    assert np.allclose(r, r.T)
+    assert np.allclose(np.diag(r), 1)
+    assert ax.images[0].get_clim() == (-1, 1)
+    assert ax.images[0].get_cmap().name == "rdbu"
+    assert ax.figure.axes[1].get_ylabel() == "r"
+    assert kx.plot(p, "heat-corr-sym").images[0].get_clim() == (-1, 1)
+
+
+def test_heat_ann_writes_every_cell_in_contrasting_ink() -> None:
+    ax = kx.plot(HEAT, "heat-ann", cmap="greys")
+    texts = ax.texts
+    assert len(texts) == HEAT.size
+    assert texts[0].get_text() == "1"
+    assert texts[0].get_color() == "black"      # lowest value: white cell on greys
+    assert texts[2].get_color() == "white"      # 9, the highest: black cell
+
+
+def test_heat_colour_flags() -> None:
+    lo, hi = kx.plot(HEAT - 5, "heat-sym").images[0].get_clim()
+    assert lo == -hi == -4
+    assert isinstance(kx.plot(HEAT, "heat-logc").images[0].norm, mpl.colors.LogNorm)
+    assert len(kx.plot(HEAT, "heat-nocb").figure.axes) == 1
+
+
+@pytest.mark.parametrize(("spec", "data", "match"), [
+    ("heat-corr-logc", HEAT, "do not go together"),
+    ("heat-logc", HEAT - 5, "needs z > 0"),
+    ("heat", HEAT.assign(g=["x", "y", "z"]), r"columns \['g'\] are not"),
+])
+def test_heat_errors(spec: str, data: pd.DataFrame, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(data, spec)
+
+
 # ---------- flags, title, labels ----------
 def test_flags() -> None:
     ax = kx.plot(X, Y, Z, "line-grid-leg-logx-logy-tight", title="t")
@@ -597,7 +656,7 @@ def test_table_kind_rejects_columns_y_z_and_by(table_kind: list, call: Callable[
 
 
 def test_frame_without_columns_hints_table_kinds(table_kind: list) -> None:
-    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: tbl"):
+    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: heat, tbl"):
         kx.plot(DF, "line")
 
 

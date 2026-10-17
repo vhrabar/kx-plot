@@ -3,12 +3,14 @@ kx: tiny matplotlib helper.
 
 Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
   kind  : line | step | area | band | scatter | bar | barh | hist | kde | ridge | ecdf | box | violin | strip
-          | qq
+          | qq | heat
   theme : any file name in styles/
   flags : grid | leg | legout | tight | rot | logx | logy | logxy | symlogy | zero | eq | pct | si
           and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars),
-          mean median ann (distributions), nocb sym logc (scatter). kx.grammar(kind) lists them.
+          mean median ann (distributions), nocb sym logc (scatter, heat), corr ann (heat).
+          kx.grammar(kind) lists them.
 by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq)
+table  : heat takes a whole DataFrame or 2-D array, with no column names: kx.plot(df, 'heat-corr')
 
 Palettes (kx.use(theme, palette="okabe")): any file name in styles/palettes/
 Colormaps (kx.use(theme, cmap="magma")):  kx.cmaps()
