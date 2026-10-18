@@ -613,6 +613,45 @@ def test_nullmap_without_nans_is_all_background() -> None:
     assert to_hex(im.to_rgba(im.get_array())[0, 0]) == to_hex(im.get_cmap()(0.0))
 
 
+CLUMPS = pd.DataFrame({"x": [0, 0, 0, 10, 10, np.nan], "y": [0, 0, 0, 10, 10, 5],
+                       "heat": [1, 2, 3, 4, 6, 100]})       # two clumps of points, and a row with a NaN
+
+
+def test_hexbin_counts_points_per_hexagon() -> None:
+    cloud = kx.load("cloud")
+    ax = kx.plot(cloud, "x", "y", "hexbin", gridsize=10)
+    assert ax.collections[0].get_array().sum() == len(cloud)
+    assert ax.figure.axes[1].get_ylabel() == "count"
+    counts = kx.plot(CLUMPS, "x", "y", "hexbin").collections[0].get_array()
+    assert sorted(counts) == [2, 3]                 # the NaN row is left out, empty cells are not drawn
+
+
+def test_hexbin_z_is_the_mean_per_hexagon() -> None:
+    ax = kx.plot(CLUMPS, "x", "y", "heat", "hexbin")
+    assert sorted(ax.collections[0].get_array()) == [2, 5]
+    assert ax.figure.axes[1].get_ylabel() == "heat"
+
+
+def test_hexbin_colour_flags() -> None:
+    cloud = kx.load("cloud")
+    ax = kx.plot(cloud, "x", "y", "hexbin-logc-nocb")
+    assert isinstance(ax.collections[0].norm, mpl.colors.LogNorm)
+    assert ax.collections[0].get_array().sum() == len(cloud)       # counts, not log10 counts
+    assert len(ax.figure.axes) == 1
+    lo, hi = kx.plot(cloud, "x", "y", "z", "hexbin-sym").collections[0].get_clim()
+    assert lo == -hi
+
+
+@pytest.mark.parametrize(("spec", "cols", "match"), [
+    ("hexbin-logc", ("x", "y", "z"), "needs z > 0"),
+    ("hexbin-sym", ("x", "y"), "counts are never below 0"),
+    ("hexbin", ("x",), "needs both x and y"),
+])
+def test_hexbin_errors(spec: str, cols: tuple[str, ...], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(kx.load("cloud"), *cols, spec)
+
+
 # ---------- flags, title, labels ----------
 def test_flags() -> None:
     ax = kx.plot(X, Y, Z, "line-grid-leg-logx-logy-tight", title="t")

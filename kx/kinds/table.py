@@ -91,6 +91,27 @@ def nullmap(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: 
     ax.set_ylabel("row, most missing first" if "sort" in flags else "row")
 
 
+def _check_hexbin(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if z is None and "sym" in flags:
+        raise ValueError("flag 'sym' centres the colours of a z on 0; counts are never below 0")
+
+
+@kind("hexbin", flags=COLOUR, check=_check_hexbin)
+def hexbin(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """How many points fall in each hexagon, or the mean of z there. Rows with a NaN are left out.
+    nocb = no colorbar, sym = colours symmetric around 0 (z only), logc = log colour scale.
+    kw: ax.hexbin (gridsize= sets the number of hexagons across)."""
+    cols = [np.asarray(a, dtype=float).ravel() for a in (x, y, z) if a is not None]
+    keep = np.logical_and.reduce([np.isfinite(c) for c in cols])
+    xs, ys, *zs = (c[keep] for c in cols)
+    if z is None:                               # counts; LogNorm, as bins="log" stores log10 counts before 3.8
+        style = {"mincnt": 1, "norm": mpl.colors.LogNorm() if "logc" in flags else None}
+    else:                                       # mincnt left out: cells with any point, on every matplotlib
+        style = {"C": zs[0], "reduce_C_function": np.mean, "norm": norm(zs[0], flags)}
+    hb = ax.hexbin(xs, ys, **{**style, **kw})
+    colorbar(ax, hb, "count" if z is None else label(z, "z"), flags)
+
+
 def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: str = "{:.2g}", **kw: Any) -> None:
     """frame as an image: column labels along x, index labels down y, a colorbar, ann = fmt in each cell."""
     values = frame.to_numpy(dtype=float)

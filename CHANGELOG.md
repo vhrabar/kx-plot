@@ -24,6 +24,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Plot kind** `nullmap`: where the missing values are, one row of the image per row of the table and the
   columns along x. Missing cells are in the palette's first colour on the theme's background. `sort` puts the rows
   with the most missing values on top and groups rows with the same gaps, so patterns show as blocks.
+- **Plot kind** `hexbin`: how many points fall in each hexagon, or with `z` the mean of `z` there, with a
+  colorbar labelled `count` or with `z`'s name. Rows with a NaN are left out. Takes `nocb` and `logc` (`sym` with
+  `z` only), and `gridsize=` sets the number of hexagons across.
 - `kx.missing(df)`: the same as `kx.plot(df, 'missing-ann')`. A spec adds a theme and flags,
   `kx.missing(df, 'dark-wrap')`, and other keywords such as `title=` and `ax=` go to `kx.plot`.
 - **Flag for every kind** `wrap`: long text tick labels break into lines of at most 12 characters at spaces,
