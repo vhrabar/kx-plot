@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-18
+
 ### Added
 
 - **Plot kind** `heat`: a DataFrame or 2-D array as coloured cells, columns along x and index labels down y.
@@ -31,7 +33,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `kx.missing(df, 'dark-wrap')`, and other keywords such as `title=` and `ax=` go to `kx.plot`.
 - **Flag for every kind** `wrap`: long text tick labels break into lines of at most 12 characters at spaces,
   on both axes. Numbers, dates and single long words are left as they are. Works together with `rot`.
-
 - `kx.plot(df, spec)` and `kx.plot(matrix, spec)` hand the whole table to a table kind, with no column names. A
   2-D array becomes a DataFrame labelled `0..n`. A table kind given columns, `y`, `z` or `by=` raises, and
   `kx.grammar(kind)` says it takes a DataFrame or 2-D array.
@@ -193,7 +194,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `kx.use`, `kx.show`, `kx.source`, `kx.grammar`, `kx.load` and the demo CSVs
 - a workflow that publishes the dataset to Kaggle
 
-[Unreleased]: https://github.com/vhrabar/kx-plot/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/vhrabar/kx-plot/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/vhrabar/kx-plot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vhrabar/kx-plot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vhrabar/kx-plot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vhrabar/kx-plot/compare/v0.0.2...v0.1.0
