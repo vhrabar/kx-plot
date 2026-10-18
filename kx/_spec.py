@@ -6,10 +6,10 @@ from typing import Any, NamedTuple
 
 from ._theme import styles
 
-COMMON_FLAGS = {"grid", "leg", "legout", "tight", "rot",                   # handled by kx.plot for every kind
+COMMON_FLAGS = {"grid", "leg", "legout", "tight", "rot", "wrap",           # handled by kx.plot for every kind
                 "logx", "logy", "logxy", "symlogy", "zero", "eq", "pct", "si"}
 EXCLUSIVE = ({"logy", "logxy", "symlogy"}, {"logx", "logxy"}, {"zero", "logy"}, {"zero", "logxy"},
-             {"pct", "si"}, {"sym", "logc"})                                # pairs that ask for opposite things
+             {"pct", "si"}, {"sym", "logc"}, {"corr", "logc"})          # pairs that ask for opposite things
 
 
 @dataclass(frozen=True)
@@ -22,6 +22,7 @@ class Kind:
     check: Callable[[Any, Any, set[str]], None] | None     # check(y, z, flags) raises on bad input
     takes_by: bool = False                      # draw also gets by= (group labels for x)
     value_axis: str = "y"                       # where pct, si and zero apply: "x" for barh
+    takes_table: bool = False                   # x is a whole DataFrame (or 2-D array), with no y or z
 
 
 KINDS: dict[str, Kind] = {}
@@ -29,12 +30,12 @@ KINDS: dict[str, Kind] = {}
 
 def kind(name: str, flags: tuple[str, ...] = (), needs_y: bool = True,
          check: Callable[[Any, Any, set[str]], None] | None = None, takes_by: bool = False,
-         value_axis: str = "y") -> Callable:
-    """Decorator that registers a draw function as kind `name`."""
+         value_axis: str = "y", table: bool = False) -> Callable:
+    """Decorator that registers a draw function as kind `name`. table=True: x is the whole DataFrame."""
     def register(draw: Callable[..., None]) -> Callable[..., None]:
         if name in KINDS or name in COMMON_FLAGS or "-" in name:
             raise ValueError(f"kind name {name!r} is taken or has a '-'")
-        KINDS[name] = Kind(name, draw, frozenset(flags), needs_y, check, takes_by, value_axis)
+        KINDS[name] = Kind(name, draw, frozenset(flags), needs_y and not table, check, takes_by, value_axis, table)
         return draw
     return register
 

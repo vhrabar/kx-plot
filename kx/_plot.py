@@ -1,13 +1,16 @@
 """kx.plot: the one-liner. Kinds live in kx/kinds/; this file checks input and applies common flags."""
 import contextlib
 import difflib
+import textwrap
 from typing import Any
 
 import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.category import StrCategoryFormatter
 from matplotlib.layout_engine import ConstrainedLayoutEngine
 from numpy.typing import ArrayLike
 
@@ -16,12 +19,14 @@ from ._spec import KINDS, Spec, parse
 from ._theme import style_path
 
 OUTSIDE = {"loc": "center left", "bbox_to_anchor": (1, 0.5)}       # legend right of the axes
+WRAP = 12                                                           # wrap: characters per tick label line
 
 
 def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, title: str | None = None,
          ax: Axes | None = None, by: ArrayLike | str | None = None, **kwargs: Any) -> Axes:
     """kx.plot(x, y, z, 'scatter-dark-grid-leg')   or   kx.plot(x, y, 'bar-light')
     kx.plot(df, 'month', 'y2025', 'y2026', 'bar')   names columns of a DataFrame.
+    kx.plot(df, 'heat')   a table kind takes the whole DataFrame (or a 2-D array) instead.
 
     Up to three arrays x, y, z, then the spec (or spec=). by= gives a group label per x value,
     one curve, box or violin per group: kx.plot(df, 'value', spec='kde', by='group').
@@ -33,6 +38,9 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, 
     x, y, z, spec, by = _arrays(data, spec, by)
     name, theme, flags = parse(spec or "line")
     kind = KINDS[name]
+    if kind.takes_table and not (isinstance(x, pd.DataFrame) and y is None and by is None):
+        raise TypeError(f"kind {name!r} takes a whole table and no columns, y, z or by=: kx.plot(df, {name!r}), "
+                        f"or kx.plot(df[cols], {name!r}) for some columns")
     if kind.needs_y and y is None:
         raise ValueError(f"kind {name!r} needs both x and y")
     if by is not None and not kind.takes_by:
@@ -70,9 +78,16 @@ def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None) ->
                     _column(df, data[-1])
                 raise
         spec = data.pop()
+    table = KINDS[parse(spec or "line").kind].takes_table
+    if table and df is None and len(data) == 1 and np.ndim(data[0]) == 2:
+        df, data = pd.DataFrame(data[0]), []    # a 2-D array is a table with 0..n labels
     if df is not None:
+        if not data and table:
+            return df, None, None, spec, by
         if not data:
-            raise TypeError("kx.plot(df, ...) needs the column names to plot: kx.plot(df, 'x', 'y')")
+            tables = ", ".join(sorted(k.name for k in KINDS.values() if k.takes_table))
+            raise TypeError("kx.plot(df, ...) needs the column names to plot: kx.plot(df, 'x', 'y')"
+                            + (f", or a table kind: {tables}" if tables else ""))
         data = [_column(df, c) for c in data]
         by = _column(df, by) if isinstance(by, str) else by
     elif isinstance(by, str):
@@ -116,6 +131,20 @@ def _common(ax: Axes, name: str, value_axis: str, flags: set[str]) -> None:
         loc = mdates.AutoDateLocator()
         ax.xaxis.set_major_locator(loc)
         ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(loc))
+    if "wrap" in flags:
+        for axis in (ax.xaxis, ax.yaxis):
+            _wrap(axis)
     if "rot" in flags:                          # rotation stays for ticks matplotlib adds later
         ax.tick_params(axis="x", labelrotation=45)
         plt.setp(ax.get_xticklabels(), ha="right", rotation_mode="anchor")
+
+
+def _wrap(axis: mpl.axis.Axis) -> None:
+    """Text tick labels broken into lines of WRAP characters at spaces; numbers and dates are left alone."""
+    def fill(text: str) -> str:
+        return textwrap.fill(text, WRAP, break_long_words=False)
+    old = axis.get_major_formatter()
+    if isinstance(old, StrCategoryFormatter):               # text plotted directly: matplotlib's categories
+        axis.set_major_formatter(mpl.ticker.FuncFormatter(lambda v, pos: fill(old(v, pos))))
+    elif isinstance(axis.get_major_locator(), mpl.ticker.FixedLocator):    # set_xticks(ticks, labels): stay fixed
+        axis.set_ticks(axis.get_majorticklocs(), [fill(t.get_text()) for t in axis.get_majorticklabels()])

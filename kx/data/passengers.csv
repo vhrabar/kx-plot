@@ -1,0 +1,501 @@
+age,fare,sex,pclass,port,deck,ticket_type,survived
+52.4,7.49,male,3,Southampton,,standard single journey,1
+37.2,25.81,male,3,Southampton,,family return ticket,0
+,30.99,male,3,Southampton,,standard single journey,0
+,50.07,female,1,Southampton,G,first class saloon pass,1
+12.4,11.12,female,3,Southampton,,family return ticket,1
+,57.13,female,2,Cherbourg,E,family return ticket,0
+39.1,6.22,male,3,Southampton,,standard single journey,0
+,80.69,male,1,Southampton,E,first class saloon pass,0
+24.6,17.5,female,3,Southampton,,standard single journey,0
+7.2,5.11,female,3,Southampton,,family return ticket,1
+46.9,11.75,male,3,Southampton,,family return ticket,0
+,10.21,female,3,Southampton,,standard single journey,1
+27.4,15.42,female,2,Queenstown,,standard single journey,0
+22.5,23.53,male,3,Cherbourg,A,standard single journey,0
+32.5,8.75,female,3,Cherbourg,,standard single journey,0
+40.2,80.94,male,2,Cherbourg,G,family return ticket,0
+40.4,14.49,male,3,Southampton,,standard single journey,0
+1.9,6.28,female,3,Queenstown,,standard single journey,1
+50.6,74.15,male,1,Southampton,A,first class saloon pass,1
+4.4,6.07,female,3,Queenstown,,family return ticket,1
+38.4,15.44,male,3,Southampton,,family return ticket,1
+23.7,14.07,male,3,Southampton,,standard single journey,0
+14.5,4.73,female,3,Queenstown,,family return ticket,1
+30.5,49.82,male,1,Southampton,E,first class saloon pass,0
+,12.61,male,3,Southampton,,staff concession fare,0
+29.4,9.88,male,3,Southampton,,standard single journey,1
+41.9,5.36,female,3,Southampton,,standard single journey,1
+40.1,18.11,male,3,Southampton,,staff concession fare,1
+30.1,47.21,male,2,Southampton,,standard single journey,1
+52.1,26.48,male,1,Southampton,C,first class saloon pass,0
+36.2,22.6,female,3,Southampton,,standard single journey,1
+58.0,2.85,male,3,Queenstown,,standard single journey,0
+,8.72,female,3,Southampton,,standard single journey,1
+,6.38,female,3,Cherbourg,,standard single journey,1
+25.8,15.11,male,2,Southampton,D,family return ticket,1
+19.6,10.46,male,3,Southampton,,family return ticket,0
+25.7,4.74,male,3,Southampton,,standard single journey,0
+,8.83,male,3,Cherbourg,,standard single journey,0
+38.6,25.23,male,3,,,standard single journey,0
+47.9,81.63,male,1,Southampton,A,first class saloon pass,0
+30.3,22.48,female,3,Southampton,,standard single journey,1
+,15.58,male,3,Queenstown,,standard single journey,0
+27.8,24.05,male,1,Southampton,B,first class saloon pass,1
+22.3,26.61,male,3,Southampton,,staff concession fare,0
+0.5,34.41,male,2,Southampton,,staff concession fare,1
+27.3,91.98,male,1,Southampton,D,first class saloon pass,1
+31.0,50.11,female,1,Southampton,,first class saloon pass,1
+63.5,6.9,male,3,Southampton,,staff concession fare,0
+11.7,5.06,male,3,Southampton,,family return ticket,1
+30.4,19.07,male,2,Cherbourg,,first class saloon pass,1
+25.2,10.03,male,3,Southampton,,standard single journey,0
+16.7,57.03,male,1,Southampton,E,first class saloon pass,1
+33.0,8.57,female,3,Cherbourg,,standard single journey,1
+29.7,2.99,female,3,Southampton,,standard single journey,0
+10.2,6.01,female,3,Southampton,,family return ticket,1
+0.5,13.08,female,2,Southampton,,staff concession fare,1
+28.8,24.76,male,2,Cherbourg,,standard single journey,0
+10.6,15.92,male,2,Cherbourg,,standard single journey,0
+38.5,7.16,male,3,Cherbourg,,standard single journey,1
+25.9,21.83,female,2,Queenstown,,standard single journey,1
+,7.05,male,3,Southampton,,standard single journey,0
+,7.88,male,3,,,staff concession fare,1
+50.0,17.68,male,3,Southampton,,family return ticket,0
+38.8,18.78,male,2,Southampton,,standard single journey,0
+49.9,12.14,male,2,Southampton,,standard single journey,0
+,13.18,female,3,Southampton,,family return ticket,1
+,98.95,female,1,Southampton,D,first class saloon pass,1
+11.1,29.79,male,2,Southampton,,family return ticket,0
+23.2,4.29,male,3,Cherbourg,,first class saloon pass,1
+33.7,16.11,male,3,Southampton,,family return ticket,0
+29.6,63.59,female,1,Southampton,D,first class saloon pass,1
+70.4,66.85,male,1,,D,first class saloon pass,0
+,9.78,female,3,Southampton,,family return ticket,1
+36.1,12.16,male,3,Southampton,,standard single journey,0
+39.1,82.51,female,1,Southampton,B,first class saloon pass,0
+13.4,22.01,female,3,Southampton,G,family return ticket,1
+,71.74,male,1,Southampton,G,first class saloon pass,1
+38.7,8.88,female,3,Queenstown,,standard single journey,1
+41.6,13.59,male,3,Southampton,,family return ticket,0
+17.8,8.78,female,3,Southampton,,staff concession fare,1
+,117.7,male,1,Southampton,,first class saloon pass,1
+29.7,10.24,male,3,Southampton,,standard single journey,0
+45.8,32.06,female,2,Southampton,,standard single journey,0
+12.0,6.93,male,3,Cherbourg,A,family return ticket,0
+39.2,37.05,male,2,Southampton,C,family return ticket,0
+47.2,13.47,female,3,Cherbourg,,family return ticket,0
+24.8,5.72,female,3,Southampton,,standard single journey,0
+19.6,7.52,male,3,Southampton,,family return ticket,0
+56.0,65.61,male,1,Southampton,,first class saloon pass,1
+41.7,28.99,female,1,Southampton,D,first class saloon pass,1
+,33.15,male,1,Southampton,G,first class saloon pass,0
+,27.57,female,2,Cherbourg,E,family return ticket,1
+44.8,12.53,male,3,Southampton,,standard single journey,0
+,135.98,female,1,Queenstown,,first class saloon pass,1
+2.4,4.43,male,3,Cherbourg,,standard single journey,1
+38.5,7.54,male,3,Queenstown,,standard single journey,0
+21.5,2.87,male,3,Southampton,,staff concession fare,0
+38.8,25.73,male,3,Southampton,,family return ticket,0
+23.7,4.32,male,3,Cherbourg,,standard single journey,1
+,8.07,male,3,Queenstown,F,standard single journey,1
+35.4,189.74,female,1,Southampton,A,first class saloon pass,1
+49.7,141.94,female,1,Southampton,D,first class saloon pass,1
+,5.62,female,3,Southampton,,standard single journey,1
+,76.4,male,2,Cherbourg,,standard single journey,0
+,12.04,male,3,Southampton,,standard single journey,0
+30.5,5.1,male,3,Southampton,,standard single journey,1
+18.4,23.93,male,2,Southampton,,standard single journey,0
+50.3,13.4,female,3,Southampton,,standard single journey,0
+26.5,88.67,female,1,Southampton,,first class saloon pass,1
+9.8,5.97,female,2,Southampton,,staff concession fare,1
+23.9,59.5,female,2,Southampton,,standard single journey,1
+32.3,8.05,male,2,Queenstown,E,family return ticket,0
+31.5,8.11,male,3,Cherbourg,,standard single journey,0
+,21.11,male,3,Southampton,,standard single journey,1
+24.5,11.54,male,3,Queenstown,,standard single journey,0
+2.0,8.99,male,3,Queenstown,,standard single journey,0
+,43.02,male,1,Queenstown,A,first class saloon pass,0
+53.6,28.5,female,2,Cherbourg,,staff concession fare,1
+20.8,20.47,female,3,Southampton,,staff concession fare,1
+6.5,6.67,female,3,Southampton,,standard single journey,1
+,26.11,male,2,Southampton,,family return ticket,1
+,7.4,male,3,Southampton,,standard single journey,1
+0.5,7.21,male,3,Southampton,,family return ticket,0
+20.4,6.13,male,2,Southampton,G,staff concession fare,1
+11.0,10.7,male,3,Southampton,,first class saloon pass,0
+,15.91,female,3,Southampton,,standard single journey,1
+57.1,8.47,female,3,Queenstown,,standard single journey,1
+,17.02,male,3,Southampton,,standard single journey,0
+28.4,10.27,male,3,Southampton,,family return ticket,1
+38.8,126.3,male,1,Southampton,D,first class saloon pass,1
+,10.16,female,3,Southampton,C,standard single journey,1
+15.9,7.55,female,3,Southampton,,standard single journey,1
+40.6,7.01,male,3,Cherbourg,,family return ticket,0
+,21.94,female,2,Southampton,,standard single journey,1
+41.9,11.1,male,3,Southampton,,staff concession fare,0
+33.7,5.95,male,3,Southampton,,family return ticket,0
+28.7,57.29,male,1,Southampton,E,first class saloon pass,1
+45.0,4.33,female,3,Southampton,,standard single journey,0
+,28.72,male,1,Queenstown,F,first class saloon pass,1
+55.4,13.65,female,3,Queenstown,,family return ticket,1
+33.3,77.37,male,1,Southampton,B,first class saloon pass,1
+,15.71,female,3,Cherbourg,,family return ticket,0
+29.5,68.08,male,1,Southampton,F,first class saloon pass,0
+47.1,10.86,male,3,Southampton,,standard single journey,0
+20.6,27.26,male,3,Southampton,,family return ticket,0
+30.5,5.8,male,3,Southampton,,staff concession fare,0
+,11.12,male,3,Southampton,,family return ticket,0
+37.8,23.39,male,3,Southampton,,family return ticket,0
+34.6,67.79,male,2,Cherbourg,D,family return ticket,0
+34.3,13.04,female,3,Cherbourg,C,staff concession fare,0
+35.3,19.62,male,2,Queenstown,,standard single journey,0
+39.4,5.11,female,3,Southampton,,family return ticket,1
+26.6,8.57,male,3,Southampton,,standard single journey,1
+,22.76,male,2,Cherbourg,,standard single journey,0
+48.6,9.47,female,3,Southampton,,staff concession fare,0
+24.4,83.58,female,1,Queenstown,F,first class saloon pass,1
+55.4,12.99,male,3,Southampton,,standard single journey,0
+34.5,7.13,male,3,Southampton,,standard single journey,0
+73.4,12.41,male,2,Cherbourg,,standard single journey,0
+46.5,7.9,male,3,Southampton,,standard single journey,1
+,12.0,male,3,Southampton,,standard single journey,1
+43.0,23.91,male,3,Southampton,,staff concession fare,0
+11.8,3.64,male,3,Southampton,,standard single journey,0
+32.9,38.35,male,2,Southampton,,standard single journey,0
+25.7,17.54,female,2,Southampton,,standard single journey,1
+30.8,38.85,male,2,Southampton,,standard single journey,0
+2.9,61.09,female,2,Southampton,,standard single journey,1
+0.9,12.38,female,3,Southampton,,family return ticket,1
+40.1,4.81,male,3,Southampton,,family return ticket,0
+31.0,7.29,female,3,Southampton,,standard single journey,1
+,11.41,male,3,Cherbourg,,standard single journey,0
+29.0,7.65,female,3,Southampton,A,standard single journey,1
+21.4,8.89,male,3,Cherbourg,,standard single journey,0
+23.7,5.92,female,3,Southampton,B,family return ticket,1
+47.4,54.2,male,1,Southampton,A,first class saloon pass,0
+27.0,6.45,female,3,Southampton,,standard single journey,1
+47.5,100.72,female,1,Cherbourg,D,first class saloon pass,1
+20.6,11.0,male,3,Cherbourg,,family return ticket,0
+5.7,14.1,male,3,Southampton,,standard single journey,0
+,3.61,male,3,Southampton,,standard single journey,0
+28.1,7.11,male,3,Cherbourg,,standard single journey,0
+22.9,40.09,male,1,Cherbourg,C,first class saloon pass,1
+24.7,7.19,female,3,Southampton,,staff concession fare,1
+31.1,37.12,male,1,Southampton,B,first class saloon pass,1
+42.4,6.08,male,3,Southampton,,family return ticket,0
+,50.53,female,2,Cherbourg,F,standard single journey,1
+44.7,17.52,male,2,Southampton,,standard single journey,0
+27.5,29.84,female,1,Southampton,C,first class saloon pass,1
+42.4,51.77,female,1,Queenstown,,first class saloon pass,1
+47.2,33.41,male,3,Queenstown,,standard single journey,0
+32.2,13.79,male,3,Southampton,A,staff concession fare,1
+36.9,35.98,male,1,Southampton,F,first class saloon pass,0
+19.5,7.96,male,3,Cherbourg,,family return ticket,0
+41.1,19.59,male,2,Southampton,,standard single journey,0
+32.2,9.37,male,3,Southampton,,standard single journey,0
+51.3,21.17,female,1,Southampton,G,first class saloon pass,1
+,5.33,male,3,Southampton,,family return ticket,0
+57.7,8.32,male,3,Queenstown,,standard single journey,0
+29.5,3.41,female,3,Southampton,,family return ticket,0
+13.3,8.25,female,3,Southampton,A,staff concession fare,1
+,9.54,female,3,Cherbourg,,standard single journey,0
+36.3,14.27,male,3,Southampton,,standard single journey,0
+47.2,16.82,male,3,Southampton,,family return ticket,0
+31.4,54.88,male,1,Southampton,D,first class saloon pass,1
+,10.42,male,3,Cherbourg,,standard single journey,0
+26.2,13.49,male,3,Southampton,,standard single journey,1
+,16.36,male,3,Southampton,,standard single journey,0
+1.3,9.56,female,3,Southampton,,standard single journey,1
+39.5,5.96,male,3,Southampton,,family return ticket,0
+,12.86,male,3,Southampton,B,standard single journey,1
+27.6,99.51,female,1,Cherbourg,C,first class saloon pass,1
+16.5,9.97,female,3,Southampton,,family return ticket,1
+27.9,28.27,male,2,Southampton,C,standard single journey,1
+18.8,22.81,male,3,Queenstown,,standard single journey,0
+48.5,45.82,male,1,Southampton,,first class saloon pass,0
+21.5,6.14,male,3,Southampton,,standard single journey,0
+,32.86,male,1,Southampton,A,first class saloon pass,1
+13.2,11.21,female,3,Southampton,,staff concession fare,1
+,35.1,male,2,Southampton,,family return ticket,0
+9.0,6.88,male,3,Cherbourg,,family return ticket,0
+10.8,25.91,female,3,Queenstown,,standard single journey,1
+35.7,14.65,male,2,Queenstown,,family return ticket,0
+41.3,10.74,female,3,Southampton,,family return ticket,1
+,8.62,female,3,Southampton,,standard single journey,1
+32.8,20.35,male,3,Queenstown,D,family return ticket,0
+,6.42,male,3,Southampton,,standard single journey,1
+44.9,23.68,male,3,Southampton,F,family return ticket,0
+13.3,8.34,female,3,Southampton,,standard single journey,1
+47.5,9.51,male,2,Southampton,,standard single journey,0
+62.5,6.66,female,3,Cherbourg,,family return ticket,1
+30.8,8.41,male,3,Southampton,,family return ticket,0
+,24.14,female,3,Southampton,,standard single journey,1
+38.3,15.58,male,2,Southampton,,staff concession fare,1
+,20.38,female,2,Southampton,,staff concession fare,1
+14.8,67.24,male,2,Cherbourg,,standard single journey,0
+20.7,10.08,male,3,Southampton,,family return ticket,0
+40.0,42.81,male,1,Southampton,,first class saloon pass,0
+,6.03,male,3,Cherbourg,,family return ticket,0
+31.5,8.36,male,2,Southampton,,first class saloon pass,1
+44.8,11.25,male,3,Cherbourg,,standard single journey,0
+31.2,122.34,female,1,Cherbourg,G,first class saloon pass,1
+11.0,7.44,male,3,Southampton,,family return ticket,0
+30.4,11.11,male,2,Southampton,,family return ticket,1
+37.3,71.28,female,1,Southampton,G,first class saloon pass,1
+19.0,61.07,female,1,Cherbourg,B,first class saloon pass,1
+43.8,8.41,male,3,Southampton,,family return ticket,1
+25.2,78.39,male,1,Cherbourg,F,first class saloon pass,1
+20.3,20.54,male,2,Cherbourg,C,family return ticket,0
+33.0,7.35,male,3,Southampton,,standard single journey,0
+15.6,35.68,female,2,Cherbourg,,family return ticket,0
+38.3,3.12,female,3,Queenstown,,first class saloon pass,1
+35.3,4.72,male,3,Southampton,,standard single journey,0
+,7.68,female,3,Cherbourg,,standard single journey,1
+30.0,4.14,male,3,Cherbourg,,family return ticket,0
+31.7,142.18,male,1,Southampton,C,first class saloon pass,0
+,5.68,male,2,Queenstown,,family return ticket,0
+34.2,13.41,female,3,Southampton,,staff concession fare,0
+48.4,12.39,male,3,Southampton,,first class saloon pass,1
+40.7,10.88,male,3,Queenstown,,standard single journey,0
+,76.04,male,1,Cherbourg,C,first class saloon pass,1
+51.6,42.93,male,1,Southampton,F,first class saloon pass,1
+56.1,39.35,male,1,Cherbourg,B,first class saloon pass,0
+,44.73,male,2,Southampton,,standard single journey,1
+,8.19,male,3,Southampton,,standard single journey,0
+46.7,3.84,male,3,Southampton,E,standard single journey,0
+21.7,4.38,male,3,Southampton,,standard single journey,0
+24.2,8.17,male,2,Cherbourg,,family return ticket,1
+38.7,23.07,female,2,Southampton,F,standard single journey,1
+35.5,114.46,male,1,Cherbourg,A,first class saloon pass,1
+46.6,7.44,male,3,Queenstown,,staff concession fare,0
+,9.66,male,3,Southampton,,family return ticket,1
+38.5,6.66,male,3,Cherbourg,,standard single journey,1
+64.1,14.87,male,3,Southampton,,first class saloon pass,0
+45.9,14.81,female,3,Southampton,,staff concession fare,1
+,15.27,male,3,Southampton,,family return ticket,0
+16.6,25.27,male,3,Southampton,,family return ticket,0
+17.1,9.87,female,2,Southampton,,staff concession fare,1
+29.9,14.32,female,3,Southampton,,staff concession fare,1
+11.8,3.71,male,3,Southampton,,standard single journey,1
+38.0,13.74,female,3,Southampton,,standard single journey,1
+,14.53,male,3,Southampton,,standard single journey,0
+,13.84,male,3,Southampton,,standard single journey,0
+28.3,96.78,male,1,Cherbourg,C,first class saloon pass,0
+34.7,56.78,male,1,Southampton,E,first class saloon pass,1
+26.4,14.21,male,2,Cherbourg,C,family return ticket,1
+27.4,95.37,male,1,Southampton,D,first class saloon pass,0
+53.1,6.45,female,3,Southampton,B,family return ticket,0
+21.2,13.89,male,3,Southampton,,staff concession fare,0
+15.5,5.7,male,3,Southampton,,first class saloon pass,1
+35.2,11.25,male,3,Southampton,,staff concession fare,0
+34.8,10.94,female,3,Southampton,,standard single journey,0
+50.7,5.76,female,3,Southampton,,family return ticket,1
+50.8,7.74,male,3,Southampton,,standard single journey,0
+27.8,15.69,male,3,Southampton,,standard single journey,1
+2.3,9.48,female,3,Southampton,D,family return ticket,1
+39.3,27.86,male,2,Cherbourg,,standard single journey,0
+41.0,6.81,female,3,Southampton,,standard single journey,0
+54.1,9.94,female,3,Southampton,,staff concession fare,1
+17.2,26.85,male,1,Southampton,D,first class saloon pass,1
+22.6,39.99,female,1,Southampton,A,first class saloon pass,1
+50.9,19.01,male,3,Queenstown,,staff concession fare,0
+51.8,12.73,male,3,Cherbourg,,standard single journey,0
+47.4,9.4,male,3,Southampton,,standard single journey,0
+37.7,67.26,male,1,Southampton,G,first class saloon pass,1
+47.2,4.33,female,3,Southampton,,family return ticket,1
+,11.82,male,3,Southampton,,family return ticket,0
+13.4,10.28,male,2,Southampton,,family return ticket,0
+37.1,40.86,male,1,Southampton,A,first class saloon pass,0
+,30.63,female,2,Southampton,,standard single journey,1
+40.6,6.08,male,3,Southampton,,standard single journey,0
+,15.33,male,2,Queenstown,,standard single journey,0
+,8.78,male,3,Southampton,,family return ticket,0
+33.5,9.75,female,3,Southampton,B,standard single journey,0
+44.2,131.62,male,1,Queenstown,C,first class saloon pass,1
+12.9,3.47,male,3,Southampton,,standard single journey,0
+34.2,48.41,female,1,Southampton,A,first class saloon pass,1
+30.4,12.79,male,3,Cherbourg,,family return ticket,0
+35.6,6.91,female,3,Southampton,,staff concession fare,0
+18.2,16.19,male,2,Southampton,,first class saloon pass,0
+21.6,5.73,male,3,Southampton,,standard single journey,0
+14.9,16.95,male,2,Queenstown,,standard single journey,1
+34.1,13.13,male,3,Cherbourg,,standard single journey,0
+25.1,18.41,male,3,Cherbourg,,standard single journey,0
+,11.07,male,3,Southampton,,staff concession fare,0
+38.1,44.13,male,2,Queenstown,,standard single journey,0
+27.3,9.61,male,3,Southampton,,staff concession fare,1
+21.6,23.56,male,1,Southampton,A,first class saloon pass,0
+44.6,30.96,male,2,Queenstown,,standard single journey,1
+,2.88,male,3,Southampton,,first class saloon pass,0
+35.6,8.76,male,3,Southampton,,staff concession fare,1
+23.7,60.35,female,1,Cherbourg,,first class saloon pass,1
+44.2,4.75,male,3,Southampton,,standard single journey,0
+21.7,8.05,male,3,Southampton,,standard single journey,0
+12.7,44.27,male,1,Southampton,,first class saloon pass,1
+27.8,9.8,female,3,Southampton,,standard single journey,0
+61.4,50.79,female,1,Queenstown,E,first class saloon pass,1
+23.5,12.79,female,3,Southampton,,standard single journey,0
+,7.3,male,3,Southampton,,family return ticket,0
+47.6,28.41,male,2,,,staff concession fare,0
+39.9,60.32,male,1,Cherbourg,D,first class saloon pass,1
+,23.11,male,2,Cherbourg,,standard single journey,1
+29.6,21.53,female,2,Queenstown,E,staff concession fare,1
+37.2,6.91,female,3,Southampton,,standard single journey,1
+,17.06,female,3,Southampton,B,standard single journey,1
+42.1,84.04,male,1,Southampton,E,first class saloon pass,1
+44.8,16.68,male,1,Cherbourg,D,first class saloon pass,1
+32.5,30.22,male,1,Southampton,,first class saloon pass,0
+39.0,23.77,male,3,Southampton,,family return ticket,0
+44.9,51.6,female,1,Southampton,B,first class saloon pass,1
+,44.49,male,3,Cherbourg,,family return ticket,0
+35.0,77.22,male,1,Southampton,,first class saloon pass,0
+,11.71,male,3,Cherbourg,,standard single journey,0
+27.5,15.49,female,2,Southampton,,standard single journey,1
+26.7,8.0,male,3,Cherbourg,,standard single journey,0
+16.0,9.92,female,3,Southampton,,family return ticket,1
+30.9,33.7,male,2,Southampton,,standard single journey,1
+,9.56,male,3,Southampton,,standard single journey,1
+,8.82,female,3,Southampton,,family return ticket,0
+,5.17,male,3,Southampton,,family return ticket,0
+36.9,6.92,male,3,Southampton,,family return ticket,0
+37.5,7.07,female,3,Southampton,D,staff concession fare,1
+17.4,8.33,female,3,Southampton,,standard single journey,1
+44.4,39.39,male,1,Southampton,B,first class saloon pass,1
+,4.81,male,3,Southampton,,staff concession fare,0
+24.7,7.46,male,3,Southampton,,staff concession fare,0
+,2.21,male,3,Southampton,,staff concession fare,0
+34.8,25.07,female,1,Southampton,D,first class saloon pass,1
+0.5,12.26,female,2,Southampton,,standard single journey,0
+32.3,10.9,female,3,Southampton,,family return ticket,1
+14.9,5.87,female,3,Southampton,,family return ticket,1
+28.3,4.67,male,3,Cherbourg,,standard single journey,0
+38.4,28.03,female,2,Southampton,,standard single journey,0
+34.5,53.12,male,1,Southampton,E,first class saloon pass,1
+23.7,18.42,female,3,Southampton,,standard single journey,0
+39.3,50.32,male,1,Southampton,C,first class saloon pass,0
+35.9,5.7,male,3,Southampton,,first class saloon pass,0
+26.6,45.84,male,1,Southampton,,first class saloon pass,0
+29.2,153.04,male,1,Southampton,F,first class saloon pass,0
+36.0,20.09,female,3,Southampton,,standard single journey,0
+,61.32,female,1,Southampton,G,first class saloon pass,1
+29.4,15.12,female,3,Southampton,,standard single journey,0
+48.9,25.59,female,1,Southampton,A,first class saloon pass,1
+,17.01,female,3,Southampton,,standard single journey,1
+29.5,10.16,male,3,Southampton,,standard single journey,0
+30.4,7.97,male,3,Southampton,,standard single journey,0
+20.7,56.47,male,1,Southampton,C,first class saloon pass,0
+,9.61,female,3,Southampton,,standard single journey,1
+,43.03,male,1,Southampton,B,first class saloon pass,1
+4.2,44.62,male,1,Queenstown,,first class saloon pass,1
+28.1,4.17,female,3,Queenstown,,staff concession fare,1
+33.1,44.11,female,2,Cherbourg,,standard single journey,1
+40.3,33.04,male,1,Cherbourg,A,first class saloon pass,1
+41.3,49.74,male,1,Queenstown,D,first class saloon pass,0
+,14.47,male,3,Southampton,,first class saloon pass,0
+19.5,16.05,female,3,Southampton,,standard single journey,1
+26.6,18.0,male,3,Southampton,,standard single journey,1
+17.8,5.74,female,3,Southampton,,standard single journey,1
+,13.78,male,2,Southampton,,staff concession fare,0
+44.8,7.62,male,3,Southampton,,standard single journey,1
+17.5,2.79,female,3,Southampton,,family return ticket,1
+32.5,85.79,male,1,Cherbourg,A,first class saloon pass,1
+52.7,3.12,female,3,Southampton,,standard single journey,0
+27.3,7.23,male,3,Cherbourg,,standard single journey,0
+16.1,12.92,male,3,Southampton,,family return ticket,0
+32.4,12.43,female,3,Cherbourg,,standard single journey,0
+39.4,40.16,female,1,Cherbourg,C,first class saloon pass,1
+31.0,28.65,male,2,Queenstown,,standard single journey,0
+,31.4,male,2,Cherbourg,,standard single journey,1
+32.9,6.61,female,2,Cherbourg,,staff concession fare,1
+,6.63,male,3,,,standard single journey,0
+,11.13,female,3,Southampton,,standard single journey,0
+46.3,65.36,male,1,Southampton,E,first class saloon pass,1
+24.0,6.81,female,3,Southampton,,family return ticket,0
+41.7,48.13,female,1,Southampton,D,first class saloon pass,1
+,28.23,male,3,Southampton,,first class saloon pass,0
+27.9,6.25,male,3,Cherbourg,,family return ticket,0
+37.3,93.1,female,1,Cherbourg,B,first class saloon pass,1
+47.5,8.75,male,2,Cherbourg,,staff concession fare,0
+36.3,23.08,male,2,Cherbourg,,first class saloon pass,0
+36.7,13.89,male,3,Southampton,,standard single journey,0
+17.7,6.14,male,3,Southampton,,standard single journey,0
+,36.68,female,1,Southampton,,first class saloon pass,1
+13.8,148.76,male,1,Cherbourg,G,first class saloon pass,0
+46.2,15.73,male,2,Southampton,,staff concession fare,1
+24.4,14.17,female,3,Queenstown,,standard single journey,1
+38.6,3.55,female,3,Cherbourg,,standard single journey,1
+48.5,21.04,female,3,Cherbourg,,standard single journey,0
+16.6,2.65,male,3,Southampton,,family return ticket,0
+45.5,10.78,male,2,Southampton,,standard single journey,0
+33.6,5.87,male,3,Southampton,,standard single journey,0
+53.5,53.32,male,1,Cherbourg,E,first class saloon pass,1
+,20.6,male,2,Southampton,,standard single journey,0
+21.9,20.61,male,3,Southampton,,standard single journey,0
+47.5,27.26,female,3,Cherbourg,,staff concession fare,1
+,24.42,male,3,Southampton,,standard single journey,1
+,90.22,male,1,Southampton,G,first class saloon pass,1
+16.2,21.35,female,2,Southampton,,standard single journey,1
+47.9,2.66,male,3,Cherbourg,,standard single journey,0
+26.6,8.17,male,3,Southampton,,standard single journey,0
+36.1,41.26,female,1,Cherbourg,,first class saloon pass,1
+,81.72,male,1,Cherbourg,B,first class saloon pass,1
+31.1,4.87,male,3,Southampton,,staff concession fare,1
+38.6,5.39,male,3,Cherbourg,,standard single journey,0
+,5.67,female,3,Queenstown,,standard single journey,1
+37.8,83.01,male,1,Southampton,C,first class saloon pass,0
+23.8,9.53,female,3,Southampton,,family return ticket,0
+50.0,10.78,female,2,Southampton,,staff concession fare,0
+,7.25,male,2,Cherbourg,,standard single journey,0
+27.1,6.28,male,3,Southampton,E,standard single journey,0
+19.5,6.03,male,3,,,family return ticket,0
+34.1,6.35,male,3,Southampton,,standard single journey,0
+10.0,9.07,male,3,Cherbourg,,family return ticket,0
+33.9,13.06,male,3,Queenstown,,family return ticket,1
+34.2,13.5,male,3,Cherbourg,,staff concession fare,1
+32.8,5.93,male,3,Queenstown,,family return ticket,0
+51.1,5.64,female,3,Southampton,,standard single journey,1
+,136.4,female,1,Cherbourg,G,first class saloon pass,1
+36.4,7.6,male,3,Queenstown,,standard single journey,1
+26.1,13.12,male,3,Southampton,,standard single journey,1
+,21.65,female,2,Southampton,,family return ticket,0
+53.3,72.53,male,1,Cherbourg,,first class saloon pass,1
+15.4,21.66,male,3,Southampton,,family return ticket,0
+21.3,7.71,male,3,Southampton,,family return ticket,0
+35.4,109.92,female,1,Queenstown,E,first class saloon pass,1
+17.4,79.76,male,1,Cherbourg,D,first class saloon pass,1
+16.4,18.15,female,2,Southampton,,standard single journey,0
+51.6,6.83,male,3,Southampton,,first class saloon pass,0
+,6.6,male,3,Southampton,,standard single journey,1
+41.5,17.15,male,3,Cherbourg,,standard single journey,0
+20.4,15.66,female,3,Cherbourg,,staff concession fare,1
+43.4,5.53,male,3,Queenstown,,standard single journey,0
+34.8,24.95,male,2,Cherbourg,,standard single journey,0
+42.2,3.2,female,3,Queenstown,,family return ticket,1
+20.9,61.66,male,1,Southampton,,first class saloon pass,1
+34.4,28.7,male,3,Southampton,,staff concession fare,1
+31.4,30.41,male,1,Southampton,B,first class saloon pass,0
+,10.66,female,3,Queenstown,,staff concession fare,1
+39.8,6.33,female,3,Southampton,,family return ticket,0
+,9.43,male,3,Southampton,,standard single journey,0
+,4.92,male,3,Southampton,,family return ticket,1
+30.5,9.99,female,3,Southampton,,staff concession fare,1
+33.9,5.31,male,2,Southampton,B,standard single journey,0
+32.2,51.61,female,1,Cherbourg,D,first class saloon pass,1
+25.1,7.48,male,3,Southampton,,staff concession fare,0
+,8.48,male,3,Queenstown,,family return ticket,0
+17.2,62.59,male,2,Queenstown,,standard single journey,0
+44.0,4.62,male,3,Southampton,,staff concession fare,0
+,6.02,female,3,Southampton,,standard single journey,1
+47.2,9.1,female,2,Southampton,,standard single journey,1
+39.7,11.81,male,3,Southampton,,standard single journey,1
+16.8,59.63,male,1,Queenstown,D,first class saloon pass,1
+7.2,4.54,male,3,Southampton,,standard single journey,0
+,100.35,male,1,Southampton,E,first class saloon pass,1
+,22.96,female,2,Southampton,,standard single journey,1
+,19.95,female,3,Southampton,,standard single journey,1
+50.7,90.68,male,1,Cherbourg,E,first class saloon pass,0
+35.2,9.25,male,3,Southampton,,family return ticket,0
+27.8,5.64,male,3,Southampton,,staff concession fare,0
+,17.18,male,1,Queenstown,F,first class saloon pass,1
+49.4,6.23,male,3,Southampton,,family return ticket,1

@@ -4,11 +4,12 @@ from typing import Any
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
 from .._spec import kind
-from .._util import categories, label
+from .._util import COLOUR, categories, colorbar, label, norm
 
 LINES = ("date", "mk")                          # flags of the kinds that draw lines against x
 
@@ -73,25 +74,9 @@ def band(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike, flags: set[str], **
                     linewidth=0, label=f"± {label(z, 'z')}")
 
 
-COLOUR = ("nocb", "sym", "logc")               # flags for a numeric z on a colour scale
-
-
 def _check_scatter(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
     if flags & set(COLOUR) and (z is None or categories(z) is not None):
         raise ValueError(f"flags {sorted(flags & set(COLOUR))} colour a numeric z; this scatter has none")
-
-
-def _norm(z: ArrayLike, flags: set[str]) -> mpl.colors.Normalize | None:
-    """sym = limits ±max|z| so 0 sits mid-colormap, logc = log colour scale. None = matplotlib's linear default."""
-    v = np.asarray(z, dtype=float)
-    if "sym" in flags:
-        top = np.nanmax(np.abs(v))
-        return mpl.colors.Normalize(-top, top)
-    if "logc" in flags:
-        if np.nanmin(v) <= 0:
-            raise ValueError("flag 'logc' needs z > 0; use 'sym' for values around 0")
-        return mpl.colors.LogNorm()
-    return None
 
 
 @kind("scatter", flags=("date", *COLOUR), check=_check_scatter)
@@ -101,9 +86,9 @@ def scatter(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: se
     size = 0.5 * plt.rcParams["lines.markersize"] ** 2
     cats = None if z is None else categories(z)
     if cats is None:
-        sc = ax.scatter(x, y, **{"c": z, "s": size, "norm": None if z is None else _norm(z, flags), **kw})
-        if z is not None and "nocb" not in flags:
-            ax.figure.colorbar(sc, ax=ax, label=label(z, "z"))
+        sc = ax.scatter(x, y, **{"c": z, "s": size, "norm": None if z is None else norm(z, flags), **kw})
+        if z is not None:
+            colorbar(ax, sc, label(z, "z"), flags)
     else:
         xs, ys, zs = np.asarray(x), np.asarray(y), np.asarray(z, dtype=object)
         for c in cats:
@@ -118,29 +103,75 @@ def bar(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[st
     """y and z grouped per category, x = category labels; stack = z on top of y.
     sort = largest first (by y, or by the total with stack), ann = the value on each bar.
     kw: ax.bar (ax.barh); width= (height= for barh) is the space a category's bars fill, 0.8 by default."""
-    w = kw.pop("height" if horizontal else "width", 0.8) / 2
-    names = label(y, "y"), None if z is None else label(z, "z")
-    x, y = np.asarray(x, dtype=object), np.asarray(y, dtype=float)
-    z = None if z is None else np.asarray(z, dtype=float)
+    series = [(label(a, n), np.asarray(a, dtype=float)) for a, n in ((y, "y"), (z, "z")) if a is not None]
+    _bars(ax, np.asarray(x, dtype=object), series, flags, horizontal, **kw)
+
+
+def _bars(ax: Axes, cats: np.ndarray, series: list[tuple[str, np.ndarray]], flags: set[str], horizontal: bool,
+          fmt: str = "{:.3g}", **kw: Any) -> None:
+    """One bar per category for each series, side by side (or stacked), with the category labels as ticks.
+    sort = largest first (by the first series, or by the total with stack), ann = fmt on each bar."""
+    w = kw.pop("height" if horizontal else "width", 0.8)
+    stack = "stack" in flags and len(series) > 1
     if "sort" in flags:
-        key = y + z if z is not None and "stack" in flags else y
-        order = np.argsort(-key, kind="stable")
-        x, y, z = x[order], y[order], None if z is None else z[order]
-    idx = np.arange(len(x))
+        order = np.argsort(-(sum(v for _, v in series) if stack else series[0][1]), kind="stable")
+        cats, series = cats[order], [(n, v[order]) for n, v in series]
+    idx = np.arange(len(cats))
     draw = ax.barh if horizontal else ax.bar
-    if z is None:
-        draw(idx, y, 2 * w, **{"label": names[0], **kw})
-    elif "stack" in flags:                      # z starts where y ends, so the bar's end is the total
-        draw(idx, y, 2 * w, **{"label": names[0], **kw})
-        draw(idx, z, 2 * w, y, **{"label": names[1], **kw})
-    else:
-        draw(idx - w / 2, y, w, **{"label": names[0], **kw})
-        draw(idx + w / 2, z, w, **{"label": names[1], **kw})
-    (ax.set_yticks if horizontal else ax.set_xticks)(idx, [str(v) for v in x])
+    bottom = None
+    for i, (name, v) in enumerate(series):
+        if stack:                               # each series starts where the last ended: the end is the total
+            draw(idx, v, w, bottom, **{"label": name, **kw})
+            bottom = v if bottom is None else bottom + v
+        else:                                   # side by side, together filling w
+            draw(idx + (i + 0.5 - len(series) / 2) * w / len(series), v, w / len(series), **{"label": name, **kw})
+    (ax.set_yticks if horizontal else ax.set_xticks)(idx, [str(c) for c in cats])
     if "ann" in flags:                          # stacked segments: value inside; otherwise past the end
-        inside = z is not None and "stack" in flags
         for c in ax.containers:
-            ax.bar_label(c, fmt="{:.3g}", label_type="center" if inside else "edge", padding=0 if inside else 2)
+            ax.bar_label(c, fmt=fmt, label_type="center" if stack else "edge", padding=0 if stack else 2)
+
+
+def _levels(v: ArrayLike) -> tuple[list[str], list[np.ndarray]]:
+    """Labels and masks of v's categories in order, with missing values as a last 'NaN' category."""
+    arr = np.asarray(v, dtype=object).ravel()
+    missing = pd.isna(arr)
+    cats = categories(v)
+    if cats is None:
+        cats = sorted(pd.unique(arr[~missing]))
+    labels, masks = [str(c) for c in cats], [(arr == c) & ~missing for c in cats]
+    if missing.any():
+        labels.append("NaN")
+        masks.append(missing)
+    return labels, masks
+
+
+def _check_count(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if y is not None:
+        raise ValueError("kind 'count' counts the categories of x; split them with by=, not y")
+
+
+@kind("count", flags=("stack", "sort", "ann", "norm"), needs_y=False, takes_by=True, check=_check_count)
+def count(ax: Axes, x: ArrayLike, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
+          **kw: Any) -> None:
+    """How often each category of x occurs, one bar per by= group; missing values count as 'NaN'.
+    stack = groups on top of each other, sort = most common first, ann = the count on each bar,
+    norm = shares instead of counts (within each category with by= and stack, else within each group).
+    kw: ax.bar; width= is the space a category's bars fill, 0.8 by default."""
+    cats, xs = _levels(x)
+    groups, gs = _levels(by) if by is not None else (["count"], [np.ones(np.size(x), dtype=bool)])
+    counts = np.array([[np.sum(xm & gm) for xm in xs] for gm in gs], dtype=float)    # groups x categories
+    if "norm" in flags:
+        with np.errstate(invalid="ignore", divide="ignore"):
+            counts = counts / (counts.sum(axis=0) if by is not None and "stack" in flags
+                               else counts.sum(axis=1, keepdims=True))
+        ax.yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1))
+    _bars(ax, np.array(cats, dtype=object), list(zip(groups, counts, strict=True)), flags, False,
+          fmt="{:.0%}" if "norm" in flags else "{:g}", **kw)
+    ax.set_xlabel(label(x, ""))
+    ax.set_ylabel("share" if "norm" in flags else "count")
+    if by is not None:                          # a 100% stack has no free corner: legend outside, as area-norm
+        full = "norm" in flags and "stack" in flags
+        ax.legend(title=label(by, "by"), **({"loc": "center left", "bbox_to_anchor": (1, 0.5)} if full else {}))
 
 
 @kind("barh", flags=("stack", "sort", "ann"), value_axis="x")

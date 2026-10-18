@@ -3,17 +3,22 @@ kx: tiny matplotlib helper.
 
 Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
   kind  : line | step | area | band | scatter | bar | barh | hist | kde | ridge | ecdf | box | violin | strip
-          | qq
+          | qq | heat | crosstab | count | missing | nullmap | hexbin
   theme : any file name in styles/
-  flags : grid | leg | legout | tight | rot | logx | logy | logxy | symlogy | zero | eq | pct | si
-          and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars),
-          mean median ann (distributions), nocb sym logc (scatter). kx.grammar(kind) lists them.
-by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq)
+  flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si
+          and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
+          stack norm (count),
+          mean median ann (distributions), nocb sym logc (scatter, heat, hexbin), corr ann (heat),
+          norm ann nocb logc (crosstab), ann all (missing), sort (nullmap).
+          kx.grammar(kind) lists them.
+by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count)
+table  : heat, missing and nullmap take a whole DataFrame or 2-D array, with no column names: kx.plot(df, 'heat-corr')
 
 Palettes (kx.use(theme, palette="okabe")): any file name in styles/palettes/
 Colormaps (kx.use(theme, cmap="magma")):  kx.cmaps()
 with kx.context(theme, ...): the same as kx.use, for one block only.
 kx.save("fig.png"): saves to /kaggle/working on Kaggle, the current folder elsewhere.
+kx.missing(df): the share of missing values per column, the same as kx.plot(df, 'missing-ann').
 kx.grid(5): a figure of 5 panels as a flat array of axes, for kx.plot(..., ax=).
 kx.grammar("area") and kx.source("area") explain one kind; kx.parse(spec) shows how a spec is read.
 """
@@ -22,16 +27,21 @@ import importlib.metadata
 import inspect
 import os
 import re
+from typing import Any
+
+import pandas as pd
+from matplotlib.axes import Axes
 
 from ._data import datasets, load
 from ._grid import grid
 from ._plot import plot
 from ._save import save
 from ._spec import COMMON_FLAGS, KINDS, Spec, all_flags, parse
-from ._theme import BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
+from ._theme import BREWER_CMAPS, BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
 
-__all__ = ["BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "datasets", "grammar",
-           "grid", "load", "palette", "palettes", "parse", "plot", "save", "show", "source", "styles", "use"]
+__all__ = ["BREWER_CMAPS", "BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "datasets",
+           "grammar", "grid", "load", "missing", "palette", "palettes", "parse", "plot", "save", "show", "source",
+           "styles", "use"]
 
 
 def _version() -> str:
@@ -65,6 +75,8 @@ def grammar(kind: str | None = None) -> None:
         k = _kind(kind)
         print(f"{k.name}: {inspect.getdoc(k.draw)}")
         print("flags:", sorted(COMMON_FLAGS), "+", sorted(k.flags) or "none of its own")
+        if k.takes_table:
+            print("data : takes a DataFrame or 2-D array")
         if k.takes_by:
             print("by=  : group labels for x, one per group")
         return
@@ -84,3 +96,9 @@ def source(kind: str | None = None) -> None:
     for p in sorted(glob.glob(os.path.join(here, "**", "*.py"), recursive=True)):
         with open(p) as f:
             print(f"# ---------- kx/{os.path.relpath(p, here)} ----------\n{f.read()}")
+
+
+def missing(df: pd.DataFrame, spec: str = "", **kw: Any) -> Axes:
+    """The share of missing values in each column, labelled: kx.plot(df, 'missing-ann-' + spec).
+    kx.missing(df, 'dark-wrap') adds a theme and flags; other keywords (title=, ax=, ...) go to kx.plot."""
+    return plot(df, "-".join(["missing", "ann", *([spec] if spec else [])]), **kw)

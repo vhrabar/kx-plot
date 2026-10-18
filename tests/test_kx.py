@@ -1,5 +1,5 @@
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from statistics import NormalDist
 
@@ -379,6 +379,287 @@ def test_violin_marks_median() -> None:
     assert ax.collections[-1].get_offsets()[0][1] == pytest.approx(np.median(X))
 
 
+# ---------- table kinds ----------
+HEAT = pd.DataFrame({"a": [1.0, 2, 3], "b": [4.0, 5, 6], "c": [9.0, 7, 8]}, index=["r1", "r2", "r3"])
+
+
+def test_heat_draws_the_frame_with_its_labels() -> None:
+    ax = kx.plot(HEAT, "heat")
+    im = ax.images[0]
+    assert im.get_array().shape == HEAT.shape
+    assert (im.get_array() == HEAT.to_numpy()).all()
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["a", "b", "c"]
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["r1", "r2", "r3"]
+    assert len(ax.figure.axes) == 2             # the colorbar
+
+
+def test_heat_takes_a_2d_array() -> None:
+    ax = kx.plot(np.arange(6).reshape(2, 3), "heat")
+    assert ax.images[0].get_array().shape == (2, 3)
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["0", "1", "2"]
+
+
+def test_heat_corr_is_symmetric_from_minus_one_to_one() -> None:
+    p = kx.load("passengers")
+    ax = kx.plot(p, "heat-corr")
+    r = ax.images[0].get_array()
+    assert r.shape == (4, 4)                    # the numeric columns only
+    assert np.allclose(r, r.T)
+    assert np.allclose(np.diag(r), 1)
+    assert ax.images[0].get_clim() == (-1, 1)
+    assert ax.images[0].get_cmap().name == "rdbu"
+    assert ax.figure.axes[1].get_ylabel() == "r"
+    assert kx.plot(p, "heat-corr-sym").images[0].get_clim() == (-1, 1)
+
+
+def test_heat_ann_writes_every_cell_in_contrasting_ink() -> None:
+    ax = kx.plot(HEAT, "heat-ann", cmap="greys")
+    texts = ax.texts
+    assert len(texts) == HEAT.size
+    assert texts[0].get_text() == "1"
+    assert texts[0].get_color() == "black"      # lowest value: white cell on greys
+    assert texts[2].get_color() == "white"      # 9, the highest: black cell
+
+
+def test_heat_ann_keeps_three_digits_and_corr_two_decimals() -> None:
+    texts = [t.get_text() for t in kx.plot(HEAT * 40, "heat-ann").texts]
+    assert texts[:3] == ["40", "160", "360"]    # not 1.6e+02
+    corr = [t.get_text() for t in kx.plot(HEAT, "heat-corr-ann").texts]
+    assert corr[0] == "1.00"
+    assert all(len(t.lstrip("-")) == 4 for t in corr)
+
+
+def test_heat_colour_flags() -> None:
+    lo, hi = kx.plot(HEAT - 5, "heat-sym").images[0].get_clim()
+    assert lo == -hi == -4
+    assert isinstance(kx.plot(HEAT, "heat-logc").images[0].norm, mpl.colors.LogNorm)
+    assert len(kx.plot(HEAT, "heat-nocb").figure.axes) == 1
+
+
+@pytest.mark.parametrize(("spec", "data", "match"), [
+    ("heat-corr-logc", HEAT, "do not go together"),
+    ("heat-logc", HEAT - 5, "needs z > 0"),
+    ("heat", HEAT.assign(g=["x", "y", "z"]), r"columns \['g'\] are not"),
+])
+def test_heat_errors(spec: str, data: pd.DataFrame, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(data, spec)
+
+
+PASSENGERS = kx.load("passengers")
+
+
+def test_crosstab_counts_match_pandas() -> None:
+    ax = kx.plot(PASSENGERS, "sex", "pclass", "crosstab-ann")
+    want = pd.crosstab(PASSENGERS.pclass, PASSENGERS.sex)
+    assert (ax.images[0].get_array() == want.to_numpy()).all()
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["female", "male"]
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["1", "2", "3"]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("sex", "pclass")
+    assert [t.get_text() for t in ax.texts] == [str(v) for v in want.to_numpy().ravel()]
+    assert ax.figure.axes[1].get_ylabel() == "count"
+
+
+def test_crosstab_norm_gives_shares_within_each_x() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "deck", "crosstab-norm-ann")
+    shares = ax.images[0].get_array()
+    assert np.allclose(shares.sum(axis=0), 1)
+    assert all(t.get_text().endswith("%") for t in ax.texts)
+    cb = ax.figure.axes[1]
+    assert cb.get_ylabel() == "share"
+    assert isinstance(cb.yaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+
+
+def test_crosstab_logc_leaves_empty_pairs_blank() -> None:
+    x, y = ["a", "a", "b"], ["u", "v", "u"]     # (b, v) never occurs
+    ax = kx.plot(x, y, "crosstab-logc-ann-nocb")
+    assert np.ma.is_masked(ax.images[0].get_array()[1, 1])
+    assert len(ax.texts) == 3
+    assert len(ax.figure.axes) == 1
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(PASSENGERS, "sex", spec="crosstab"), "needs both x and y"),
+    (lambda: kx.plot(PASSENGERS, "sex", "pclass", "port", "crosstab"), "takes no z"),
+])
+def test_crosstab_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
+def _heights(ax: Axes) -> list[list[float]]:
+    return [[p.get_height() for p in c] for c in ax.containers]
+
+
+def test_count_matches_value_counts_with_nan_as_a_bar() -> None:
+    ax = kx.plot(PASSENGERS, "deck", "count-ann")
+    want = PASSENGERS.deck.value_counts(dropna=False)
+    ticks = [t.get_text() for t in ax.get_xticklabels()]
+    assert ticks == [*"ABCDEFG", "NaN"]
+    assert _heights(ax) == [[want[np.nan if t == "NaN" else t] for t in ticks]]
+    assert [t.get_text() for t in ax.texts] == [str(want[np.nan if t == "NaN" else t]) for t in ticks]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("deck", "count")
+
+
+def test_count_sort_puts_the_most_common_first() -> None:
+    ax = kx.plot(PASSENGERS, "port", "count-sort")
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["Southampton", "Cherbourg", "Queenstown", "NaN"]
+    assert _heights(ax)[0] == sorted(_heights(ax)[0], reverse=True)
+
+
+def test_count_numeric_categories_in_order() -> None:
+    ax = kx.plot([3, 1, 10, 1, 3, 3], spec="count")
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["1", "3", "10"]
+    assert _heights(ax) == [[2, 3, 1]]
+
+
+def test_count_by_gives_one_container_per_group() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", spec="count", by="port")
+    assert len(ax.containers) == 4                  # 3 ports and NaN
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["Cherbourg", "Queenstown", "Southampton", "NaN"]
+    assert ax.get_legend().get_title().get_text() == "port"
+    want = pd.crosstab(PASSENGERS.port, PASSENGERS.pclass)
+    assert _heights(ax)[:3] == want.to_numpy().tolist()
+    assert [p.get_width() for p in ax.patches] == pytest.approx([0.2] * 12)      # 0.8 shared by 4 groups
+
+
+def test_count_norm_shares() -> None:
+    ax = kx.plot(PASSENGERS, "sex", "count-norm-ann")
+    assert sum(_heights(ax)[0]) == pytest.approx(1)
+    assert all(t.get_text().endswith("%") for t in ax.texts)
+    assert isinstance(ax.yaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+    stacked = kx.plot(PASSENGERS, "pclass", "count-stack-norm", by="survived")
+    assert np.allclose(np.sum(_heights(stacked), axis=0), 1)           # each category's bar is 100%
+    assert stacked.get_legend().get_bbox_to_anchor().x0 > stacked.get_position().x1 - 0.01    # outside
+    grouped = kx.plot(PASSENGERS, "pclass", "count-norm", by="survived")
+    assert np.allclose(np.sum(_heights(grouped), axis=1), 1)           # each group's bars are 100%
+
+
+def test_count_errors() -> None:
+    with pytest.raises(ValueError, match="split them with by="):
+        kx.plot(PASSENGERS, "sex", "pclass", "count")
+
+
+def test_missing_shows_columns_with_nans_most_missing_on_top() -> None:
+    ax = kx.plot(PASSENGERS, "missing")
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["deck", "age", "port"]
+    assert ax.yaxis_inverted()                      # deck, the first label, is drawn on top
+    want = PASSENGERS.isna().mean()
+    assert [p.get_width() for p in ax.patches] == pytest.approx([want.deck, want.age, want.port])
+    assert isinstance(ax.xaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+
+
+def test_missing_all_and_ann() -> None:
+    ax = kx.plot(PASSENGERS, "missing-all-ann")
+    labels = [t.get_text() for t in ax.get_yticklabels()]
+    assert len(labels) == PASSENGERS.shape[1]
+    assert labels[:3] == ["deck", "age", "port"]
+    assert labels[3:] == ["fare", "sex", "pclass", "ticket_type", "survived"]   # ties keep column order
+    texts = [t.get_text() for t in ax.texts]
+    assert texts[0] == f"{PASSENGERS.deck.isna().mean():.1%}"
+    assert all(t.endswith("%") for t in texts)
+
+
+def test_missing_without_nans_says_so() -> None:
+    ax = kx.plot(HEAT, "missing-ann")
+    assert not ax.patches
+    assert [t.get_text() for t in ax.texts] == ["no missing values"]
+
+
+def _bars_and_texts(ax: Axes) -> tuple:
+    return ([t.get_text() for t in ax.get_yticklabels()], [p.get_width() for p in ax.patches],
+            [t.get_text() for t in ax.texts])
+
+
+def test_missing_shortcut_is_the_long_form() -> None:
+    assert _bars_and_texts(kx.missing(PASSENGERS)) == _bars_and_texts(kx.plot(PASSENGERS, "missing-ann"))
+    assert "missing" in kx.__all__
+
+
+def test_missing_shortcut_passes_theme_flags_and_keywords() -> None:
+    ax = kx.missing(PASSENGERS, "dark-all-wrap", title="gaps", color="red")
+    assert len(ax.patches) == PASSENGERS.shape[1]
+    assert ax.get_title() == "gaps"
+    assert to_hex(ax.patches[0].get_facecolor()) == "#ff0000"
+    assert to_hex(ax.get_facecolor()) == "#111418"          # the dark theme, for this plot only
+    with pytest.raises(ValueError, match="unknown tokens"):
+        kx.missing(PASSENGERS, "dakr")
+
+
+def test_nullmap_image_is_where_the_nans_are() -> None:
+    ax = kx.plot(PASSENGERS, "nullmap")
+    im = ax.images[0]
+    assert (im.get_array() == PASSENGERS.isna().to_numpy()).all()
+    assert [t.get_text() for t in ax.get_xticklabels()] == list(PASSENGERS.columns)
+    assert len(ax.get_yticks()) <= 12           # row positions, not 500 ticks
+    assert im.get_interpolation() == "nearest"
+    assert ax.get_aspect() == "auto"
+
+
+def test_nullmap_sort_puts_most_missing_rows_first_and_groups_patterns() -> None:
+    gaps = kx.plot(PASSENGERS, "nullmap-sort").images[0].get_array().astype(bool)
+    counts = gaps.sum(axis=1)
+    assert (np.diff(counts) <= 0).all()
+    assert sorted(map(tuple, gaps)) == sorted(map(tuple, PASSENGERS.isna().to_numpy()))   # the same rows
+    patterns = [tuple(r) for r in gaps]
+    runs = [p for i, p in enumerate(patterns) if i == 0 or p != patterns[i - 1]]
+    assert len(runs) == len(set(patterns))      # each pattern is one block
+
+
+def test_nullmap_colours_follow_theme_and_palette() -> None:
+    with kx.context("dark", palette=["#e9c46a", "#264653"]):
+        ax = kx.plot(PASSENGERS, "nullmap")
+        cmap = ax.images[0].get_cmap()
+        assert to_hex(cmap(0.0)) == to_hex(ax.get_facecolor())     # present: the background
+        assert to_hex(cmap(1.0)) == "#e9c46a"                       # missing: the first palette colour
+    assert ax.images[0].get_clim() == (0, 1)
+
+
+def test_nullmap_without_nans_is_all_background() -> None:
+    im = kx.plot(HEAT, "nullmap").images[0]
+    assert not im.get_array().any()
+    assert to_hex(im.to_rgba(im.get_array())[0, 0]) == to_hex(im.get_cmap()(0.0))
+
+
+CLUMPS = pd.DataFrame({"x": [0, 0, 0, 10, 10, np.nan], "y": [0, 0, 0, 10, 10, 5],
+                       "heat": [1, 2, 3, 4, 6, 100]})       # two clumps of points, and a row with a NaN
+
+
+def test_hexbin_counts_points_per_hexagon() -> None:
+    cloud = kx.load("cloud")
+    ax = kx.plot(cloud, "x", "y", "hexbin", gridsize=10)
+    assert ax.collections[0].get_array().sum() == len(cloud)
+    assert ax.figure.axes[1].get_ylabel() == "count"
+    counts = kx.plot(CLUMPS, "x", "y", "hexbin").collections[0].get_array()
+    assert sorted(counts) == [2, 3]                 # the NaN row is left out, empty cells are not drawn
+
+
+def test_hexbin_z_is_the_mean_per_hexagon() -> None:
+    ax = kx.plot(CLUMPS, "x", "y", "heat", "hexbin")
+    assert sorted(ax.collections[0].get_array()) == [2, 5]
+    assert ax.figure.axes[1].get_ylabel() == "heat"
+
+
+def test_hexbin_colour_flags() -> None:
+    cloud = kx.load("cloud")
+    ax = kx.plot(cloud, "x", "y", "hexbin-logc-nocb")
+    assert isinstance(ax.collections[0].norm, mpl.colors.LogNorm)
+    assert ax.collections[0].get_array().sum() == len(cloud)       # counts, not log10 counts
+    assert len(ax.figure.axes) == 1
+    lo, hi = kx.plot(cloud, "x", "y", "z", "hexbin-sym").collections[0].get_clim()
+    assert lo == -hi
+
+
+@pytest.mark.parametrize(("spec", "cols", "match"), [
+    ("hexbin-logc", ("x", "y", "z"), "needs z > 0"),
+    ("hexbin-sym", ("x", "y"), "counts are never below 0"),
+    ("hexbin", ("x",), "needs both x and y"),
+])
+def test_hexbin_errors(spec: str, cols: tuple[str, ...], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(kx.load("cloud"), *cols, spec)
+
+
 # ---------- flags, title, labels ----------
 def test_flags() -> None:
     ax = kx.plot(X, Y, Z, "line-grid-leg-logx-logy-tight", title="t")
@@ -425,6 +706,30 @@ def test_legout_moves_a_kinds_own_legend_and_keeps_its_title() -> None:
 def test_rot_turns_x_tick_labels() -> None:
     ax = kx.plot(["a", "b", "c"], [1, 2, 3], "bar-rot")
     assert {t.get_rotation() for t in ax.get_xticklabels()} == {45}
+
+
+LONG = ["standard single journey", "short", "first class saloon pass"]
+
+
+@pytest.mark.parametrize(("spec", "axis"), [("bar-wrap", "x"), ("barh-wrap", "y"), ("line-wrap", "x")])
+def test_wrap_breaks_long_tick_labels_at_spaces(spec: str, axis: str) -> None:
+    ax = kx.plot(LONG, [1, 2, 3], spec)
+    ax.figure.canvas.draw()
+    labels = [t.get_text() for t in getattr(ax, f"get_{axis}ticklabels")()]
+    assert labels == ["standard\nsingle\njourney", "short", "first class\nsaloon pass"]
+    assert all(len(line) <= 12 for t in labels for line in t.split("\n"))
+
+
+def test_wrap_keeps_fixed_ticks_and_numbers() -> None:
+    ax = kx.plot(LONG, [1e6, 2e6, 3e6], "bar-wrap-rot-si")
+    assert isinstance(ax.xaxis.get_major_locator(), mpl.ticker.FixedLocator)
+    assert list(ax.get_xticks()) == [0, 1, 2]
+    assert {t.get_rotation() for t in ax.get_xticklabels()} == {45}
+    ax.figure.canvas.draw()
+    assert all("\n" not in t.get_text() for t in ax.get_yticklabels())
+    assert "1M" in [t.get_text() for t in ax.get_yticklabels()]
+    words = kx.plot(["supercalifragilistic", "b"], [1, 2], "bar-wrap")      # one long word stays whole
+    assert words.get_xticklabels()[0].get_text() == "supercalifragilistic"
 
 
 def test_date_reads_text_as_dates() -> None:
@@ -554,6 +859,58 @@ def test_dataframe_column_named_like_a_kind_is_a_column() -> None:
 def test_call_shape_errors(call: Callable[[], Axes], error: type, match: str) -> None:
     with pytest.raises(error, match=match):
         call()
+
+
+@pytest.fixture
+def table_kind() -> Iterator[list]:
+    """A dummy table kind 'tbl' that records what draw gets, removed after the test."""
+    seen = []
+    kx._spec.kind("tbl", table=True)(lambda ax, x, y, z, flags, **kw: seen.append((x, y, z)))
+    yield seen
+    del kx._spec.KINDS["tbl"]
+
+
+def test_table_kind_gets_the_whole_frame(table_kind: list) -> None:
+    assert not kx._spec.KINDS["tbl"].needs_y
+    kx.plot(DF, "tbl")
+    kx.plot(DF, spec="tbl")
+    for x, y, z in table_kind:
+        assert x is DF
+        assert y is None
+        assert z is None
+
+
+def test_table_kind_takes_a_2d_array_with_numbered_labels(table_kind: list) -> None:
+    m = np.arange(6).reshape(2, 3)
+    kx.plot(m, "tbl")
+    x = table_kind[0][0]
+    assert isinstance(x, pd.DataFrame)
+    assert (x.to_numpy() == m).all()
+    assert list(x.columns) == [0, 1, 2]
+    assert list(x.index) == [0, 1]
+
+
+@pytest.mark.parametrize("call", [
+    lambda: kx.plot(DF, "t", "speed", "tbl"),
+    lambda: kx.plot(DF, "t", "tbl"),
+    lambda: kx.plot(DF, "tbl", by="group"),
+    lambda: kx.plot(X, "tbl"),
+])
+def test_table_kind_rejects_columns_y_z_and_by(table_kind: list, call: Callable[[], Axes]) -> None:
+    with pytest.raises(TypeError, match=r"takes a whole table.*kx.plot\(df\[cols\], 'tbl'\)"):
+        call()
+
+
+def test_frame_without_columns_hints_table_kinds(table_kind: list) -> None:
+    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: heat, missing, nullmap, tbl"):
+        kx.plot(DF, "line")
+
+
+def test_grammar_says_a_table_kind_takes_a_frame(table_kind: list, capsys: pytest.CaptureFixture[str]) -> None:
+    kx.grammar("tbl")
+    assert "takes a DataFrame or 2-D array" in capsys.readouterr().out
+    kx.grammar("line")
+    assert "DataFrame" not in capsys.readouterr().out
 
 
 def test_kwargs_reach_matplotlib_and_win_over_defaults() -> None:
@@ -709,13 +1066,15 @@ def test_palettes_discovers_new_files(tmp_path: Path, monkeypatch: pytest.Monkey
 
 # ---------- colormaps ----------
 def test_cmaps_lists_matplotlib_builtins() -> None:
-    assert kx.cmaps() == sorted(n for n in kx.BUILTIN_CMAPS + kx.VENDORED_CMAPS if n in mpl.colormaps)
+    names = (*kx.BUILTIN_CMAPS, *kx.BREWER_CMAPS, *kx.VENDORED_CMAPS)
+    assert kx.cmaps() == sorted(n for n in names if n in mpl.colormaps)
     assert set(kx.BUILTIN_CMAPS) - {"berlin", "managua", "vanimo"} <= set(kx.cmaps())   # only these need 3.10
 
 
 def test_cmaps_skips_names_missing_from_matplotlib(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(kx._theme, "BUILTIN_CMAPS", ("viridis", "notacmap"))
     monkeypatch.setattr(kx._theme, "VENDORED_CMAPS", ())
+    monkeypatch.setattr(kx._theme, "BREWER_CMAPS", {})
     assert kx.cmaps() == ["viridis"]
 
 
@@ -725,7 +1084,16 @@ def test_vendored_cmaps_are_registered(name: str) -> None:
     assert name in kx.cmaps()
 
 
-@pytest.mark.parametrize("name", ["viridis", *kx.VENDORED_CMAPS])
+@pytest.mark.parametrize(("name", "brewer"), kx.BREWER_CMAPS.items())
+def test_brewer_cmaps_are_lowercase_copies(name: str, brewer: str) -> None:
+    assert name in mpl.colormaps
+    assert name in kx.cmaps()
+    assert mpl.colormaps[name].name == name
+    for v in (0, 0.5, 1):
+        assert to_hex(mpl.colormaps[name](v)) == to_hex(mpl.colormaps[brewer](v))
+
+
+@pytest.mark.parametrize("name", ["viridis", *kx.BREWER_CMAPS, *kx.VENDORED_CMAPS])
 def test_use_reversed_cmap(name: str) -> None:
     kx.use("light", cmap=f"{name}_r")
     rev = kx.plot(X, Y, Z, "scatter").collections[0].get_cmap()
@@ -733,11 +1101,12 @@ def test_use_reversed_cmap(name: str) -> None:
     assert to_hex(rev(1.0)) == to_hex(mpl.colormaps[name](0.0))
 
 
-@pytest.mark.parametrize("name", kx.BUILTIN_CMAPS + kx.VENDORED_CMAPS)
+@pytest.mark.parametrize("name", [*kx.BUILTIN_CMAPS, *kx.BREWER_CMAPS, *kx.VENDORED_CMAPS])
 def test_use_cmap_colours_scatter(name: str) -> None:
     if name not in mpl.colormaps:
         pytest.skip(f"{name} needs a newer matplotlib")
     kx.use("light", cmap=name)
+    assert mpl.rcParams["image.cmap"] == name
     assert kx.plot(X, Y, Z, "scatter").collections[0].get_cmap().name == name
 
 
@@ -896,7 +1265,7 @@ def test_save_without_extension_uses_theme_format(kaggle: Path) -> None:
 
 # ---------- data ----------
 def test_datasets_and_load() -> None:
-    assert {"waves", "cloud", "monthly", "dists", "daily"} <= set(kx.datasets())
+    assert {"waves", "cloud", "monthly", "dists", "daily", "passengers"} <= set(kx.datasets())
     assert list(kx.load("waves").columns) == ["x", "y", "z"]
 
 
@@ -906,6 +1275,28 @@ def test_daily_is_two_full_years_of_days() -> None:
     days = pd.to_datetime(daily.date)
     assert days.diff().iloc[1:].eq(pd.Timedelta("1D")).all()
     assert (days.iloc[0], days.iloc[-1]) == (pd.Timestamp("2025-01-01"), pd.Timestamp("2026-12-31"))
+
+
+def test_passengers_has_categories_and_nans() -> None:
+    p = kx.load("passengers")
+    assert p.shape == (500, 8)
+    assert list(p.columns) == ["age", "fare", "sex", "pclass", "port", "deck", "ticket_type", "survived"]
+    assert all(pd.api.types.is_float_dtype(p[c]) for c in ("age", "fare"))
+    assert all(pd.api.types.is_integer_dtype(p[c]) for c in ("pclass", "survived"))
+    for c in ("sex", "port", "deck", "ticket_type"):
+        assert all(isinstance(v, str) for v in p[c].dropna())
+    assert set(p.pclass) == {1, 2, 3}
+    assert set(p.survived) == {0, 1}
+    assert p.sex.nunique() == 2
+    assert p.port.nunique() == 3
+    assert set(p.deck.dropna()) == set("ABCDEFG")
+    assert p.ticket_type.str.len().min() > 12
+    assert p.fare.mean() > p.fare.median()
+    nans = p.isna().mean()
+    assert nans.age == pytest.approx(0.2, abs=0.05)
+    assert nans.deck == pytest.approx(0.75, abs=0.05)
+    assert 0 < nans.port < 0.03
+    assert (nans.drop(["age", "deck", "port"]) == 0).all()
 
 
 def test_load_unknown() -> None:
