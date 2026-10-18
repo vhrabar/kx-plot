@@ -45,10 +45,11 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 | Token | Values                                                                                        |
 |-------|-----------------------------------------------------------------------------------------------|
 | kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
-|       | `strip` `qq`                                                                                  |
+|       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap`                           |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
-| flags | `grid` `leg` `legout` `tight` `rot` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct` `si`    |
-|       | per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb` `sym` `logc`   |
+| flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
+|       | `si`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb` `sym`    |
+|       | `logc` `corr` `all`                                                                           |
 
 `stack` works with `area`, `bar`, `barh` and `hist`. `norm` is a 100% stack for `area` and a
 density (area 1) for `hist`. `cum` makes `hist` cumulative; `hist-norm-cum` is the CDF.
@@ -57,6 +58,23 @@ density (area 1) for `hist`. `cum` makes `hist` cumulative; `hist-norm-cum` is t
 Unknown tokens raise an error instead of being guessed, with the closest valid tokens as a hint.
 Everything is inspectable: `kx.grammar()`, `kx.grammar('area')`, `kx.parse('leg-scatter')`, `kx.show('dark')`,
 `kx.source('scatter')`.
+
+### Tables
+
+`kx.load('passengers')` is a demo table with numbers, categories and NaNs to try these on.
+
+```python
+kx.missing(df)                                     # share of NaNs per column, the most missing on top
+kx.plot(df, 'nullmap-sort')                        # where the NaNs are: one pixel row per table row
+kx.plot(df, 'heat-corr-ann')                       # correlations of the numeric columns, -1 to 1
+kx.plot(df, 'heat')                                # any numeric DataFrame or 2-D array as coloured cells
+kx.plot(df, 'pclass', spec='count', by='survived') # rows per category, split by a second column
+kx.plot(df, 'pclass', 'port', 'crosstab-norm-ann') # how often each pair of categories occurs
+kx.plot(df, 'age', 'fare', 'hexbin-logc')          # points per hexagon; with a z, its mean per hexagon
+```
+
+`heat`, `missing` and `nullmap` take the whole table and no column names; `kx.plot(df[cols], 'heat')` for some
+columns. `wrap` breaks long tick labels onto several lines.
 
 rcParams can be overridden in `kx.use` with `__` for dots: `kx.use('dark', figure__figsize=(8, 4))`.
 

@@ -32,7 +32,8 @@ def heat(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any
                          "Pass df.select_dtypes('number'), or use 'corr'")
     corr = {"cmap": "rdbu", "norm": mpl.colors.Normalize(-1, 1)}  # the scale of r, whatever this data's range
     style = corr if "corr" in flags else {"norm": norm(frame.to_numpy(dtype=float), flags)}
-    _matrix(ax, frame, flags, "r" if "corr" in flags else "", **{**style, **kw})
+    _matrix(ax, frame, flags, "r" if "corr" in flags else "", "{:.2f}" if "corr" in flags else "{:.3g}",
+            **{**style, **kw})
 
 
 def _check_crosstab(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:

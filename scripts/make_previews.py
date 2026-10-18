@@ -17,12 +17,13 @@ import kx  # noqa: E402
 
 
 def render(theme: str, out_dir: str) -> str:
-    """Draw one panel per kind in `theme`, 5 per row, and save it as PNG."""
-    waves, cloud, monthly, dists = (kx.load(n) for n in ("waves", "cloud", "monthly", "dists"))
+    """Draw one panel per kind in `theme`, 7 per row, and save it as PNG."""
+    waves, cloud, monthly, dists, passengers = (kx.load(n) for n in ("waves", "cloud", "monthly", "dists",
+                                                                     "passengers"))
     spread = (0.1 + waves.x / 40).rename("std")
     samples = (dists.normal, dists.skewed, dists.bimodal)
     kx.use(theme)
-    a = iter(axs := kx.grid(15, cols=5))
+    a = iter(axs := kx.grid(21, cols=7))
     fig = axs[0].figure
     kx.plot(waves.x, waves.y, waves.z, "line-leg", title="line", ax=next(a))
     kx.plot(monthly.month, monthly.y2025, monthly.y2026, "step-leg", title="step", ax=next(a))
@@ -39,6 +40,12 @@ def render(theme: str, out_dir: str) -> str:
     kx.plot(*samples, spec="violin", title="violin", ax=next(a))
     kx.plot(*samples, spec="strip", title="strip", ax=next(a))
     kx.plot(*samples, spec="qq", title="qq", ax=next(a))
+    kx.plot(cloud, "heat-corr-ann", title="heat-corr", ax=next(a))
+    kx.plot(passengers, "pclass", "port", "crosstab-ann", title="crosstab", ax=next(a))
+    kx.plot(passengers, "pclass", spec="count-leg", by="survived", title="count", ax=next(a))
+    kx.plot(passengers, "missing-ann-wrap", title="missing", ax=next(a))
+    kx.plot(passengers, "nullmap-sort-rot", title="nullmap", ax=next(a))
+    kx.plot(cloud.x, cloud.y, "hexbin", title="hexbin", gridsize=12, ax=next(a))
     fig.suptitle(theme)
     path = os.path.join(out_dir, f"{theme}.png")
     fig.savefig(path, bbox_inches="tight")

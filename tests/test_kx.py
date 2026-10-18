@@ -421,6 +421,14 @@ def test_heat_ann_writes_every_cell_in_contrasting_ink() -> None:
     assert texts[2].get_color() == "white"      # 9, the highest: black cell
 
 
+def test_heat_ann_keeps_three_digits_and_corr_two_decimals() -> None:
+    texts = [t.get_text() for t in kx.plot(HEAT * 40, "heat-ann").texts]
+    assert texts[:3] == ["40", "160", "360"]    # not 1.6e+02
+    corr = [t.get_text() for t in kx.plot(HEAT, "heat-corr-ann").texts]
+    assert corr[0] == "1.00"
+    assert all(len(t.lstrip("-")) == 4 for t in corr)
+
+
 def test_heat_colour_flags() -> None:
     lo, hi = kx.plot(HEAT - 5, "heat-sym").images[0].get_clim()
     assert lo == -hi == -4
