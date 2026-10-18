@@ -578,6 +578,41 @@ def test_missing_shortcut_passes_theme_flags_and_keywords() -> None:
         kx.missing(PASSENGERS, "dakr")
 
 
+def test_nullmap_image_is_where_the_nans_are() -> None:
+    ax = kx.plot(PASSENGERS, "nullmap")
+    im = ax.images[0]
+    assert (im.get_array() == PASSENGERS.isna().to_numpy()).all()
+    assert [t.get_text() for t in ax.get_xticklabels()] == list(PASSENGERS.columns)
+    assert len(ax.get_yticks()) <= 12           # row positions, not 500 ticks
+    assert im.get_interpolation() == "nearest"
+    assert ax.get_aspect() == "auto"
+
+
+def test_nullmap_sort_puts_most_missing_rows_first_and_groups_patterns() -> None:
+    gaps = kx.plot(PASSENGERS, "nullmap-sort").images[0].get_array().astype(bool)
+    counts = gaps.sum(axis=1)
+    assert (np.diff(counts) <= 0).all()
+    assert sorted(map(tuple, gaps)) == sorted(map(tuple, PASSENGERS.isna().to_numpy()))   # the same rows
+    patterns = [tuple(r) for r in gaps]
+    runs = [p for i, p in enumerate(patterns) if i == 0 or p != patterns[i - 1]]
+    assert len(runs) == len(set(patterns))      # each pattern is one block
+
+
+def test_nullmap_colours_follow_theme_and_palette() -> None:
+    with kx.context("dark", palette=["#e9c46a", "#264653"]):
+        ax = kx.plot(PASSENGERS, "nullmap")
+        cmap = ax.images[0].get_cmap()
+        assert to_hex(cmap(0.0)) == to_hex(ax.get_facecolor())     # present: the background
+        assert to_hex(cmap(1.0)) == "#e9c46a"                       # missing: the first palette colour
+    assert ax.images[0].get_clim() == (0, 1)
+
+
+def test_nullmap_without_nans_is_all_background() -> None:
+    im = kx.plot(HEAT, "nullmap").images[0]
+    assert not im.get_array().any()
+    assert to_hex(im.to_rgba(im.get_array())[0, 0]) == to_hex(im.get_cmap()(0.0))
+
+
 # ---------- flags, title, labels ----------
 def test_flags() -> None:
     ax = kx.plot(X, Y, Z, "line-grid-leg-logx-logy-tight", title="t")
@@ -820,7 +855,7 @@ def test_table_kind_rejects_columns_y_z_and_by(table_kind: list, call: Callable[
 
 
 def test_frame_without_columns_hints_table_kinds(table_kind: list) -> None:
-    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: heat, missing, tbl"):
+    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: heat, missing, nullmap, tbl"):
         kx.plot(DF, "line")
 
 

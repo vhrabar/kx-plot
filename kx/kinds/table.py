@@ -75,6 +75,22 @@ def missing(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: 
     ax.set_xlabel("missing")
 
 
+@kind("nullmap", flags=("sort",), table=True)
+def nullmap(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any) -> None:
+    """Where the missing values are: one row per row of the table, columns along x, missing cells in the
+    palette's first colour on the background. sort = the rows with the most missing on top. kw: ax.imshow."""
+    gaps = x.isna()
+    if "sort" in flags:                         # most missing first; ties by pattern, so the same gaps form a block
+        g = gaps.to_numpy()
+        gaps = gaps.iloc[np.lexsort([*(~g[:, j] for j in reversed(range(g.shape[1]))), -g.sum(axis=1)])]
+    colours = mpl.colors.ListedColormap([ax.get_facecolor(), mpl.colors.to_rgba("C0")])
+    ax.imshow(gaps.to_numpy(dtype=float), **{"cmap": colours, "vmin": 0, "vmax": 1, "interpolation": "nearest",
+                                             "aspect": "auto", **kw})
+    ax.set_xticks(range(gaps.shape[1]), [str(c) for c in gaps.columns])
+    ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(10, integer=True))    # row positions, not every row
+    ax.set_ylabel("row, most missing first" if "sort" in flags else "row")
+
+
 def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: str = "{:.2g}", **kw: Any) -> None:
     """frame as an image: column labels along x, index labels down y, a colorbar, ann = fmt in each cell."""
     values = frame.to_numpy(dtype=float)
