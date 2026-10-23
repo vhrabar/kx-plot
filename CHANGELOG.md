@@ -32,6 +32,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   (`gbm (AUC 0.80)`), which it draws without `leg`. A dotted diagonal marks a random model, and both axes run
   from 0 to 1 at equal scale. `z` adds a second model's score. A 2-D score, one column per class, draws one
   curve per class, one-vs-rest, named after the DataFrame's columns or else the sorted labels of `y_true`.
+- **Plot kind** `pr`: the precision-recall curve, `kx.plot(y_true, score, 'pr')`, with the average precision in
+  the legend (`gbm (AP 0.80)`) and a dotted baseline at the positive rate, what a random model gets. The curve
+  is drawn in the steps that the average precision sums. `z` adds a second model on the same baseline; a 2-D
+  score draws one curve per class, each with its own baseline in its colour.
 
 ## [0.4.0] - 2026-10-18
 

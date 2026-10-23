@@ -587,6 +587,39 @@ def test_roc_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+def _dotted(ax: Axes) -> list:
+    return [ln for ln in ax.lines if ln.get_linestyle() == ":"]
+
+
+def test_pr_baseline_at_the_positive_rate_and_ap_in_the_legend() -> None:
+    ax = kx.plot(BINARY, "y", "gbm", "pr")
+    curve, = _curves(ax)
+    assert (curve.get_xdata()[0], curve.get_ydata()[0]) == (0, 1)
+    assert curve.get_xdata()[-1] == 1
+    assert curve.get_drawstyle() == "steps-pre"
+    assert _legend(ax) == [f"gbm (AP {kx.pr_ap(BINARY.y, BINARY.gbm):.2f})"]
+    base, = _dotted(ax)
+    assert list(base.get_ydata()) == pytest.approx([BINARY.y.mean()] * 2)
+    assert list(base.get_xdata()) == [0, 1]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("recall", "precision")
+    assert (ax.get_xlim(), ax.get_ylim()) == ((0, 1), (0, 1))
+
+
+def test_pr_z_shares_one_baseline() -> None:
+    ax = kx.plot(BINARY, "y", "gbm", "logreg", "pr")
+    assert len(_curves(ax)) == 2
+    assert len(_dotted(ax)) == 1
+    assert _legend(ax)[1].startswith("logreg (AP ")
+
+
+def test_pr_multiclass_one_baseline_per_class_in_its_colour() -> None:
+    ax = kx.plot(MULTI.y, MULTI[["cat", "dog", "bird"]], "pr")
+    curves, bases = _curves(ax), _dotted(ax)
+    assert [t.split(" ")[0] for t in _legend(ax)] == ["cat", "dog", "bird"]
+    assert [b.get_ydata()[0] for b in bases] == pytest.approx([(MULTI.y == c).mean() for c in ("cat", "dog", "bird")])
+    assert [to_hex(b.get_color()) for b in bases] == [to_hex(c.get_color()) for c in curves]
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 

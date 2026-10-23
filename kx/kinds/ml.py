@@ -9,7 +9,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
-from .._metrics import binary, classes, confusion, roc_auc, roc_curve
+from .._metrics import binary, classes, confusion, pr_ap, pr_curve, roc_auc, roc_curve
 from .._spec import kind
 from .._util import label
 from .table import _matrix
@@ -77,19 +77,19 @@ def _scored(x: ArrayLike, y: ArrayLike, z: ArrayLike | None) -> list[tuple[np.nd
     return [((truth == c).astype(int), scores[:, j], str(name)) for j, (c, name) in enumerate(pairs)]
 
 
-def _chance(ax: Axes, xs: list[float], ys: list[float]) -> None:
-    """A dotted line for what a random model scores."""
-    ax.plot(xs, ys, color=plt.rcParams["text.color"], linestyle=":", linewidth=1, marker="", alpha=0.6,
-            zorder=1)
+def _chance(ax: Axes, xs: list[float], ys: list[float], color: Any = None) -> None:
+    """A dotted line for what a random model scores, in the text colour unless it belongs to one curve."""
+    ax.plot(xs, ys, color=color or plt.rcParams["text.color"], linestyle=":", linewidth=1, marker="",
+            alpha=0.6, zorder=1)
 
 
-def _unit(ax: Axes, xlabel: str, ylabel: str) -> None:
-    """Both axes from 0 to 1, labelled, with the legend in the lower right: the metric is the point of the plot."""
+def _unit(ax: Axes, xlabel: str, ylabel: str, loc: str) -> None:
+    """Both axes from 0 to 1, labelled, with the legend drawn: the metric is the point of the plot."""
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.legend(loc="lower right")
+    ax.legend(loc=loc)
 
 
 @kind("roc", check=_check_scores)
@@ -102,4 +102,23 @@ def roc(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[st
         ax.plot(fpr, tpr, **{"label": f"{name} (AUC {roc_auc(t, s):.2f})", **kw})
     _chance(ax, [0, 1], [0, 1])
     ax.set_aspect("equal")
-    _unit(ax, "false positive rate", "true positive rate")
+    _unit(ax, "false positive rate", "true positive rate", "lower right")
+
+
+@kind("pr", check=_check_scores)
+def pr(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """Precision-recall curve: kx.plot(y_true, score, 'pr'), precision against recall as the threshold falls,
+    with the average precision in the legend and a dotted baseline at the positive rate, what a random model gets.
+    z = a second model's score; a 2-D score (one column per class) draws one curve and baseline per class,
+    one-vs-rest. kw: the curves (ax.plot)."""
+    curves = _scored(x, y, z)
+    shared = len(curves) == 1 or z is not None              # y and z score the same truth: one baseline
+    for t, s, name in curves:
+        precision, recall, _ = pr_curve(t, s)
+        ln, = ax.plot(recall, precision, **{"drawstyle": "steps-pre",      # the steps AP sums
+                                            "label": f"{name} (AP {pr_ap(t, s):.2f})", **kw})
+        if not shared:
+            _chance(ax, [0, 1], [t.mean()] * 2, ln.get_color())
+    if shared:
+        _chance(ax, [0, 1], [curves[0][0].mean()] * 2)
+    _unit(ax, "recall", "precision", "lower left")
