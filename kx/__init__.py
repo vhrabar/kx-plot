@@ -4,14 +4,15 @@ kx: tiny matplotlib helper.
 Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
   kind  : line | step | area | band | scatter | bar | barh | hist | kde | ridge | ecdf | box | violin | strip
           | qq | heat | crosstab | count | missing | nullmap | hexbin
-          | cm | roc | pr | calib | proba | thresh | gain | lift
+          | cm | roc | pr | calib | proba | thresh | gain | lift | pva | resid
   theme : any file name in styles/
   flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si
           and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
           stack norm (count),
           mean median ann (distributions), nocb sym logc (scatter, heat, hexbin), corr ann (heat),
           norm ann nocb logc (crosstab), ann all (missing), sort (nullmap), diag (scatter, hexbin),
-          fit (scatter), norm ann nocb (cm), norm (proba), best (thresh).
+          fit (scatter), norm ann nocb (cm), norm (proba), best (thresh),
+          nocb sym logc (resid).
           kx.grammar(kind) lists them.
 by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count)
 table  : heat, missing and nullmap take a whole DataFrame or 2-D array, with no column names: kx.plot(df, 'heat-corr')

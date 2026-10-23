@@ -10,12 +10,27 @@ import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
-from .._metrics import binary, brier, calibration, classes, confusion, pr_ap, pr_curve, roc_auc, roc_curve, thresholds
+from .._metrics import (
+    binary,
+    brier,
+    calibration,
+    classes,
+    confusion,
+    fit_errors,
+    pr_ap,
+    pr_curve,
+    roc_auc,
+    roc_curve,
+    thresholds,
+)
 from .._metrics import gain as gains
 from .._spec import kind
-from .._util import label
+from .._util import COLOUR, label
+from .basic import _check_scatter, scatter
 from .dist import _hist
-from .table import _matrix
+from .table import _matrix, hexbin
+
+HEXBIN = 5000                                   # pva: more points than this draw as hexagons
 
 
 def _flat(a: ArrayLike, name: str) -> np.ndarray:
@@ -251,3 +266,41 @@ def lift(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[s
     the top rows hold than the same share picked at random; the dotted line at 1 is random.
     z = a second model's score; a 2-D score draws one curve per class, one-vs-rest. kw: the curves (ax.plot)."""
     _ranked(ax, x, y, z, True, **kw)
+
+
+def _check_pva(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if z is not None:
+        raise ValueError("kind 'pva' compares actual (x) with predicted (y); it takes no z. "
+                         "To colour by a third column, use 'resid'")
+
+
+@kind("pva", check=_check_pva)
+def pva(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: Any) -> None:
+    """Predicted against actual: kx.plot(actual, predicted, 'pva'), with the dashed y = x line a perfect model lies
+    on and R², RMSE and MAE in the corner. Over 5,000 points it draws hexagons (hexbin), so big test sets stay
+    readable. kw: ax.scatter, or ax.hexbin over 5,000 points."""
+    r2, rmse, mae = fit_errors(x, y)
+    if np.size(x) > HEXBIN:
+        hexbin(ax, x, y, None, {"diag"}, **kw)
+    else:
+        scatter(ax, x, y, None, {"diag"}, **kw)
+    ax.text(0.03, 0.97, f"R² {r2:.3f}\nRMSE {rmse:.3g}\nMAE {mae:.3g}", transform=ax.transAxes, ha="left",
+            va="top", bbox={"boxstyle": "round", "facecolor": ax.get_facecolor(), "edgecolor": "none",
+                            "alpha": 0.85})
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.set_xlabel(label(x, "actual"))
+    ax.set_ylabel(label(y, "predicted"))
+
+
+@kind("resid", flags=COLOUR, check=_check_scatter)
+def resid(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """Residuals: kx.plot(actual, predicted, 'resid'), actual - predicted against predicted, with a line at 0.
+    Above it the model guessed too low, below too high; a funnel means the error grows with the prediction.
+    z colours the points as in scatter (a colorbar for numbers, a legend for categories), with nocb, sym and logc.
+    kw: ax.scatter."""
+    fit_errors(x, y)                            # same lengths, no NaN
+    a, p = np.asarray(x, dtype=float).ravel(), np.asarray(y, dtype=float).ravel()
+    scatter(ax, p, a - p, z, flags & set(COLOUR), **kw)
+    ax.axhline(0, color=plt.rcParams["text.color"], linestyle="--", linewidth=1, alpha=0.6, zorder=1)
+    ax.set_xlabel(label(y, "predicted"))
+    ax.set_ylabel("residual (actual - predicted)")

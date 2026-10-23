@@ -52,6 +52,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   the share of rows taken, highest scores first, between a dotted diagonal (a random order) and a dashed corner
   at the positive rate (a perfect one). `lift` divides the gain by the random order's, so how many times more
   positives the top rows hold, with a dotted line at 1. `z` adds a second model to both.
+- **Plot kind** `pva`: predicted against actual for a regression, `kx.plot(actual, predicted, 'pva')`, with the
+  dashed `y = x` line, equal scales, and R², RMSE and MAE in the corner. Above 5,000 points it draws hexagons
+  (`hexbin`) instead of dots, so big test sets stay readable.
+- **Plot kind** `resid`: residuals (`actual - predicted`) against predicted, with a dashed line at 0. `z` colours
+  the points as in `scatter`, such as by a feature, and takes `nocb`, `sym` and `logc`.
 
 ## [0.4.0] - 2026-10-18
 

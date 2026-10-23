@@ -529,7 +529,7 @@ def test_cm_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
-BINARY, MULTI = kx.load("binary"), kx.load("multiclass")
+BINARY, MULTI, REGRESSION = kx.load("binary"), kx.load("multiclass"), kx.load("regression")
 
 
 def _curves(ax: Axes) -> list:
@@ -771,6 +771,51 @@ def test_gain_multiclass_one_perfect_corner_per_class() -> None:
     assert _legend(ax) == ["cat", "dog", "bird"]
     corners = [ln for ln in _dotted(ax) if len(ln.get_xdata()) == 3]
     assert [c.get_xdata()[1] for c in corners] == pytest.approx([(MULTI.y == c).mean() for c in ("cat", "dog", "bird")])
+
+
+def test_pva_metrics_by_hand_in_the_corner() -> None:
+    assert kx._metrics.fit_errors([1, 2, 3, 4], [1, 2, 3, 5]) == pytest.approx((0.8, 0.5, 0.25))
+    ax = kx.plot(pd.Series([1, 2, 3, 4], name="price"), pd.Series([1, 2, 3, 5], name="guess"), "pva")
+    box, = ax.texts
+    assert box.get_text() == "R² 0.800\nRMSE 0.5\nMAE 0.25"
+    line, = _dashed(ax)
+    assert (line.get_xdata().min(), line.get_xdata().max()) == (1, 5)
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("price", "guess")
+    assert ax.get_aspect() == 1
+
+
+def test_pva_switches_to_hexbin_over_5000_points() -> None:
+    rng = np.random.default_rng(0)
+    small = kx.plot(REGRESSION.actual, REGRESSION.predicted, "pva")
+    assert isinstance(small.collections[0], mpl.collections.PathCollection)
+    assert len(small.figure.axes) == 1
+    a = rng.normal(size=5001)
+    big = kx.plot(a, a + rng.normal(size=5001), "pva")
+    assert isinstance(big.collections[0], mpl.collections.PolyCollection)     # hexagons, with a count colorbar
+    assert big.figure.axes[1].get_ylabel() == "count"
+    assert len(_dashed(big)) == 1
+
+
+def test_resid_sign_line_at_zero_and_z_colour() -> None:
+    ax = kx.plot([3, 1], [1, 2], "resid")                   # actual 3 predicted 1: +2; actual 1 predicted 2: -1
+    assert ax.collections[0].get_offsets().tolist() == [[1, 2], [2, -1]]
+    zero, = _dashed(ax)
+    assert list(zero.get_ydata()) == [0, 0]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("predicted", "residual (actual - predicted)")
+    coloured = kx.plot(REGRESSION, "actual", "predicted", "x", "resid-sym")
+    assert coloured.figure.axes[1].get_ylabel() == "x"
+    assert len(kx.plot(REGRESSION, "actual", "predicted", "x", "resid-nocb").figure.axes) == 1
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot([1, 2], [1, 2], [1, 2], "pva"), "takes no z"),
+    (lambda: kx.plot([1, 2], [1, np.nan], "pva"), "NaN"),
+    (lambda: kx.plot([1, 2, 3], [1, 2], "resid"), "actual has 3 values but predicted has 2"),
+    (lambda: kx.plot([1, 2], [1, 2], "resid-logc"), "colour a numeric z"),
+])
+def test_pva_resid_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
 
 
 def _heights(ax: Axes) -> list[list[float]]:

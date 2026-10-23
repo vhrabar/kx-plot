@@ -107,6 +107,19 @@ def confusion(y: ArrayLike, p: ArrayLike, labels: list[Any] | None = None) -> np
     return m
 
 
+def fit_errors(actual: ArrayLike, predicted: ArrayLike) -> tuple[float, float, float]:
+    """R², RMSE and MAE of a regression's predictions. R² is 1 - SSres / SStot, so below 0 is worse than the mean."""
+    a, p = np.asarray(actual, dtype=float).ravel(), np.asarray(predicted, dtype=float).ravel()
+    if len(a) != len(p):
+        raise ValueError(f"actual has {len(a)} values but predicted has {len(p)}")
+    if not (np.isfinite(a).all() and np.isfinite(p).all()):
+        raise ValueError("actual or predicted has NaN or inf values; drop those rows first")
+    err = a - p
+    total = np.sum((a - a.mean()) ** 2)
+    r2 = 1 - np.sum(err ** 2) / total if total else float("nan")
+    return float(r2), float(np.sqrt(np.mean(err ** 2))), float(np.mean(np.abs(err)))
+
+
 def brier(y: ArrayLike, s: ArrayLike) -> float:
     """Mean squared gap between the score and the 0/1 outcome: 0 is perfect."""
     t, sc = _pair(y, s)
