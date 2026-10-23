@@ -48,6 +48,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `kx.plot(y_true, score, 'thresh')`, where a row is positive when its score is at or above the threshold.
 - **Flag** `best` (`thresh`): a dashed vertical line at the threshold with the highest F1, labelled in the legend
   (`best F1 0.74 at 0.38`).
+- **Plot kinds** `gain` and `lift`: `kx.plot(y_true, score, 'gain')` draws the share of positives found against
+  the share of rows taken, highest scores first, between a dotted diagonal (a random order) and a dashed corner
+  at the positive rate (a perfect one). `lift` divides the gain by the random order's, so how many times more
+  positives the top rows hold, with a dotted line at 1. `z` adds a second model to both.
 
 ## [0.4.0] - 2026-10-18
 

@@ -732,6 +732,47 @@ def test_thresh_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+def test_gain_ends_at_one_with_the_perfect_corner_at_the_positive_rate() -> None:
+    ax = kx.plot(BINARY, "y", "gbm", "gain")
+    curves = {ln.get_label(): ln for ln in _curves(ax)}
+    assert list(curves) == ["gbm", "perfect"]
+    model = curves["gbm"]
+    assert (model.get_xdata()[0], model.get_ydata()[0]) == (0, 0)
+    assert (model.get_xdata()[-1], model.get_ydata()[-1]) == (1, 1)
+    assert list(curves["perfect"].get_xdata()) == pytest.approx([0, BINARY.y.mean(), 1])
+    assert list(curves["perfect"].get_ydata()) == [0, 1, 1]
+    assert list(_dotted(ax)[0].get_ydata()) == [0, 1]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("rows taken, highest score first", "positives found")
+
+
+def test_gain_by_hand_and_a_second_model() -> None:
+    ax = kx.plot([1, 0, 1, 0], [0.9, 0.8, 0.7, 0.1], "gain")
+    model = _curves(ax)[0]
+    assert list(model.get_xdata()) == [0, 0.25, 0.5, 0.75, 1]
+    assert list(model.get_ydata()) == [0, 0.5, 0.5, 1, 1]
+    ax = kx.plot(BINARY, "y", "gbm", "logreg", "gain")
+    assert _legend(ax) == ["gbm", "logreg", "perfect"]
+
+
+def test_lift_is_one_when_every_row_is_taken() -> None:
+    ax = kx.plot(BINARY, "y", "gbm", "logreg", "lift")
+    for curve in _curves(ax):
+        assert curve.get_xdata()[-1] == 1
+        assert curve.get_ydata()[-1] == pytest.approx(1)
+        assert curve.get_ydata()[0] > 1.5                   # the top rows hold far more positives than average
+    assert list(_dotted(ax)[0].get_ydata()) == [1, 1]
+    assert ax.get_ylabel() == "lift"
+    lifted = _curves(kx.plot([1, 0, 1, 0], [0.9, 0.8, 0.7, 0.1], "lift"))[0]
+    assert list(lifted.get_ydata()) == pytest.approx([2, 1, 4 / 3, 1])
+
+
+def test_gain_multiclass_one_perfect_corner_per_class() -> None:
+    ax = kx.plot(MULTI.y, MULTI[["cat", "dog", "bird"]], "gain")
+    assert _legend(ax) == ["cat", "dog", "bird"]
+    corners = [ln for ln in _dotted(ax) if len(ln.get_xdata()) == 3]
+    assert [c.get_xdata()[1] for c in corners] == pytest.approx([(MULTI.y == c).mean() for c in ("cat", "dog", "bird")])
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 

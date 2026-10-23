@@ -3,6 +3,7 @@ Machine-learning kinds: truth first, then predictions or scores.
 """
 from typing import Any
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
 from .._metrics import binary, brier, calibration, classes, confusion, pr_ap, pr_curve, roc_auc, roc_curve, thresholds
+from .._metrics import gain as gains
 from .._spec import kind
 from .._util import label
 from .dist import _hist
@@ -199,3 +201,53 @@ def thresh(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw:
     ax.set_ylim(0, 1.02)
     ax.set_xlabel(f"threshold on {label(y, 'score')}")
     ax.legend(loc="lower left")
+
+
+def _ranked(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, lift: bool, **kw: Any) -> None:
+    """gain or lift of each model against the share of rows taken, best scores first."""
+    curves = _scored(x, y, z)
+    shared = len(curves) == 1 or z is not None              # y and z score the same truth: one perfect model
+    for t, s, name in curves:
+        taken, found = gains(t, s)
+        if lift:                                # found / taken, from the first rows taken on
+            ln, = ax.plot(taken[1:], found[1:] / taken[1:], **{"label": name, **kw})
+        else:
+            ln, = ax.plot(taken, found, **{"label": name, **kw})
+            if not shared:
+                _chance(ax, [0, t.mean(), 1], [0, 1, 1], ln.get_color())
+    if lift:
+        _chance(ax, [0, 1], [1, 1])
+    else:
+        if shared:
+            rate = curves[0][0].mean()          # the perfect model takes every positive first
+            ax.plot([0, rate, 1], [0, 1, 1], color=plt.rcParams["text.color"], linestyle="--", linewidth=1,
+                    marker="", alpha=0.6, label="perfect")
+        _chance(ax, [0, 1], [0, 1])
+    ax.xaxis.set_major_formatter(mpl.ticker.PercentFormatter(1))
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("rows taken, highest score first")
+    if lift:
+        ax.set_ylim(bottom=0)
+        ax.set_ylabel("lift")
+        ax.legend(loc="upper right")
+    else:
+        ax.yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1))
+        ax.set_ylim(0, 1)
+        ax.set_ylabel("positives found")
+        ax.legend(loc="lower right")
+
+
+@kind("gain", check=_check_scores)
+def gain(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """Cumulative gain: kx.plot(y_true, score, 'gain'), the share of positives found against the share of rows
+    taken, highest scores first. The dotted diagonal is a random order, the dashed corner a perfect one.
+    z = a second model's score; a 2-D score draws one curve per class, one-vs-rest. kw: the curves (ax.plot)."""
+    _ranked(ax, x, y, z, False, **kw)
+
+
+@kind("lift", check=_check_scores)
+def lift(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """Lift: kx.plot(y_true, score, 'lift'), the gain divided by a random order's, so how many times more positives
+    the top rows hold than the same share picked at random; the dotted line at 1 is random.
+    z = a second model's score; a 2-D score draws one curve per class, one-vs-rest. kw: the curves (ax.plot)."""
+    _ranked(ax, x, y, z, True, **kw)
