@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   the average precision (the step sum `Σ (Rₙ − Rₙ₋₁) Pₙ`), in numpy with no scikit-learn needed, and tied scores
   counted as one step as scikit-learn does. Labels are 0/1 or bool with `1`/`True` positive; with two other labels
   the later one in sorted order is positive. More than two labels, a 2-D score or only one class raise.
+- **Datasets** for the machine-learning kinds, for `kx.load`: `binary` (a 0/1 `y` scored by two models, `gbm`
+  ranking better and `logreg` better calibrated), `multiclass` (a 3-class `y`, one probability column per class
+  `cat`, `dog`, `bird` summing to 1, and `pred`), `regression` (`actual`, `predicted` and an `x` the error grows
+  with), `history` (`loss`, `val_loss`, `accuracy`, `val_accuracy` per `epoch`, overfitting after about 30 epochs),
+  `importance` (`feature`, `importance`, `std`) and `curves` (learning-curve scores per training `size`,
+  `train_1..5` and `val_1..5`). `scripts/make_ml.py` writes them with a fixed seed.
 
 ## [0.4.0] - 2026-10-18
 

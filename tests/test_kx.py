@@ -1375,6 +1375,32 @@ def test_passengers_has_categories_and_nans() -> None:
     assert (nans.drop(["age", "deck", "port"]) == 0).all()
 
 
+def test_ml_datasets_shapes_and_story() -> None:
+    b, m, r = kx.load("binary"), kx.load("multiclass"), kx.load("regression")
+    h, imp, c = kx.load("history"), kx.load("importance"), kx.load("curves")
+    assert list(b.columns) == ["y", "gbm", "logreg"]
+    assert list(m.columns) == ["y", "cat", "dog", "bird", "pred"]
+    assert list(r.columns) == ["actual", "predicted", "x"]
+    assert list(h.columns) == ["epoch", "loss", "val_loss", "accuracy", "val_accuracy"]
+    assert list(imp.columns) == ["feature", "importance", "std"]
+    assert list(c.columns) == ["size", *(f"train_{k}" for k in range(1, 6)), *(f"val_{k}" for k in range(1, 6))]
+    assert (b.shape, m.shape, r.shape, h.shape, imp.shape, c.shape) == (
+        (1000, 3), (600, 5), (500, 3), (60, 5), (15, 3), (10, 11))
+    assert set(b.y) == {0, 1}
+    assert b[["gbm", "logreg"]].stack().between(0, 1).all()
+    assert kx.roc_auc(b.y, b.gbm) > kx.roc_auc(b.y, b.logreg)
+    assert set(m.y) == set(m.pred) == {"cat", "dog", "bird"}
+    assert np.allclose(m[["cat", "dog", "bird"]].sum(axis=1), 1)
+    assert (m.pred == m[["cat", "dog", "bird"]].idxmax(axis=1)).all()
+    err = (r.actual - r.predicted).abs()
+    assert err[r.x > 7].mean() > 2 * err[r.x < 3].mean()
+    assert 0 < h.val_loss.idxmin() < len(h) - 1             # overfits: the minimum is inside, not at the end
+    assert h.loss.idxmin() > h.val_loss.idxmin()
+    assert imp.importance.sum() == pytest.approx(1, abs=1e-3)
+    assert c.val_1.iloc[-1] > c.val_1.iloc[0]
+    assert c.train_1.iloc[-1] < c.train_1.iloc[0]
+
+
 def test_load_unknown() -> None:
     with pytest.raises(ValueError, match="unknown dataset"):
         kx.load("nope")

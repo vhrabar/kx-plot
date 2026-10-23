@@ -1,0 +1,16 @@
+feature,importance,std
+discount,0.0652,0.0127
+income,0.2451,0.0562
+device,0.033,0.0063
+tenure,0.1409,0.0254
+returns,0.011,0.0022
+plan,0.0024,0.0002
+reviews,0.0081,0.0019
+basket_size,0.063,0.0091
+weekday,0.0242,0.0025
+hour,0.0129,0.0035
+age,0.2397,0.0263
+email_opens,0.0052,0.0007
+region,0.0413,0.0123
+referrals,0.0042,0.0005
+visits,0.104,0.0211
