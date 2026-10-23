@@ -708,6 +708,61 @@ def test_rot_turns_x_tick_labels() -> None:
     assert {t.get_rotation() for t in ax.get_xticklabels()} == {45}
 
 
+def _dashed(ax: Axes) -> list:
+    return [ln for ln in ax.lines if ln.get_linestyle() == "--"]
+
+
+@pytest.mark.parametrize("spec", ["scatter-diag", "hexbin-diag"])
+def test_diag_spans_the_shared_range(spec: str) -> None:
+    ax = kx.plot(np.array([0, 2, 5.0]), np.array([2, 10, 4.0]), spec)
+    line, = _dashed(ax)
+    assert (line.get_xdata().min(), line.get_xdata().max()) == (0, 10)
+    assert np.array_equal(line.get_xdata(), line.get_ydata())
+    assert len(kx.plot(X, Y, "scatter").lines) == 0
+
+
+def test_diag_stays_straight_on_log_axes() -> None:
+    line, = _dashed(kx.plot(X, Y, "scatter-diag-logx"))
+    assert len(line.get_xdata()) > 2                       # many points, so y = x curves right on a log x axis
+
+
+def test_fit_slope_and_r2_in_the_legend() -> None:
+    x = np.array([0, 1, 2, 3, np.nan])
+    ax = kx.plot(x, 2 * x + 1, "scatter-fit")
+    line, = ax.lines
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["slope 2, R² 1.00"]
+    assert list(line.get_xdata()) == [0, 3]
+    assert list(line.get_ydata()) == pytest.approx([1, 7])
+    noisy = kx.plot([0, 1, 2, 3], [0, 2, 1, 3], "scatter-fit")
+    assert "slope 0.8, R² 0.64" in [t.get_text() for t in noisy.get_legend().get_texts()]
+
+
+def test_fit_one_line_per_group() -> None:
+    ax = kx.plot(DF, "t", "speed", "group", "scatter-fit")
+    assert len(ax.lines) == 2
+    texts = [t.get_text() for t in ax.get_legend().get_texts()]
+    assert len(texts) == 2                                  # one entry per group: its points and its line
+    assert texts[0].startswith("early (slope ")
+    assert texts[1].startswith("late (slope ")
+    assert ax.get_legend().get_title().get_text() == "group"
+    assert to_hex(ax.lines[0].get_color()) == to_hex(ax.collections[0].get_facecolor()[0])
+
+
+@pytest.mark.parametrize(("spec", "match"), [
+    ("scatter-fit-logx", "a curve on a logx axis"),
+    ("scatter-fit-logxy", "a curve on a logxy axis"),
+    ("scatter-fit-date", "needs numbers on x"),
+])
+def test_fit_raises(spec: str, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(X, Y, spec)
+
+
+def test_fit_needs_two_x_values() -> None:
+    with pytest.raises(ValueError, match="at least 2 distinct"):
+        kx.plot([1, 1], [2, 3], "scatter-fit")
+
+
 LONG = ["standard single journey", "short", "first class saloon pass"]
 
 

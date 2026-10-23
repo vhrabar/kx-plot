@@ -44,3 +44,14 @@ def norm(values: ArrayLike, flags: set[str]) -> mpl.colors.Normalize | None:
 def colorbar(ax: Axes, mappable: ScalarMappable, label: str, flags: set[str]) -> Colorbar | None:
     """A colorbar for mappable next to ax, unless nocb."""
     return None if "nocb" in flags else ax.figure.colorbar(mappable, ax=ax, label=label)
+
+
+def diagonal(ax: Axes, x: ArrayLike, y: ArrayLike, flags: set[str]) -> None:
+    """diag: a dashed y = x line across the range x and y share, from the lower minimum to the higher maximum."""
+    xs, ys = np.asarray(x, dtype=float).ravel(), np.asarray(y, dtype=float).ravel()
+    lo = min(np.nanmin(xs), np.nanmin(ys))
+    hi = max(np.nanmax(xs), np.nanmax(ys))
+    logs = flags & {"logx", "logy", "logxy"}
+    ends = np.geomspace(lo, hi, 100) if logs and lo > 0 else np.linspace(lo, hi, 100)   # straight on any scale
+    ax.plot(ends, ends, color=mpl.rcParams["text.color"], linestyle="--", linewidth=1, marker="", alpha=0.6,
+            zorder=3)

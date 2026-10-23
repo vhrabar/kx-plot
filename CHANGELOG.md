@@ -18,6 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   with), `history` (`loss`, `val_loss`, `accuracy`, `val_accuracy` per `epoch`, overfitting after about 30 epochs),
   `importance` (`feature`, `importance`, `std`) and `curves` (learning-curve scores per training `size`,
   `train_1..5` and `val_1..5`). `scripts/make_ml.py` writes them with a fixed seed.
+- **Flag** `diag` (`scatter`, `hexbin`): a dashed `y = x` line across the range `x` and `y` share, to compare
+  predicted with actual values or two measurements of the same thing.
+- **Flag** `fit` (`scatter`): a least-squares line with its slope and R² in the legend, which it draws. With a
+  categorical `z`, one line per group in the group's colour. With a log axis it raises, because a straight fit
+  is a curve there; fit the logs instead.
 
 ## [0.4.0] - 2026-10-18
 

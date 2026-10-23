@@ -10,7 +10,7 @@ from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
 from .._spec import kind
-from .._util import COLOUR, colorbar, label, norm
+from .._util import COLOUR, colorbar, diagonal, label, norm
 from .basic import _bars
 
 
@@ -97,10 +97,10 @@ def _check_hexbin(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("flag 'sym' centres the colours of a z on 0; counts are never below 0")
 
 
-@kind("hexbin", flags=COLOUR, check=_check_hexbin)
+@kind("hexbin", flags=("diag", *COLOUR), check=_check_hexbin)
 def hexbin(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """How many points fall in each hexagon, or the mean of z there. Rows with a NaN are left out.
-    nocb = no colorbar, sym = colours symmetric around 0 (z only), logc = log colour scale.
+    nocb = no colorbar, sym = colours symmetric around 0 (z only), logc = log colour scale, diag = a dashed y = x line.
     kw: ax.hexbin (gridsize= sets the number of hexagons across)."""
     cols = [np.asarray(a, dtype=float).ravel() for a in (x, y, z) if a is not None]
     keep = np.logical_and.reduce([np.isfinite(c) for c in cols])
@@ -111,6 +111,8 @@ def hexbin(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set
         style = {"C": zs[0], "reduce_C_function": np.mean, "norm": norm(zs[0], flags)}
     hb = ax.hexbin(xs, ys, **{**style, **kw})
     colorbar(ax, hb, "count" if z is None else label(z, "z"), flags)
+    if "diag" in flags:
+        diagonal(ax, xs, ys, flags)
 
 
 def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: str = "{:.2g}", **kw: Any) -> None:

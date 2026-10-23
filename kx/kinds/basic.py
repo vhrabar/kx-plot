@@ -9,7 +9,7 @@ from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
 from .._spec import kind
-from .._util import COLOUR, categories, colorbar, label, norm
+from .._util import COLOUR, categories, colorbar, diagonal, label, norm
 
 LINES = ("date", "mk")                          # flags of the kinds that draw lines against x
 
@@ -77,24 +77,56 @@ def band(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike, flags: set[str], **
 def _check_scatter(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
     if flags & set(COLOUR) and (z is None or categories(z) is not None):
         raise ValueError(f"flags {sorted(flags & set(COLOUR))} colour a numeric z; this scatter has none")
+    if "fit" in flags and (logs := sorted(flags & {"logx", "logy", "logxy", "symlogy"})):
+        raise ValueError(f"flag 'fit' draws a straight line, which is a curve on a {logs[0]} axis; "
+                         "fit the logs instead: kx.plot(np.log(x), y, 'scatter-fit')")
+    if flags & {"fit", "diag"} and "date" in flags:
+        raise ValueError(f"flag {sorted(flags & {'fit', 'diag'})[0]!r} needs numbers on x, not dates")
 
 
-@kind("scatter", flags=("date", *COLOUR), check=_check_scatter)
+def _fit(ax: Axes, x: ArrayLike, y: ArrayLike, **kw: Any) -> str | None:
+    """fit: the least-squares line through the finite points. Returns 'slope …, R² …', None under 2 x values."""
+    xs, ys = np.asarray(x, dtype=float).ravel(), np.asarray(y, dtype=float).ravel()
+    keep = np.isfinite(xs) & np.isfinite(ys)
+    xs, ys = xs[keep], ys[keep]
+    if len(np.unique(xs)) < 2:
+        return None
+    slope, icept = np.polyfit(xs, ys, 1)
+    total = np.sum((ys - ys.mean()) ** 2)
+    r2 = 1 - np.sum((ys - (slope * xs + icept)) ** 2) / total if total else 1.0
+    ends = np.array([xs.min(), xs.max()])
+    ax.plot(ends, slope * ends + icept, **{"linewidth": 1.5, "marker": "", "zorder": 3, **kw})
+    return f"slope {slope:.3g}, R² {r2:.2f}"
+
+
+@kind("scatter", flags=("date", "diag", "fit", *COLOUR), check=_check_scatter)
 def scatter(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """y against x; z becomes a colorbar (numbers) or a legend (categories).
-    Numeric z: nocb = no colorbar, sym = colours symmetric around 0, logc = log colour scale. kw: ax.scatter."""
+    Numeric z: nocb = no colorbar, sym = colours symmetric around 0, logc = log colour scale.
+    diag = a dashed y = x line, fit = a least-squares line with its slope and R² in the legend
+    (one per group with a categorical z). kw: ax.scatter."""
     size = 0.5 * plt.rcParams["lines.markersize"] ** 2
     cats = None if z is None else categories(z)
     if cats is None:
         sc = ax.scatter(x, y, **{"c": z, "s": size, "norm": None if z is None else norm(z, flags), **kw})
         if z is not None:
             colorbar(ax, sc, label(z, "z"), flags)
+        if "fit" in flags:
+            text = _fit(ax, x, y, color=plt.rcParams["text.color"])
+            if text is None:
+                raise ValueError("flag 'fit' needs at least 2 distinct finite x values")
+            ax.lines[-1].set_label(text)
+            ax.legend()
     else:
         xs, ys, zs = np.asarray(x), np.asarray(y), np.asarray(z, dtype=object)
         for c in cats:
             m = zs == c
-            ax.scatter(xs[m], ys[m], **{"s": size, "label": str(c), **kw})
+            pts = ax.scatter(xs[m], ys[m], **{"s": size, "label": str(c), **kw})
+            if "fit" in flags and (text := _fit(ax, xs[m], ys[m], color=pts.get_facecolor()[0])):
+                pts.set_label(f"{c} ({text})")  # one legend entry per group; under 2 x values, no line
         ax.legend(title=label(z, "z"))
+    if "diag" in flags:
+        diagonal(ax, x, y, flags)
 
 
 @kind("bar", flags=("stack", "sort", "ann"))

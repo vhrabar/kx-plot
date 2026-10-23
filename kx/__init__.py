@@ -9,7 +9,8 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
           stack norm (count),
           mean median ann (distributions), nocb sym logc (scatter, heat, hexbin), corr ann (heat),
-          norm ann nocb logc (crosstab), ann all (missing), sort (nullmap).
+          norm ann nocb logc (crosstab), ann all (missing), sort (nullmap), diag (scatter, hexbin),
+          fit (scatter).
           kx.grammar(kind) lists them.
 by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count)
 table  : heat, missing and nullmap take a whole DataFrame or 2-D array, with no column names: kx.plot(df, 'heat-corr')
