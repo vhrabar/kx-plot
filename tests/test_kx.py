@@ -487,6 +487,48 @@ def test_crosstab_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+# ---------- machine-learning kinds ----------
+def test_cm_counts_true_rows_and_predicted_columns() -> None:
+    ax = kx.plot(["a", "b", "b", "c", "c"], ["a", "b", "a", "a", "b"], "cm-ann")
+    assert ax.images[0].get_array().tolist() == [[1, 0, 0], [1, 1, 0], [1, 1, 0]]
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["a", "b", "c"]    # 'c' is never predicted
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["a", "b", "c"]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("predicted", "true")
+    assert [t.get_text() for t in ax.texts] == ["1", "0", "0", "1", "1", "0", "1", "1", "0"]
+    assert ax.figure.axes[1].get_ylabel() == "count"
+
+
+def test_cm_extra_predicted_class_gets_a_blank_norm_row() -> None:
+    ax = kx.plot([0, 0, 1], [0, 2, 1], "cm-norm")
+    shares = ax.images[0].get_array()
+    assert shares.shape == (3, 3)
+    assert np.allclose(shares[:2].sum(axis=1), 1)
+    assert shares[:2].tolist() == [[0.5, 0, 0.5], [0, 1, 0]]
+    assert np.ma.is_masked(shares[2, 0]) or np.isnan(shares[2, 0])     # class 2 is never true: no recall
+
+
+def test_cm_norm_rows_sum_to_one_with_a_percent_colorbar() -> None:
+    m = kx.load("multiclass")
+    ax = kx.plot(m, "y", "pred", "cm-norm-ann")
+    assert np.allclose(ax.images[0].get_array().sum(axis=1), 1)
+    assert all(t.get_text().endswith("%") for t in ax.texts)
+    cb = ax.figure.axes[1]
+    assert isinstance(cb.yaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+    assert len(kx.plot(m, "y", "pred", "cm-nocb").figure.axes) == 1
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot([0, 1, 2], np.eye(3), "cm"), r"proba\.argmax\(axis=1\)"),
+    (lambda: kx.plot(np.eye(3), [0, 1, 2], "cm"), "y_true is 2-D"),
+    (lambda: kx.plot([0, 1], [0, 1], [0, 1], "cm"), "takes no z"),
+    (lambda: kx.plot([0, 1], [0, 1, 1], "cm"), "y_true has 2 values but y_pred has 3"),
+    (lambda: kx.plot([0, np.nan], [0, 1], "cm"), "missing values"),
+])
+def test_cm_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 

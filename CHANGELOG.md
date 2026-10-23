@@ -23,6 +23,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Flag** `fit` (`scatter`): a least-squares line with its slope and R² in the legend, which it draws. With a
   categorical `z`, one line per group in the group's colour. With a log axis it raises, because a straight fit
   is a curve there; fit the logs instead.
+- **Plot kind** `cm`: a confusion matrix, `kx.plot(y_true, y_pred, 'cm')`, with the true classes down the rows
+  and the predicted ones along the columns, as in scikit-learn. Every label of either array gets a row and a
+  column, so a class that is never predicted still shows. `norm` divides each row by its total (the recall of
+  each class) with a percent colorbar, `ann` writes each cell's value and `nocb` drops the colorbar. A 2-D
+  `y_pred` raises with a hint to pass `proba.argmax(axis=1)`.
 
 ## [0.4.0] - 2026-10-18
 

@@ -85,6 +85,12 @@ def pr_ap(y_true: ArrayLike, score: ArrayLike) -> float:
     return float(np.sum(np.diff(recall) * precision[1:]))
 
 
+def classes(*arrays: ArrayLike) -> list[Any]:
+    """The labels found in any of arrays, sorted (numbers before text when both occur)."""
+    found = set().union(*(pd.unique(np.asarray(a, dtype=object).ravel()) for a in arrays))
+    return sorted(found, key=lambda c: (str(type(c)), c))
+
+
 def confusion(y: ArrayLike, p: ArrayLike, labels: list[Any] | None = None) -> np.ndarray:
     """Counts with the true class down the rows and the predicted class along the columns.
     labels default to the union of both arrays in sorted order, so a class never predicted still gets a column."""
@@ -92,7 +98,7 @@ def confusion(y: ArrayLike, p: ArrayLike, labels: list[Any] | None = None) -> np
     if len(t) != len(q):
         raise ValueError(f"y_true has {len(t)} values but y_pred has {len(q)}")
     if labels is None:
-        labels = sorted(set(pd.unique(t)) | set(pd.unique(q)), key=lambda c: (str(type(c)), c))
+        labels = classes(t, q)
     index = {c: i for i, c in enumerate(labels)}
     m = np.zeros((len(labels), len(labels)), dtype=int)
     for a, b in zip(t, q, strict=True):
