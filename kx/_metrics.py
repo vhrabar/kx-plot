@@ -79,7 +79,7 @@ def roc_auc(y_true: ArrayLike, score: ArrayLike) -> float:
 
 
 def pr_ap(y_true: ArrayLike, score: ArrayLike) -> float:
-    """Average precision: the step sum Σ (Rₙ − Rₙ₋₁) Pₙ over thresholds, as scikit-learn computes it.
+    """Average precision: the step sum Σ (Rₙ - Rₙ₋₁) Pₙ over thresholds, as scikit-learn computes it.
     Trapezoids would overstate it."""
     precision, recall, _ = pr_curve(y_true, score)
     return float(np.sum(np.diff(recall) * precision[1:]))
@@ -95,7 +95,7 @@ def confusion(y: ArrayLike, p: ArrayLike, labels: list[Any] | None = None) -> np
         labels = sorted(set(pd.unique(t)) | set(pd.unique(q)), key=lambda c: (str(type(c)), c))
     index = {c: i for i, c in enumerate(labels)}
     m = np.zeros((len(labels), len(labels)), dtype=int)
-    for a, b in zip(t, q):
+    for a, b in zip(t, q, strict=True):
         if a in index and b in index:
             m[index[a], index[b]] += 1
     return m
