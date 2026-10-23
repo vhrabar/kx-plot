@@ -529,6 +529,64 @@ def test_cm_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+BINARY, MULTI = kx.load("binary"), kx.load("multiclass")
+
+
+def _curves(ax: Axes) -> list:
+    """The labelled lines: one per model or class, not the chance line."""
+    return [ln for ln in ax.lines if not ln.get_label().startswith("_")]
+
+
+def _legend(ax: Axes) -> list[str]:
+    return [t.get_text() for t in ax.get_legend().get_texts()]
+
+
+def test_roc_runs_from_corner_to_corner_with_auc_in_the_legend() -> None:
+    ax = kx.plot(BINARY, "y", "gbm", "roc")
+    curve, = _curves(ax)
+    assert (curve.get_xdata()[0], curve.get_ydata()[0]) == (0, 0)
+    assert (curve.get_xdata()[-1], curve.get_ydata()[-1]) == (1, 1)
+    assert _legend(ax) == [f"gbm (AUC {kx.roc_auc(BINARY.y, BINARY.gbm):.2f})"]   # drawn without 'leg'
+    assert (ax.get_xlim(), ax.get_ylim()) == ((0, 1), (0, 1))
+    assert ax.get_aspect() == 1
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("false positive rate", "true positive rate")
+    chance = [ln for ln in ax.lines if ln.get_linestyle() == ":"]
+    assert len(chance) == 1
+
+
+def test_roc_z_is_a_second_model() -> None:
+    ax = kx.plot(BINARY, "y", "gbm", "logreg", "roc")
+    assert len(_curves(ax)) == 2
+    assert _legend(ax)[1].startswith("logreg (AUC ")
+    assert _legend(kx.plot(BINARY.y.to_numpy(), BINARY.gbm.to_numpy(), "roc"))[0].startswith("y (AUC ")
+
+
+def test_roc_multiclass_one_curve_per_column() -> None:
+    ax = kx.plot(MULTI.y, MULTI[["cat", "dog", "bird"]], "roc")
+    assert [t.split(" ")[0] for t in _legend(ax)] == ["cat", "dog", "bird"]
+    want = kx.roc_auc(MULTI.y == "dog", MULTI.dog)
+    assert _legend(ax)[1] == f"dog (AUC {want:.2f})"
+
+
+def test_roc_multiclass_array_takes_the_sorted_labels() -> None:
+    codes = MULTI.y.map({"bird": 0, "cat": 1, "dog": 2})
+    ax = kx.plot(codes, MULTI[["bird", "cat", "dog"]].to_numpy(), "roc")
+    assert [t.split(" ")[0] for t in _legend(ax)] == ["0", "1", "2"]
+    renamed = MULTI[["bird", "cat", "dog"]].set_axis(["b", "c", "d"], axis=1)  # columns in label order, other names
+    assert [t.split(" ")[0] for t in _legend(kx.plot(codes, renamed, "roc"))] == ["b", "c", "d"]
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(MULTI.y, MULTI.cat, "roc"), "pass a 2-D score, one column per class"),
+    (lambda: kx.plot(MULTI.y, MULTI[["cat", "dog"]].to_numpy(), "roc"), "2 columns but y_true has 3 labels"),
+    (lambda: kx.plot(MULTI.y, MULTI[["cat", "dog", "bird"]], MULTI.cat, "roc"), "z adds a second binary model"),
+    (lambda: kx.plot([1, 1, 1], [0.2, 0.5, 0.9], "roc"), "only positives"),
+])
+def test_roc_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 

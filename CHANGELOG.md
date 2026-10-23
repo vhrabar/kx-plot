@@ -28,6 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   column, so a class that is never predicted still shows. `norm` divides each row by its total (the recall of
   each class) with a percent colorbar, `ann` writes each cell's value and `nocb` drops the colorbar. A 2-D
   `y_pred` raises with a hint to pass `proba.argmax(axis=1)`.
+- **Plot kind** `roc`: the ROC curve, `kx.plot(y_true, score, 'roc')`, with the AUC in the legend
+  (`gbm (AUC 0.80)`), which it draws without `leg`. A dotted diagonal marks a random model, and both axes run
+  from 0 to 1 at equal scale. `z` adds a second model's score. A 2-D score, one column per class, draws one
+  curve per class, one-vs-rest, named after the DataFrame's columns or else the sorted labels of `y_true`.
 
 ## [0.4.0] - 2026-10-18
 
