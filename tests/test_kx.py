@@ -1263,6 +1263,82 @@ def test_save_without_extension_uses_theme_format(kaggle: Path) -> None:
     assert kx.save("fig2", format="svg").endswith("fig2.svg")
 
 
+# ---------- metrics ----------
+_I = np.arange(200)
+SCORE = np.round(((_I * 7919) % 200) / 200, 1)            # 11 distinct values, so many tied scores
+TRUTH = (((_I * 7919) % 200) / 200 + ((_I * 104729) % 97) / 97 * 0.8) > 0.9
+
+
+def test_auc_and_ap_match_scikit_learn() -> None:
+    # computed once with sklearn.metrics.roc_auc_score and average_precision_score on TRUTH, SCORE
+    assert kx.roc_auc(TRUTH, SCORE) == pytest.approx(0.8937043339005105, abs=1e-12)
+    assert kx.pr_ap(TRUTH, SCORE) == pytest.approx(0.8694172331641548, abs=1e-12)
+
+
+@pytest.mark.parametrize(("score", "auc", "ap"), [
+    ([0.1, 0.2, 0.8, 0.9], 1.0, 1.0),                      # perfect
+    ([0.9, 0.8, 0.2, 0.1], 0.0, 5 / 12),                   # inverted: precision 1/3 then 2/4
+    ([0.5, 0.5, 0.5, 0.5], 0.5, 0.5),                      # all tied: one step, the positive rate
+])
+def test_auc_and_ap_by_hand(score: list[float], auc: float, ap: float) -> None:
+    y = [0, 0, 1, 1]
+    assert kx.roc_auc(y, score) == pytest.approx(auc)
+    assert kx.pr_ap(y, score) == pytest.approx(ap)
+
+
+def test_roc_and_pr_curves_ends_and_ties() -> None:
+    fpr, tpr, thr = kx._metrics.roc_curve([0, 1, 0, 1], [0.3, 0.3, 0.1, 0.9])
+    assert (fpr[0], tpr[0], fpr[-1], tpr[-1]) == (0, 0, 1, 1)
+    assert list(thr) == [np.inf, 0.9, 0.3, 0.1]             # the tied 0.3 is one step
+    precision, recall, _ = kx._metrics.pr_curve([0, 1, 0, 1], [0.3, 0.3, 0.1, 0.9])
+    assert list(precision) == [1, 1, 2 / 3, 0.5]
+    assert list(recall) == [0, 0.5, 1, 1]
+
+
+@pytest.mark.parametrize(("y", "positive"), [
+    ([False, True, True], [0, 1, 1]),
+    ([1.0, 0.0, 1.0], [1, 0, 1]),
+    (["no", "yes", "no"], [0, 1, 0]),
+    (pd.Series(["b", "a", "a"]), [1, 0, 0]),
+])
+def test_binary_positive_class(y: list, positive: list[int]) -> None:
+    assert list(kx._metrics.binary(y)) == positive
+
+
+@pytest.mark.parametrize(("y", "score", "match"), [
+    ([1, 1, 1], [0.1, 0.5, 0.9], "only positives"),
+    ([0, 0, 0], [0.1, 0.5, 0.9], "only negatives"),
+    (["a", "a"], [0.1, 0.9], "one label only"),
+    ([0, 1, 2], [0.1, 0.5, 0.9], "pass a 2-D score, one column per class"),
+    ([0, 1, 1], [[0.1, 0.9], [0.5, 0.5], [0.9, 0.1]], "a binary metric takes one score per row"),
+    ([0, 1], [0.1, 0.5, 0.9], "y_true has 2 values but the score has 3"),
+    ([0, 1, 1], [0.1, np.nan, 0.9], "NaN"),
+    ([0, np.nan, 1], [0.1, 0.5, 0.9], "missing values"),
+])
+def test_metrics_raise(y: list, score: list, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.roc_auc(y, score)
+
+
+def test_confusion_counts_and_unpredicted_class() -> None:
+    m = kx._metrics.confusion(["a", "b", "b", "c", "c"], ["a", "b", "a", "a", "b"])
+    assert m.tolist() == [[1, 0, 0], [1, 1, 0], [1, 1, 0]]  # 'c' is never predicted but keeps its column
+    assert kx._metrics.confusion([0, 1], [1, 1], labels=[1, 0]).tolist() == [[1, 0], [1, 0]]
+
+
+def test_brier_calibration_and_gain() -> None:
+    assert kx._metrics.brier([0, 1, 1], [0.0, 1.0, 0.5]) == pytest.approx(0.25 / 3)
+    mean, rate, n = kx._metrics.calibration([0, 0, 1, 1, 1], [0.05, 0.15, 0.15, 0.95, 1.0], bins=10)
+    assert mean.tolist() == pytest.approx([0.05, 0.15, 0.975])  # empty bins left out, 1.0 in the last bin
+    assert rate.tolist() == [0, 0.5, 1]
+    assert n.tolist() == [1, 2, 2]
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        kx._metrics.calibration([0, 1], [-0.5, 2.0])
+    taken, found = kx._metrics.gain([1, 0, 1, 0], [0.9, 0.8, 0.7, 0.1])
+    assert taken.tolist() == [0, 0.25, 0.5, 0.75, 1]
+    assert found.tolist() == [0, 0.5, 0.5, 1, 1]
+
+
 # ---------- data ----------
 def test_datasets_and_load() -> None:
     assert {"waves", "cloud", "monthly", "dists", "daily", "passengers"} <= set(kx.datasets())

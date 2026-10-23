@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `kx.roc_auc(y_true, score)` and `kx.pr_ap(y_true, score)`: the area under the ROC curve (by trapezoids) and
+  the average precision (the step sum `Σ (Rₙ − Rₙ₋₁) Pₙ`), in numpy with no scikit-learn needed, and tied scores
+  counted as one step as scikit-learn does. Labels are 0/1 or bool with `1`/`True` positive; with two other labels
+  the later one in sorted order is positive. More than two labels, a 2-D score or only one class raise.
+
 ## [0.4.0] - 2026-10-18
 
 ### Added
