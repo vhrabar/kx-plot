@@ -76,6 +76,12 @@ def hist(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags
     kw: ax.hist; bins= (a count, edges or a numpy rule like 'auto') replaces the 30 shared bins."""
     series = _series(x, y, z)
     edges = np.histogram_bin_edges(np.concatenate([v for v, _ in series]), bins=kw.pop("bins", 30))
+    _hist(ax, series, edges, flags, **kw)
+    _vlines(ax, series, flags)
+
+
+def _hist(ax: Axes, series: list[tuple[np.ndarray, str]], edges: np.ndarray, flags: set[str], **kw: Any) -> None:
+    """Every series on the same edges: overlaid, or stack / norm / cum as in hist."""
     values, names = [v for v, _ in series], [n for _, n in series]
     if "stack" in flags:
         ax.hist(values, edges, **{"histtype": "barstacked", "label": names,
@@ -84,7 +90,6 @@ def hist(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags
         look = {"histtype": "step", "linewidth": 1.5} if "cum" in flags else {"alpha": 0.6}
         for v, n in zip(values, names, strict=True):
             ax.hist(v, edges, **{"label": n, "density": "norm" in flags, "cumulative": "cum" in flags, **look, **kw})
-    _vlines(ax, series, flags)
 
 
 def density(v: np.ndarray, grid: np.ndarray, bw: float) -> np.ndarray:

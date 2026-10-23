@@ -652,6 +652,47 @@ def test_calib_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+def test_proba_one_histogram_per_true_class_on_bins_over_0_to_1() -> None:
+    ax = kx.plot(BINARY, "y", "gbm", "proba")
+    assert len(ax.containers) == 2
+    for c in ax.containers:
+        assert c[0].get_x() == pytest.approx(0)
+        assert c[-1].get_x() + c[-1].get_width() == pytest.approx(1)
+        assert len(c) == 20
+    counts = [sum(p.get_height() for p in c) for c in ax.containers]
+    assert counts == [(BINARY.y == 0).sum(), (BINARY.y == 1).sum()]
+    assert _legend(ax) == ["0", "1"]
+    assert ax.get_legend().get_title().get_text() == "y"
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("gbm", "count")
+
+
+def test_proba_norm_gives_areas_of_one() -> None:
+    ax = kx.plot(BINARY, "y", "gbm", "proba-norm", bins=10)
+    for c in ax.containers:
+        assert len(c) == 10
+        assert sum(p.get_height() * p.get_width() for p in c) == pytest.approx(1)
+    assert ax.get_ylabel() == "density"
+
+
+def test_proba_multiclass_takes_the_score_of_the_true_class() -> None:
+    ax = kx.plot(MULTI.y, MULTI[["cat", "dog", "bird"]], "proba")
+    assert _legend(ax) == ["cat", "dog", "bird"]
+    dog = sum(p.get_height() for p in ax.containers[1])
+    assert dog == (MULTI.y == "dog").sum()
+    assert ax.get_xlabel() == "score of the true class"
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(BINARY, "y", "gbm", "logreg", "proba"), "one model's scores"),
+    (lambda: kx.plot([0, 1], [-0.5, 2.0], "proba"), "between 0 and 1"),
+    (lambda: kx.plot([0, 1], [0.2, np.nan], "proba"), "NaN"),
+    (lambda: kx.plot(MULTI.y, MULTI.cat, "proba"), "pass a 2-D score"),
+])
+def test_proba_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 

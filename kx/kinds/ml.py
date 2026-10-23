@@ -12,6 +12,7 @@ from numpy.typing import ArrayLike
 from .._metrics import binary, brier, calibration, classes, confusion, pr_ap, pr_curve, roc_auc, roc_curve
 from .._spec import kind
 from .._util import label
+from .dist import _hist
 from .table import _matrix
 
 
@@ -139,3 +140,36 @@ def calib(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[
     _chance(ax, [0, 1], [0, 1])
     ax.set_aspect("equal")
     _unit(ax, "mean score", "observed positive rate", "upper left")
+
+
+def _check_proba(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if z is not None:
+        raise ValueError("kind 'proba' shows one model's scores; compare two models with 'roc', 'pr' or 'calib'")
+
+
+@kind("proba", flags=("norm",), check=_check_proba)
+def proba(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], bins: int = 20, **kw: Any) -> None:
+    """Score distribution per true class: kx.plot(y_true, score, 'proba'), one histogram per class on the same
+    bins= equal-width bins over 0..1 (20). Where they overlap, the model confuses the classes.
+    A 2-D score (one column per class) shows each row's score for its own true class.
+    norm = densities (area 1 each), for imbalanced classes. kw: ax.hist."""
+    if np.ndim(y) == 2 and np.shape(y)[1] > 1:
+        series = [(s[t == 1], name) for t, s, name in _scored(x, y, None)]
+        xlabel = "score of the true class"
+    else:
+        s, t = np.asarray(y, dtype=float).ravel(), np.asarray(x, dtype=object).ravel()
+        binary(t)                               # two classes, or a hint for multiclass
+        if len(s) != len(t):
+            raise ValueError(f"y_true has {len(t)} values but the score has {len(s)}")
+        series = [(s[t == c], str(c)) for c in classes(t)]
+        xlabel = label(y, "score")
+    every = np.concatenate([v for v, _ in series])
+    if not np.isfinite(every).all():
+        raise ValueError("score has NaN or inf values; drop those rows first")
+    if every.min() < 0 or every.max() > 1:
+        raise ValueError("kind 'proba' needs scores between 0 and 1, such as predicted probabilities")
+    _hist(ax, series, np.linspace(0, 1, bins + 1), flags & {"norm"}, **kw)
+    ax.set_xlim(0, 1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("density" if "norm" in flags else "count")
+    ax.legend(title=label(x, "true class"))

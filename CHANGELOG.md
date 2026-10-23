@@ -40,6 +40,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   against the mean score in `bins=` equal-width bins over 0..1 (10 by default), with markers sized by the rows
   in each bin, the diagonal a calibrated model lies on, and the Brier score in the legend (`gbm (Brier 0.201)`).
   Empty bins are left out. `z` adds a second model; scores outside 0..1 raise.
+- **Plot kind** `proba`: the score distribution per true class, `kx.plot(y_true, score, 'proba')`: one
+  histogram per class on the same `bins=` equal-width bins over 0..1 (20 by default), so their overlap shows
+  where the model confuses them. `norm` draws densities, for imbalanced classes. A 2-D score shows each row's
+  score for its own true class.
 
 ## [0.4.0] - 2026-10-18
 
