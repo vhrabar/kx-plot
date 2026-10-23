@@ -44,6 +44,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   histogram per class on the same `bins=` equal-width bins over 0..1 (20 by default), so their overlap shows
   where the model confuses them. `norm` draws densities, for imbalanced classes. A 2-D score shows each row's
   score for its own true class.
+- **Plot kind** `thresh`: precision, recall and F1 against the decision threshold,
+  `kx.plot(y_true, score, 'thresh')`, where a row is positive when its score is at or above the threshold.
+- **Flag** `best` (`thresh`): a dashed vertical line at the threshold with the highest F1, labelled in the legend
+  (`best F1 0.74 at 0.38`).
 
 ## [0.4.0] - 2026-10-18
 

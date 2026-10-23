@@ -9,7 +9,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
-from .._metrics import binary, brier, calibration, classes, confusion, pr_ap, pr_curve, roc_auc, roc_curve
+from .._metrics import binary, brier, calibration, classes, confusion, pr_ap, pr_curve, roc_auc, roc_curve, thresholds
 from .._spec import kind
 from .._util import label
 from .dist import _hist
@@ -173,3 +173,29 @@ def proba(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], bins: 
     ax.set_xlabel(xlabel)
     ax.set_ylabel("density" if "norm" in flags else "count")
     ax.legend(title=label(x, "true class"))
+
+
+def _check_thresh(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if z is not None:
+        raise ValueError("kind 'thresh' shows one model's scores; compare two models with 'roc', 'pr' or 'calib'")
+
+
+def _best(ax: Axes, at: float, text: str) -> None:
+    """best: a dashed vertical line at the best x, with what makes it best in the legend."""
+    ax.axvline(at, color=plt.rcParams["text.color"], linestyle="--", linewidth=1, alpha=0.8, label=text)
+
+
+@kind("thresh", flags=("best",), check=_check_thresh)
+def thresh(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: Any) -> None:
+    """Precision, recall and F1 against the decision threshold: kx.plot(y_true, score, 'thresh').
+    A row is positive when its score is at or above the threshold. best = a dashed line at the threshold with the
+    highest F1. kw: the three lines (ax.plot)."""
+    thr, precision, recall, f1 = thresholds(x, y)
+    for values, name in ((precision, "precision"), (recall, "recall"), (f1, "F1")):
+        ax.plot(thr, values, **{"label": name, **kw})
+    if "best" in flags:
+        i = int(np.argmax(f1))                  # ties: the highest threshold, the fewest positives
+        _best(ax, thr[i], f"best F1 {f1[i]:.2f} at {thr[i]:.3g}")
+    ax.set_ylim(0, 1.02)
+    ax.set_xlabel(f"threshold on {label(y, 'score')}")
+    ax.legend(loc="lower left")

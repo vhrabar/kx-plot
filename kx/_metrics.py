@@ -129,6 +129,18 @@ def calibration(y: ArrayLike, s: ArrayLike, bins: int = 10) -> tuple[np.ndarray,
     return mean, rate, n[full]
 
 
+def thresholds(y: ArrayLike, s: ArrayLike) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Each distinct score as a threshold (score >= it is positive), highest first, with the precision, recall
+    and F1 there."""
+    tps, fps, thr, pos, _ = _counts(y, s)
+    if not pos:
+        raise ValueError("precision and recall need positives in y_true; it has only negatives")
+    precision, recall = tps / (tps + fps), tps / pos
+    with np.errstate(invalid="ignore"):
+        f1 = np.nan_to_num(2 * precision * recall / (precision + recall))     # 0 where both are 0
+    return thr, precision, recall, f1
+
+
 def gain(y: ArrayLike, s: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
     """Share of rows taken, best scores first, and the share of positives found, from (0, 0) to (1, 1)."""
     tps, fps, _, pos, neg = _counts(y, s)

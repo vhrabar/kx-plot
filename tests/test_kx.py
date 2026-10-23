@@ -693,6 +693,45 @@ def test_proba_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+def test_thresh_precision_recall_f1_by_hand() -> None:
+    ax = kx.plot([0, 1, 0, 1], [0.1, 0.4, 0.35, 0.8], "thresh")
+    lines = {ln.get_label(): ln for ln in ax.lines}
+    assert list(lines["precision"].get_xdata()) == [0.8, 0.4, 0.35, 0.1]
+    assert list(lines["precision"].get_ydata()) == pytest.approx([1, 1, 2 / 3, 0.5])
+    assert list(lines["recall"].get_ydata()) == pytest.approx([0.5, 1, 1, 1])
+    assert list(lines["F1"].get_ydata()) == pytest.approx([2 / 3, 1, 0.8, 2 / 3])
+    assert _legend(ax) == ["precision", "recall", "F1"]
+    assert ax.get_xlabel() == "threshold on score"
+
+
+def test_thresh_best_marks_the_f1_maximum() -> None:
+    ax = kx.plot([0, 1, 0, 1], [0.1, 0.4, 0.35, 0.8], "thresh-best")
+    best, = _dashed(ax)
+    assert list(best.get_xdata()) == [0.4, 0.4]
+    assert _legend(ax)[-1] == "best F1 1.00 at 0.4"
+    ax = kx.plot(BINARY, "y", "gbm", "thresh-best")
+    _, _, _, f1 = kx._metrics.thresholds(BINARY.y, BINARY.gbm)
+    assert _legend(ax)[-1].startswith(f"best F1 {f1.max():.2f} at ")
+    assert ax.get_xlabel() == "threshold on gbm"
+
+
+def test_thresh_f1_is_zero_where_nothing_is_found() -> None:
+    _, precision, recall, f1 = kx._metrics.thresholds([1, 0], [0.2, 0.9])
+    assert list(precision) == [0, 0.5]
+    assert list(recall) == [0, 1]
+    assert list(f1) == pytest.approx([0, 2 / 3])
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(BINARY, "y", "gbm", "logreg", "thresh"), "one model's scores"),
+    (lambda: kx.plot([0, 0], [0.2, 0.9], "thresh"), "only negatives"),
+    (lambda: kx.parse("roc-best"), "flag 'best' only works with kind"),
+])
+def test_thresh_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 
