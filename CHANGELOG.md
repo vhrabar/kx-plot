@@ -36,6 +36,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   the legend (`gbm (AP 0.80)`) and a dotted baseline at the positive rate, what a random model gets. The curve
   is drawn in the steps that the average precision sums. `z` adds a second model on the same baseline; a 2-D
   score draws one curve per class, each with its own baseline in its colour.
+- **Plot kind** `calib`: a reliability diagram, `kx.plot(y_true, score, 'calib')`: the observed positive rate
+  against the mean score in `bins=` equal-width bins over 0..1 (10 by default), with markers sized by the rows
+  in each bin, the diagonal a calibrated model lies on, and the Brier score in the legend (`gbm (Brier 0.201)`).
+  Empty bins are left out. `z` adds a second model; scores outside 0..1 raise.
 
 ## [0.4.0] - 2026-10-18
 

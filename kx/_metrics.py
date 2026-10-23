@@ -116,6 +116,8 @@ def brier(y: ArrayLike, s: ArrayLike) -> float:
 def calibration(y: ArrayLike, s: ArrayLike, bins: int = 10) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Mean score, observed positive rate and row count in each of bins equal-width bins over 0..1.
     Empty bins are left out."""
+    if isinstance(bins, bool) or not isinstance(bins, (int, np.integer)) or bins < 1:
+        raise ValueError(f"bins= is the number of equal-width bins over 0..1, a whole number from 1; got {bins!r}")
     t, sc = _pair(y, s)
     if sc.min() < 0 or sc.max() > 1:
         raise ValueError("calibration needs scores between 0 and 1, such as predicted probabilities")

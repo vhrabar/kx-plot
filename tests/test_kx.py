@@ -620,6 +620,38 @@ def test_pr_multiclass_one_baseline_per_class_in_its_colour() -> None:
     assert [to_hex(b.get_color()) for b in bases] == [to_hex(c.get_color()) for c in curves]
 
 
+def test_calib_perfect_model_lies_on_the_diagonal_without_empty_bins() -> None:
+    score = [0.05] * 20 + [0.25] * 4 + [0.75] * 4             # bins 0, 2 and 7 of 10; the rest are empty
+    truth = [1] + [0] * 19 + [1, 0, 0, 0] + [1, 1, 1, 0]       # each comes true as often as it says
+    ax = kx.plot(truth, score, "calib")
+    pts = ax.collections[0]
+    assert np.allclose(pts.get_offsets(), [[0.05, 0.05], [0.25, 0.25], [0.75, 0.75]])
+    sizes = pts.get_sizes()
+    assert sizes[0] > sizes[1] == sizes[2]                    # 20 rows against 4
+    want = kx._metrics.brier(truth, score)
+    assert _legend(ax) == [f"y (Brier {want:.3f})"]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("mean score", "observed positive rate")
+    assert len(_dotted(ax)) == 1
+
+
+def test_calib_bins_and_a_second_model() -> None:
+    ax = kx.plot(BINARY, "y", "gbm", "logreg", "calib", bins=5)
+    assert len(_curves(ax)) == 2
+    assert all(len(c.get_xdata()) <= 5 for c in _curves(ax))
+    gbm, logreg = (kx._metrics.brier(BINARY.y, BINARY[c]) for c in ("gbm", "logreg"))
+    assert _legend(ax) == [f"gbm (Brier {gbm:.3f})", f"logreg (Brier {logreg:.3f})"]
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot([0, 1], [-0.5, 2.0], "calib"), "between 0 and 1"),
+    (lambda: kx.plot([0, 1], [0.2, 0.8], "calib", bins=0), "whole number from 1"),
+    (lambda: kx.plot([0, 1], [0.2, 0.8], "calib", bins=2.5), "whole number from 1"),
+])
+def test_calib_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 

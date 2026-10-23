@@ -9,7 +9,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
-from .._metrics import binary, classes, confusion, pr_ap, pr_curve, roc_auc, roc_curve
+from .._metrics import binary, brier, calibration, classes, confusion, pr_ap, pr_curve, roc_auc, roc_curve
 from .._spec import kind
 from .._util import label
 from .table import _matrix
@@ -122,3 +122,20 @@ def pr(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str
     if shared:
         _chance(ax, [0, 1], [curves[0][0].mean()] * 2)
     _unit(ax, "recall", "precision", "lower left")
+
+
+@kind("calib", check=_check_scores)
+def calib(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], bins: int = 10,
+          **kw: Any) -> None:
+    """Reliability diagram: kx.plot(y_true, score, 'calib'), the observed positive rate against the mean score in
+    bins= equal-width bins over 0..1 (10), with markers sized by the rows in each bin and the Brier score in the
+    legend. On the dotted diagonal, a score of 0.7 comes true 70% of the time; empty bins are left out.
+    z = a second model's score; a 2-D score draws one line per class, one-vs-rest. kw: the lines (ax.plot)."""
+    curves = [(name, *calibration(t, s, bins), brier(t, s)) for t, s, name in _scored(x, y, z)]
+    most = max(n.max() for _, _, _, n, _ in curves)
+    for name, mean, rate, n, score in curves:
+        ln, = ax.plot(mean, rate, **{"marker": "", "clip_on": False, "label": f"{name} (Brier {score:.3f})", **kw})
+        ax.scatter(mean, rate, s=10 + 90 * n / most, color=ln.get_color(), zorder=3, clip_on=False)   # 0 and 1 too
+    _chance(ax, [0, 1], [0, 1])
+    ax.set_aspect("equal")
+    _unit(ax, "mean score", "observed positive rate", "upper left")
