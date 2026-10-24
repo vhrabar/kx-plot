@@ -6,6 +6,80 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `kx.roc_auc(y_true, score)` and `kx.pr_ap(y_true, score)`: the area under the ROC curve (by trapezoids) and
+  the average precision (the step sum `Σ (Rₙ − Rₙ₋₁) Pₙ`), in numpy with no scikit-learn needed, and tied scores
+  counted as one step as scikit-learn does. Labels are 0/1 or bool with `1`/`True` positive; with two other labels
+  the later one in sorted order is positive. More than two labels, a 2-D score or only one class raise.
+- **Datasets** for the machine-learning kinds, for `kx.load`: `binary` (a 0/1 `y` scored by two models, `gbm`
+  ranking better and `logreg` better calibrated), `multiclass` (a 3-class `y`, one probability column per class
+  `cat`, `dog`, `bird` summing to 1, and `pred`), `regression` (`actual`, `predicted` and an `x` the error grows
+  with), `history` (`loss`, `val_loss`, `accuracy`, `val_accuracy` per `epoch`, overfitting after about 30 epochs),
+  `importance` (`feature`, `importance`, `std`) and `curves` (learning-curve scores per training `size`,
+  `train_1..5` and `val_1..5`). `scripts/make_ml.py` writes them with a fixed seed.
+- **Flag** `diag` (`scatter`, `hexbin`): a dashed `y = x` line across the range `x` and `y` share, to compare
+  predicted with actual values or two measurements of the same thing.
+- **Flag** `fit` (`scatter`): a least-squares line with its slope and R² in the legend, which it draws. With a
+  categorical `z`, one line per group in the group's colour. With a log axis it raises, because a straight fit
+  is a curve there; fit the logs instead.
+- **Plot kind** `cm`: a confusion matrix, `kx.plot(y_true, y_pred, 'cm')`, with the true classes down the rows
+  and the predicted ones along the columns, as in scikit-learn. Every label of either array gets a row and a
+  column, so a class that is never predicted still shows. `norm` divides each row by its total (the recall of
+  each class) with a percent colorbar, `ann` writes each cell's value and `nocb` drops the colorbar. A 2-D
+  `y_pred` raises with a hint to pass `proba.argmax(axis=1)`.
+- **Plot kind** `roc`: the ROC curve, `kx.plot(y_true, score, 'roc')`, with the AUC in the legend
+  (`gbm (AUC 0.80)`), which it draws without `leg`. A dotted diagonal marks a random model, and both axes run
+  from 0 to 1 at equal scale. `z` adds a second model's score. A 2-D score, one column per class, draws one
+  curve per class, one-vs-rest, named after the DataFrame's columns or else the sorted labels of `y_true`.
+- **Plot kind** `pr`: the precision-recall curve, `kx.plot(y_true, score, 'pr')`, with the average precision in
+  the legend (`gbm (AP 0.80)`) and a dotted baseline at the positive rate, what a random model gets. The curve
+  is drawn in the steps that the average precision sums. `z` adds a second model on the same baseline; a 2-D
+  score draws one curve per class, each with its own baseline in its colour.
+- **Plot kind** `calib`: a reliability diagram, `kx.plot(y_true, score, 'calib')`: the observed positive rate
+  against the mean score in `bins=` equal-width bins over 0..1 (10 by default), with markers sized by the rows
+  in each bin, the diagonal a calibrated model lies on, and the Brier score in the legend (`gbm (Brier 0.201)`).
+  Empty bins are left out. `z` adds a second model; scores outside 0..1 raise.
+- **Plot kind** `proba`: the score distribution per true class, `kx.plot(y_true, score, 'proba')`: one
+  histogram per class on the same `bins=` equal-width bins over 0..1 (20 by default), so their overlap shows
+  where the model confuses them. `norm` draws densities, for imbalanced classes. A 2-D score shows each row's
+  score for its own true class.
+- **Plot kind** `thresh`: precision, recall and F1 against the decision threshold,
+  `kx.plot(y_true, score, 'thresh')`, where a row is positive when its score is at or above the threshold.
+- **Flag** `best` (`thresh`, `loss`, `elbow`): a dashed vertical line at the threshold with the highest F1, labelled in the legend
+  (`best F1 0.74 at 0.38`).
+- **Plot kinds** `gain` and `lift`: `kx.plot(y_true, score, 'gain')` draws the share of positives found against
+  the share of rows taken, highest scores first, between a dotted diagonal (a random order) and a dashed corner
+  at the positive rate (a perfect one). `lift` divides the gain by the random order's, so how many times more
+  positives the top rows hold, with a dotted line at 1. `z` adds a second model to both.
+- **Plot kind** `pva`: predicted against actual for a regression, `kx.plot(actual, predicted, 'pva')`, with the
+  dashed `y = x` line, equal scales, and R², RMSE and MAE in the corner. Above 5,000 points it draws hexagons
+  (`hexbin`) instead of dots, so big test sets stay readable.
+- **Plot kind** `resid`: residuals (`actual - predicted`) against predicted, with a dashed line at 0. `z` colours
+  the points as in `scatter`, such as by a feature, and takes `nocb`, `sym` and `logc`.
+- **Plot kind** `imp`: feature importance, `kx.plot(df, 'feature', 'importance', 'std', 'imp')`, as bars lying
+  down with the largest on top and `z` as error bars. `top=` keeps the largest (20 by default) and the y label
+  says how many were left out.
+- **Plot kind** `loss`: training curves, `kx.plot(history, 'loss')`. The first metric is a solid line and its
+  `val_` pair a dashed one in the same colour, against an `epoch` column or the row number from 1. Other metrics
+  have other scales, so `kx.plot(h[['accuracy', 'val_accuracy']], 'loss')` draws them. `best` marks the best
+  validation epoch: the lowest, or the highest for metrics named with `acc`, `auc`, `f1`, `precision` or `recall`.
+- Table kinds also take a dict of columns, or anything with a `.history` dict such as a Keras `History`, so
+  `kx.plot(model.fit(...), 'loss')` works without importing Keras.
+- **Plot kinds** `lcurve` and `vcurve`: cross-validated scores, `kx.plot(sizes, train_scores, val_scores,
+  'lcurve')`, in the shapes scikit-learn's `learning_curve` and `validation_curve` return (one row per x, one
+  column per fold). The mean is a line and ± one standard deviation a band in its colour; 1-D scores draw a line
+  without a band. `vcurve` is the same with a hyperparameter on x, so `logx` is the usual flag.
+- **Plot kind** `elbow`: choosing the number of clusters, `kx.plot(ks, inertia, 'elbow')`, with `z` (such as the
+  silhouette score) on a second y axis on the right. `best` marks the knee: the point farthest from the line
+  between the first and last points, with both axes scaled to 0..1.
+- `kx.evaluate(y_true, *scores)`: a model report in one figure, with the panels picked from the data. A binary
+  `y` with 1-D scores gets `roc`, `pr`, `calib` and `proba` (2 x 2), with up to two models in each panel but
+  `proba`. A 2-D score gets `roc` per class, the `cm` of the most likely class and `proba` of the true class. A
+  numeric `y` with more than 10 values gets `pva`, `resid` and a `hist` of the residuals. `spec=` adds a theme and
+  flags to every panel, and other keywords go to `kx.grid`. It returns the flat array of axes, as `kx.grid` does;
+  the figure is `axs[0].figure`.
+
 ## [0.4.0] - 2026-10-18
 
 ### Added

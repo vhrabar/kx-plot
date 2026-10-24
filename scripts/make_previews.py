@@ -1,10 +1,11 @@
 """
-Render previews/<theme>.png for every theme: every kind on the bundled demo CSVs.
+Render previews/<theme>.png and previews/<theme>-ml.png for every theme: every kind on the bundled demo CSVs.
 """
 import os
 import sys
 
 import matplotlib
+import numpy as np
 
 matplotlib.use("Agg")
 
@@ -53,11 +54,48 @@ def render(theme: str, out_dir: str) -> str:
     return path
 
 
+def render_ml(theme: str, out_dir: str) -> str:
+    """Draw one panel per machine-learning kind in `theme`, 5 per row, and save it as PNG."""
+    binary, multi, reg, history, imp, curves = (kx.load(n) for n in ("binary", "multiclass", "regression", "history",
+                                                                     "importance", "curves"))
+    rng = np.random.default_rng(0)
+    gamma = np.logspace(-3, 2, 10)              # vcurve: a hyperparameter where validation peaks in the middle
+    t = np.log10(gamma)[:, None]
+    noise = rng.normal(0, 0.01, (10, 5))
+    ks = np.arange(1, 11)                       # elbow: inertia and silhouette for k clusters
+    kx.use(theme)
+    a = iter(axs := kx.grid(15, cols=5))
+    fig = axs[0].figure
+    kx.plot(multi, "y", "pred", "cm-norm-ann", title="cm", ax=next(a))
+    kx.plot(binary, "y", "gbm", "logreg", "roc", title="roc", ax=next(a))
+    kx.plot(binary, "y", "gbm", "logreg", "pr", title="pr", ax=next(a))
+    kx.plot(binary, "y", "gbm", "logreg", "calib", title="calib", ax=next(a))
+    kx.plot(binary, "y", "gbm", "proba", title="proba", ax=next(a))
+    kx.plot(binary, "y", "gbm", "thresh-best", title="thresh", ax=next(a))
+    kx.plot(binary, "y", "gbm", "logreg", "gain", title="gain", ax=next(a))
+    kx.plot(binary, "y", "gbm", "logreg", "lift", title="lift", ax=next(a))
+    kx.plot(reg, "actual", "predicted", "pva", title="pva", ax=next(a))
+    kx.plot(reg, "actual", "predicted", "x", "resid", title="resid", ax=next(a))
+    kx.plot(imp, "feature", "importance", "std", "imp", title="imp", ax=next(a))
+    kx.plot(history, "loss-best", title="loss", ax=next(a))
+    kx.plot(curves["size"], curves.filter(like="train_"), curves.filter(like="val_"), "lcurve", title="lcurve",
+            ax=next(a))
+    kx.plot(gamma, 0.98 - 0.35 / (1 + np.exp(2 * (t + 1))) + noise, 0.83 - 0.03 * (t - 0.5) ** 2 + 2 * noise,
+            "vcurve-logx", title="vcurve", ax=next(a))
+    kx.plot(ks, 1000 / ks ** 1.2 + 40, 0.6 - 0.04 * np.abs(ks - 3), "elbow-best", title="elbow", ax=next(a))
+    fig.suptitle(f"{theme}: machine learning")
+    path = os.path.join(out_dir, f"{theme}-ml.png")
+    fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
 def main() -> None:
     out_dir = os.path.join(_root, "previews")
     os.makedirs(out_dir, exist_ok=True)
     for theme in kx.styles():
         print(render(theme, out_dir))
+        print(render_ml(theme, out_dir))
 
 
 if __name__ == "__main__":

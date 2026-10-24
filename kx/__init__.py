@@ -4,15 +4,20 @@ kx: tiny matplotlib helper.
 Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
   kind  : line | step | area | band | scatter | bar | barh | hist | kde | ridge | ecdf | box | violin | strip
           | qq | heat | crosstab | count | missing | nullmap | hexbin
+          | cm | roc | pr | calib | proba | thresh | gain | lift | pva | resid | imp | loss
+          | lcurve | vcurve | elbow
   theme : any file name in styles/
   flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si
           and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
           stack norm (count),
           mean median ann (distributions), nocb sym logc (scatter, heat, hexbin), corr ann (heat),
-          norm ann nocb logc (crosstab), ann all (missing), sort (nullmap).
+          norm ann nocb logc (crosstab), ann all (missing), sort (nullmap), diag (scatter, hexbin),
+          fit (scatter), norm ann nocb (cm), norm (proba), best (thresh, loss, elbow),
+          nocb sym logc (resid).
           kx.grammar(kind) lists them.
 by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count)
-table  : heat, missing and nullmap take a whole DataFrame or 2-D array, with no column names: kx.plot(df, 'heat-corr')
+table  : heat, missing, nullmap and loss take a whole DataFrame or 2-D array, with no column names:
+         kx.plot(df, 'heat-corr'); a dict or a Keras History works too: kx.plot(model.fit(...), 'loss')
 
 Palettes (kx.use(theme, palette="okabe")): any file name in styles/palettes/
 Colormaps (kx.use(theme, cmap="magma")):  kx.cmaps()
@@ -20,6 +25,8 @@ with kx.context(theme, ...): the same as kx.use, for one block only.
 kx.save("fig.png"): saves to /kaggle/working on Kaggle, the current folder elsewhere.
 kx.missing(df): the share of missing values per column, the same as kx.plot(df, 'missing-ann').
 kx.grid(5): a figure of 5 panels as a flat array of axes, for kx.plot(..., ax=).
+kx.roc_auc(y_true, score) and kx.pr_ap(y_true, score): area under the ROC curve and average precision, in numpy.
+kx.evaluate(y_true, score): a model report, the panels picked from the data (binary, multiclass or regression).
 kx.grammar("area") and kx.source("area") explain one kind; kx.parse(spec) shows how a spec is read.
 """
 import glob
@@ -33,15 +40,17 @@ import pandas as pd
 from matplotlib.axes import Axes
 
 from ._data import datasets, load
+from ._evaluate import evaluate
 from ._grid import grid
+from ._metrics import pr_ap, roc_auc
 from ._plot import plot
 from ._save import save
 from ._spec import COMMON_FLAGS, KINDS, Spec, all_flags, parse
 from ._theme import BREWER_CMAPS, BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
 
 __all__ = ["BREWER_CMAPS", "BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "datasets",
-           "grammar", "grid", "load", "missing", "palette", "palettes", "parse", "plot", "save", "show", "source",
-           "styles", "use"]
+           "evaluate", "grammar", "grid", "load", "missing", "palette", "palettes", "parse", "plot", "pr_ap", "roc_auc",
+           "save", "show", "source", "styles", "use"]
 
 
 def _version() -> str:

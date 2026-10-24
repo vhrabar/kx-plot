@@ -46,14 +46,18 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 |-------|-----------------------------------------------------------------------------------------------|
 | kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
 |       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap`                           |
+|       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
+|       | `lcurve` `vcurve` `elbow`                                                                     |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
 | flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
 |       | `si`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb` `sym`    |
-|       | `logc` `corr` `all`                                                                           |
+|       | `logc` `corr` `all` `diag` `fit` `best`                                                       |
 
 `stack` works with `area`, `bar`, `barh` and `hist`. `norm` is a 100% stack for `area` and a
 density (area 1) for `hist`. `cum` makes `hist` cumulative; `hist-norm-cum` is the CDF.
 `hist` puts every series on the same bins, so the bars line up.
+`diag` adds a dashed `y = x` line to `scatter` and `hexbin`; `fit` adds a least-squares line to `scatter`, with
+its slope and R² in the legend (one line per group with a categorical `z`).
 
 Unknown tokens raise an error instead of being guessed, with the closest valid tokens as a hint.
 Everything is inspectable: `kx.grammar()`, `kx.grammar('area')`, `kx.parse('leg-scatter')`, `kx.show('dark')`,
@@ -75,6 +79,41 @@ kx.plot(df, 'age', 'fare', 'hexbin-logc')          # points per hexagon; with a 
 
 `heat`, `missing` and `nullmap` take the whole table and no column names; `kx.plot(df[cols], 'heat')` for some
 columns. `wrap` breaks long tick labels onto several lines.
+
+### Machine learning
+
+`kx.load('binary')`, `'multiclass'`, `'regression'`, `'history'`, `'importance'` and `'curves'` are demo data for
+these kinds. Metrics are computed in numpy: no scikit-learn needed.
+
+```python
+kx.plot(y_true, score, 'roc')                      # ROC curve, AUC in the legend
+kx.plot(y_true, gbm, logreg, 'pr')                 # a second model goes in z; AP and a random baseline
+kx.plot(y_true, proba_df, 'roc')                   # a 2-D score: one curve per class, one-vs-rest
+kx.plot(y_true, score, 'calib')                    # reliability diagram, Brier score in the legend
+kx.plot(y_true, score, 'proba')                    # score histogram per true class
+kx.plot(y_true, score, 'thresh-best')              # precision, recall and F1 against the threshold
+kx.plot(y_true, score, 'gain')                     # also 'lift'
+kx.plot(y_true, y_pred, 'cm-norm-ann')             # confusion matrix, each row the recall of a class
+kx.plot(actual, predicted, 'pva')                  # predicted vs actual, R², RMSE and MAE
+kx.plot(actual, predicted, feature, 'resid')       # residuals, coloured by a feature
+kx.plot(df, 'feature', 'importance', 'std', 'imp') # feature importance with error bars, top= 20
+kx.plot(model.fit(...), 'loss-best')               # training curves from a Keras History, dict or DataFrame
+kx.plot(sizes, train_scores, val_scores, 'lcurve') # scikit-learn's learning_curve output; also 'vcurve'
+kx.plot(ks, inertia, silhouette, 'elbow-best')     # choosing k, the knee marked
+kx.roc_auc(y_true, score), kx.pr_ap(y_true, score) # the metrics as numbers
+kx.evaluate(y_true, gbm, logreg)                   # a report: the panels picked from the data
+```
+
+The truth comes first, then the predictions. Binary labels are 0/1 or bool, with `1`/`True` the positive class;
+with two other labels the later one in sorted order is positive. For multiclass, pass a 2-D score with one column
+per class: the class names are the DataFrame's columns, or else the sorted labels of `y_true`. `roc`, `pr`, `calib`,
+`gain` and `lift` draw their legend without `leg`, because the metric in it is the point of the plot.
+
+`kx.evaluate(y_true, *scores)` draws `roc`, `pr`, `calib` and `proba` for a binary task, `roc`, `cm` and
+`proba` for a 2-D score, and `pva`, `resid` and a residual `hist` for a numeric `y` with many values. It returns
+the flat array of axes, like `kx.grid`; `spec='dark-grid'` styles every panel.
+
+![machine learning kinds](https://raw.githubusercontent.com/vhrabar/kx-plot/main/previews/dark-ml.png)
 
 rcParams can be overridden in `kx.use` with `__` for dots: `kx.use('dark', figure__figsize=(8, 4))`.
 

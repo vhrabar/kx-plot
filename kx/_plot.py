@@ -67,7 +67,8 @@ def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None) ->
     data = list(data)
     df = data.pop(0) if data and isinstance(data[0], pd.DataFrame) else None
     last = data[-1] if data else None
-    if isinstance(last, Spec) or (isinstance(last, str) and (df is None or last not in df.columns)):
+    if isinstance(last, Spec) or (isinstance(last, str) and (df is None or last not in df.columns
+                                                             or (spec is None and _table_spec(last)))):
         if spec is not None:                    # a trailing string that is not a column is the spec
             raise TypeError(f"spec given twice ({data[-1]!r} and spec={spec!r})")
         if df is not None and isinstance(last, str):    # not a spec either, but close to a column: a typo
@@ -79,7 +80,9 @@ def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None) ->
                 raise
         spec = data.pop()
     table = KINDS[parse(spec or "line").kind].takes_table
-    if table and df is None and len(data) == 1 and np.ndim(data[0]) == 2:
+    if table and df is None and len(data) == 1 and _history(data[0]) is not None:
+        df, data = pd.DataFrame(_history(data[0])), []    # a dict, or a Keras History: kx.plot(model.fit(...), 'loss')
+    elif table and df is None and len(data) == 1 and np.ndim(data[0]) == 2:
         df, data = pd.DataFrame(data[0]), []    # a 2-D array is a table with 0..n labels
     if df is not None:
         if not data and table:
@@ -95,6 +98,23 @@ def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None) ->
     if not 1 <= len(data) <= 3:
         raise TypeError(f"kx.plot takes x, y and z: up to 3 arrays, got {len(data)}")
     return *data, *[None] * (3 - len(data)), spec, by
+
+
+def _table_spec(text: str) -> bool:
+    """text is a spec for a table kind. Table kinds take no columns, so a column named 'loss' (as in every Keras
+    history) does not hide kx.plot(h, 'loss')."""
+    try:
+        return KINDS[parse(text).kind].takes_table
+    except ValueError:
+        return False
+
+
+def _history(obj: object) -> dict | None:
+    """A dict of columns: obj itself, or its .history (a Keras History), so Keras need not be imported."""
+    if isinstance(obj, dict):
+        return obj
+    history = getattr(obj, "history", None)
+    return history if isinstance(history, dict) else None
 
 
 def _column(df: pd.DataFrame, name: object) -> pd.Series:
