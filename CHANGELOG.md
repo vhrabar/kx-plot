@@ -46,7 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   score for its own true class.
 - **Plot kind** `thresh`: precision, recall and F1 against the decision threshold,
   `kx.plot(y_true, score, 'thresh')`, where a row is positive when its score is at or above the threshold.
-- **Flag** `best` (`thresh`): a dashed vertical line at the threshold with the highest F1, labelled in the legend
+- **Flag** `best` (`thresh`, `loss`): a dashed vertical line at the threshold with the highest F1, labelled in the legend
   (`best F1 0.74 at 0.38`).
 - **Plot kinds** `gain` and `lift`: `kx.plot(y_true, score, 'gain')` draws the share of positives found against
   the share of rows taken, highest scores first, between a dotted diagonal (a random order) and a dashed corner
@@ -60,6 +60,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Plot kind** `imp`: feature importance, `kx.plot(df, 'feature', 'importance', 'std', 'imp')`, as bars lying
   down with the largest on top and `z` as error bars. `top=` keeps the largest (20 by default) and the y label
   says how many were left out.
+- **Plot kind** `loss`: training curves, `kx.plot(history, 'loss')`. The first metric is a solid line and its
+  `val_` pair a dashed one in the same colour, against an `epoch` column or the row number from 1. Other metrics
+  have other scales, so `kx.plot(h[['accuracy', 'val_accuracy']], 'loss')` draws them. `best` marks the best
+  validation epoch: the lowest, or the highest for metrics named with `acc`, `auc`, `f1`, `precision` or `recall`.
+- Table kinds also take a dict of columns, or anything with a `.history` dict such as a Keras `History`, so
+  `kx.plot(model.fit(...), 'loss')` works without importing Keras.
 
 ## [0.4.0] - 2026-10-18
 

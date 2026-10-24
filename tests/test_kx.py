@@ -852,6 +852,57 @@ def test_imp_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+HISTORY = kx.load("history")
+
+
+def test_loss_pairs_train_and_val_in_one_colour() -> None:
+    ax = kx.plot(HISTORY, "loss")
+    train, val = ax.lines
+    assert (train.get_label(), val.get_label()) == ("loss", "val_loss")
+    assert (train.get_linestyle(), val.get_linestyle()) == ("-", "--")
+    assert to_hex(train.get_color()) == to_hex(val.get_color())
+    assert list(train.get_xdata()) == list(HISTORY.epoch)
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("epoch", "loss")
+    assert _legend(ax) == ["loss", "val_loss"]
+
+
+def test_loss_takes_a_dict_or_a_keras_like_history() -> None:
+    class History:                              # what model.fit returns, without importing Keras
+        def __init__(self) -> None:
+            self.history = {"loss": [0.9, 0.5, 0.4], "val_loss": [1.0, 0.7, 0.8]}
+
+    for data in (History(), History().history):
+        ax = kx.plot(data, "loss")
+        assert [ln.get_label() for ln in ax.lines] == ["loss", "val_loss"]
+        assert list(ax.lines[0].get_xdata()) == [1, 2, 3]    # no epoch column: the row number from 1
+
+
+def test_loss_best_at_the_lowest_val_loss_or_highest_accuracy() -> None:
+    ax = kx.plot(HISTORY, "loss-best")
+    i = HISTORY.val_loss.idxmin()
+    best, = _dashed(ax)[1:]                     # after the val_loss curve
+    assert list(best.get_xdata()) == [HISTORY.epoch[i]] * 2
+    assert _legend(ax)[-1] == f"best val_loss {HISTORY.val_loss[i]:.3g} at epoch {HISTORY.epoch[i]}"
+    acc = kx.plot(HISTORY[["accuracy", "val_accuracy"]], "loss-best")
+    j = HISTORY.val_accuracy.idxmax()
+    assert _legend(acc)[-1].endswith(f"at epoch {j + 1}")
+    assert acc.get_ylabel() == "accuracy"
+
+
+def test_loss_without_val_columns_still_plots() -> None:
+    ax = kx.plot(HISTORY[["epoch", "loss"]], "loss-best")
+    assert ax.lines[0].get_label() == "loss"
+    assert _legend(ax)[-1].startswith(f"best loss {HISTORY.loss.min():.3g} at epoch ")
+
+
+def test_loss_errors() -> None:
+    with pytest.raises(ValueError, match="at least one metric column"):
+        kx.plot(HISTORY[["epoch"]], "loss")
+    with pytest.raises(TypeError, match="takes a whole table"):
+        kx.plot(HISTORY, "epoch", "loss", "loss")           # the trailing 'loss' is the kind, not the column
+    assert len(kx.plot(HISTORY, "epoch", "loss", "line").lines) == 1     # other kinds still read it as a column
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 
@@ -1322,7 +1373,7 @@ def test_table_kind_rejects_columns_y_z_and_by(table_kind: list, call: Callable[
 
 
 def test_frame_without_columns_hints_table_kinds(table_kind: list) -> None:
-    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: heat, missing, nullmap, tbl"):
+    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: heat, loss, missing, nullmap, tbl"):
         kx.plot(DF, "line")
 
 

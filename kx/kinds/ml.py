@@ -327,3 +327,34 @@ def imp(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[st
     left = len(names) - len(order)
     ax.set_ylabel(label(x, "feature") + (f", top {top} ({left} left out)" if left else ""))
     ax.set_xlabel(label(y, "importance") + (f" ± {label(z, 'z')}" if z is not None else ""))
+
+
+HIGH = ("acc", "auc", "f1", "precision", "recall")    # metrics that are better high; the rest, like loss, low
+
+
+@kind("loss", flags=("best",), table=True)
+def loss(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any) -> None:
+    """Training curves: kx.plot(history, 'loss') with a DataFrame, a dict or a Keras History. The first metric is a
+    solid line and its val_ pair a dashed one in the same colour, against an epoch column or the row number from 1.
+    Other metrics have other scales: kx.plot(h[['accuracy', 'val_accuracy']], 'loss') draws them.
+    best = a marker and a dashed line at the best validation epoch: lowest, or highest for acc, auc, f1,
+    precision and recall. kw: the lines (ax.plot)."""
+    epochs = x["epoch"].to_numpy() if "epoch" in x.columns else np.arange(1, len(x) + 1)
+    cols = [str(c) for c in x.columns if c != "epoch"]
+    if not cols:
+        raise ValueError("kind 'loss' needs at least one metric column besides 'epoch'")
+    metric = next((c for c in cols if not c.startswith("val_")), cols[0])
+    pair = [c for c in (metric, f"val_{metric}") if c in cols]
+    for c in pair:
+        style = {"linestyle": "--"} if c.startswith("val_") and c != metric else {}
+        ln, = ax.plot(epochs, x[c].to_numpy(dtype=float), **{"label": c, "color": "C0", **style, **kw})
+    if "best" in flags:
+        watch = pair[-1]                        # the validation curve when there is one
+        values = x[watch].to_numpy(dtype=float)
+        high = any(h in watch.lower() for h in HIGH)
+        i = int(np.nanargmax(values) if high else np.nanargmin(values))
+        ax.plot(epochs[i], values[i], marker="o", color=ln.get_color(), zorder=3)
+        _best(ax, epochs[i], f"best {watch} {values[i]:.3g} at epoch {epochs[i]}")
+    ax.set_xlabel("epoch")
+    ax.set_ylabel(metric.removeprefix("val_"))
+    ax.legend()
