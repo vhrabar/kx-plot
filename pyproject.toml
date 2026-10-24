@@ -1,21 +1,31 @@
 [project]
 name = "kx-plot"
-version = "0.4.0"
-description = "One-line matplotlib plots and themes for notebook and scripts, Kaggle-friendly"
+version = "0.5.0"
+description = "One-line matplotlib plots, themes and model-evaluation charts for notebooks and scripts, Kaggle-friendly"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "kx/styles/palettes/LICENCES.md", "kx/styles/cmaps/LICENCES.md"]
 authors = [{ name = "Vedran Hrabar", email = "vedran.hrabar@outlook.com" }]
 requires-python = ">=3.10"
-keywords = ["matplotlib", "plotting", "visualization", "themes", "kaggle", "jupyter"]
+keywords = ["matplotlib", "plotting", "visualization", "themes", "kaggle", "jupyter", "data-science",
+            "machine-learning", "model-evaluation", "roc-curve", "confusion-matrix"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Framework :: Jupyter",
     "Framework :: Matplotlib",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Visualization",
 ]
 dependencies = [
@@ -29,6 +39,7 @@ Homepage = "https://github.com/vhrabar/kx-plot"
 Issues = "https://github.com/vhrabar/kx-plot/issues"
 Changelog = "https://github.com/vhrabar/kx-plot/blob/main/CHANGELOG.md"
 Kaggle = "https://www.kaggle.com/datasets/vhrabar/kx-plot"
+"Example Notebook" = "https://www.kaggle.com/code/vhrabar/kx-one-line-matplotlib-plots-and-themes"
 
 [build-system]
 requires = ["hatchling>=1.27"]
