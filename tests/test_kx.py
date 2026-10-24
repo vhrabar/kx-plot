@@ -986,6 +986,70 @@ def test_elbow_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+def _titles(axs: np.ndarray) -> list[str]:
+    return [ax.get_title() for ax in axs]
+
+
+def test_evaluate_binary_is_roc_pr_calib_proba_with_every_score() -> None:
+    axs = kx.evaluate(BINARY.y, BINARY.gbm, BINARY.logreg)
+    assert isinstance(axs, np.ndarray)
+    assert axs.shape == (4,)
+    assert all(isinstance(ax, Axes) for ax in axs)
+    assert _titles(axs) == ["ROC", "precision-recall", "calibration", "scores by class: gbm"]
+    assert all(ax.figure is axs[0].figure for ax in axs)
+    assert [len(_curves(ax)) for ax in axs[:3]] == [2, 2, 2]  # both models in roc, pr and calib
+    assert _legend(axs[0]) == [f"gbm (AUC {kx.roc_auc(BINARY.y, BINARY.gbm):.2f})",
+                               f"logreg (AUC {kx.roc_auc(BINARY.y, BINARY.logreg):.2f})"]
+    assert len(axs[3].containers) == 2
+
+
+def test_evaluate_names_unnamed_scores() -> None:
+    axs = kx.evaluate(BINARY.y.to_numpy(), BINARY.gbm.to_numpy(), BINARY.logreg.to_numpy())
+    assert [t.split(" (")[0] for t in _legend(axs[0])] == ["score 1", "score 2"]
+    assert _legend(kx.evaluate(BINARY.y.to_numpy(), BINARY.gbm.to_numpy())[0])[0].startswith("score (AUC")
+
+
+def test_evaluate_multiclass_is_roc_cm_of_argmax_and_proba() -> None:
+    axs = kx.evaluate(MULTI.y, MULTI[["cat", "dog", "bird"]])
+    assert _titles(axs) == ["ROC, one-vs-rest", "confusion matrix", "score of the true class"]
+    assert len(_curves(axs[0])) == 3
+    want = pd.crosstab(MULTI.y, MULTI.pred, normalize="index")      # pred is the argmax column in the data
+    assert np.allclose(axs[1].images[0].get_array(), want.to_numpy())
+    codes = MULTI.y.map({"bird": 0, "cat": 1, "dog": 2})
+    by_code = kx.evaluate(codes, MULTI[["bird", "cat", "dog"]].to_numpy())
+    assert np.allclose(by_code[1].images[0].get_array(), want.to_numpy())
+
+
+def test_evaluate_regression_is_pva_resid_and_a_residual_hist() -> None:
+    axs = kx.evaluate(REGRESSION.actual, REGRESSION.predicted)
+    assert _titles(axs) == ["predicted vs actual", "residuals", "residual distribution"]
+    assert axs[0].texts[0].get_text().startswith("R² ")
+    assert axs[2].get_xlabel() == "residual (actual - predicted)"
+    heights = sum(p.get_height() for p in axs[2].patches)
+    assert heights == len(REGRESSION)
+
+
+def test_evaluate_spec_reaches_every_panel() -> None:
+    with kx.context("light"):
+        axs = kx.evaluate(BINARY.y, BINARY.gbm, spec="dark-grid")
+    dark = mpl.rc_params_from_file(kx._theme.style_path("dark"), use_default_template=False)
+    assert to_hex(axs[0].figure.get_facecolor()) == to_hex(dark["figure.facecolor"])   # the figure too, not only panels
+    for ax in axs:
+        assert to_hex(ax.get_facecolor()) == to_hex(dark["axes.facecolor"])
+        assert ax.xaxis.get_gridlines()[0].get_visible()
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.evaluate(BINARY.y), "at least one score"),
+    (lambda: kx.evaluate(BINARY.y, BINARY.gbm, BINARY.logreg, BINARY.gbm), "at most 2 models"),
+    (lambda: kx.evaluate(REGRESSION.actual, REGRESSION.predicted, REGRESSION.x), "one model's predictions"),
+    (lambda: kx.evaluate(MULTI.y, MULTI.cat), "pass a 2-D score"),
+])
+def test_evaluate_errors(call: Callable[[], np.ndarray], match: str) -> None:
+    with pytest.raises((ValueError, TypeError), match=match):
+        call()
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 

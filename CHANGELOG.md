@@ -73,6 +73,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Plot kind** `elbow`: choosing the number of clusters, `kx.plot(ks, inertia, 'elbow')`, with `z` (such as the
   silhouette score) on a second y axis on the right. `best` marks the knee: the point farthest from the line
   between the first and last points, with both axes scaled to 0..1.
+- `kx.evaluate(y_true, *scores)`: a model report in one figure, with the panels picked from the data. A binary
+  `y` with 1-D scores gets `roc`, `pr`, `calib` and `proba` (2 x 2), with up to two models in each panel but
+  `proba`. A 2-D score gets `roc` per class, the `cm` of the most likely class and `proba` of the true class. A
+  numeric `y` with more than 10 values gets `pva`, `resid` and a `hist` of the residuals. `spec=` adds a theme and
+  flags to every panel, and other keywords go to `kx.grid`. It returns the flat array of axes, as `kx.grid` does;
+  the figure is `axs[0].figure`.
 
 ## [0.4.0] - 2026-10-18
 

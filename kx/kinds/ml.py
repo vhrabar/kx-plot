@@ -288,7 +288,11 @@ def pva(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: An
     ax.text(0.03, 0.97, f"R² {r2:.3f}\nRMSE {rmse:.3g}\nMAE {mae:.3g}", transform=ax.transAxes, ha="left",
             va="top", bbox={"boxstyle": "round", "facecolor": ax.get_facecolor(), "edgecolor": "none",
                             "alpha": 0.85})
-    ax.set_aspect("equal", adjustable="datalim")
+    lo, hi = min(np.min(x), np.min(y)), max(np.max(x), np.max(y))
+    pad = 0.03 * (hi - lo) or 1.0
+    ax.set_xlim(lo - pad, hi + pad)             # one range on both axes: a square, also in a kx.grid panel
+    ax.set_ylim(lo - pad, hi + pad)
+    ax.set_aspect("equal")
     ax.set_xlabel(label(x, "actual"))
     ax.set_ylabel(label(y, "predicted"))
 
