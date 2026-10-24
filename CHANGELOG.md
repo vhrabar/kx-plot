@@ -57,6 +57,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   (`hexbin`) instead of dots, so big test sets stay readable.
 - **Plot kind** `resid`: residuals (`actual - predicted`) against predicted, with a dashed line at 0. `z` colours
   the points as in `scatter`, such as by a feature, and takes `nocb`, `sym` and `logc`.
+- **Plot kind** `imp`: feature importance, `kx.plot(df, 'feature', 'importance', 'std', 'imp')`, as bars lying
+  down with the largest on top and `z` as error bars. `top=` keeps the largest (20 by default) and the y label
+  says how many were left out.
 
 ## [0.4.0] - 2026-10-18
 

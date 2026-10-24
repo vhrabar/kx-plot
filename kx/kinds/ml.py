@@ -26,7 +26,7 @@ from .._metrics import (
 from .._metrics import gain as gains
 from .._spec import kind
 from .._util import COLOUR, label
-from .basic import _check_scatter, scatter
+from .basic import _bars, _check_scatter, scatter
 from .dist import _hist
 from .table import _matrix, hexbin
 
@@ -304,3 +304,26 @@ def resid(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[
     ax.axhline(0, color=plt.rcParams["text.color"], linestyle="--", linewidth=1, alpha=0.6, zorder=1)
     ax.set_xlabel(label(y, "predicted"))
     ax.set_ylabel("residual (actual - predicted)")
+
+
+@kind("imp", value_axis="x")
+def imp(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], top: int = 20,
+        **kw: Any) -> None:
+    """Feature importance: kx.plot(df, 'feature', 'importance', 'std', 'imp'), bars lying down with the largest on
+    top and z as error bars. top= keeps the largest (20); the y label says how many were left out. kw: ax.barh."""
+    if isinstance(top, bool) or not isinstance(top, (int, np.integer)) or top < 1:
+        raise ValueError(f"top= is how many features to keep, a whole number from 1; got {top!r}")
+    names = np.asarray(x, dtype=object).ravel()
+    values = np.asarray(y, dtype=float).ravel()
+    spread = None if z is None else np.asarray(z, dtype=float).ravel()
+    if any(len(a) != len(names) for a in (values, *([spread] if spread is not None else []))):
+        raise ValueError("feature names, importances and z need one value per feature")
+    if not np.isfinite(values).all():
+        raise ValueError("importance has NaN or inf values; drop those features first")
+    order = np.argsort(-values, kind="stable")[:top]
+    err = {} if spread is None else {"xerr": spread[order], "ecolor": plt.rcParams["text.color"], "capsize": 3}
+    _bars(ax, names[order], [(label(y, "importance"), values[order])], set(), True, **{**err, **kw})
+    ax.invert_yaxis()                           # largest on top
+    left = len(names) - len(order)
+    ax.set_ylabel(label(x, "feature") + (f", top {top} ({left} left out)" if left else ""))
+    ax.set_xlabel(label(y, "importance") + (f" ± {label(z, 'z')}" if z is not None else ""))

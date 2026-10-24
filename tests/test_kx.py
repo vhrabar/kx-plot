@@ -818,6 +818,40 @@ def test_pva_resid_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+IMPORTANCE = kx.load("importance")
+
+
+def test_imp_largest_on_top_with_error_bars_from_z() -> None:
+    ax = kx.plot(IMPORTANCE, "feature", "importance", "std", "imp")
+    want = IMPORTANCE.sort_values("importance", ascending=False)
+    bars, = (c for c in ax.containers if isinstance(c, mpl.container.BarContainer))
+    assert [p.get_width() for p in bars] == list(want.importance)
+    assert [t.get_text() for t in ax.get_yticklabels()] == list(want.feature)
+    assert ax.yaxis_inverted()                              # the first bar, the largest, is at the top
+    segments = bars.errorbar.lines[2][0].get_segments()
+    assert [s[1][0] - s[0][0] for s in segments] == pytest.approx(list(2 * want["std"]))
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("importance ± std", "feature")
+
+
+def test_imp_top_cuts_and_says_how_many_were_left_out() -> None:
+    ax = kx.plot(IMPORTANCE, "feature", "importance", "imp", top=5)
+    assert len(ax.patches) == 5
+    assert [p.get_width() for p in ax.patches] == list(IMPORTANCE.importance.nlargest(5))
+    assert ax.get_ylabel() == "feature, top 5 (10 left out)"
+    assert not any(isinstance(c, mpl.container.ErrorbarContainer) for c in ax.containers)
+    assert ax.get_ylabel() != kx.plot(IMPORTANCE, "feature", "importance", "imp", top=15).get_ylabel()
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(IMPORTANCE, "feature", "importance", "imp", top=0), "whole number from 1"),
+    (lambda: kx.plot(["a", "b"], [1.0, np.nan], "imp"), "NaN"),
+    (lambda: kx.plot(["a", "b"], [1.0, 2.0], [0.1], "imp"), "one value per feature"),
+])
+def test_imp_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 
