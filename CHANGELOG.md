@@ -66,6 +66,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   validation epoch: the lowest, or the highest for metrics named with `acc`, `auc`, `f1`, `precision` or `recall`.
 - Table kinds also take a dict of columns, or anything with a `.history` dict such as a Keras `History`, so
   `kx.plot(model.fit(...), 'loss')` works without importing Keras.
+- **Plot kinds** `lcurve` and `vcurve`: cross-validated scores, `kx.plot(sizes, train_scores, val_scores,
+  'lcurve')`, in the shapes scikit-learn's `learning_curve` and `validation_curve` return (one row per x, one
+  column per fold). The mean is a line and ± one standard deviation a band in its colour; 1-D scores draw a line
+  without a band. `vcurve` is the same with a hyperparameter on x, so `logx` is the usual flag.
 
 ## [0.4.0] - 2026-10-18
 

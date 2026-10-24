@@ -903,6 +903,47 @@ def test_loss_errors() -> None:
     assert len(kx.plot(HISTORY, "epoch", "loss", "line").lines) == 1     # other kinds still read it as a column
 
 
+CURVES = kx.load("curves")
+TRAIN, VAL = CURVES.filter(like="train_"), CURVES.filter(like="val_")
+
+
+def test_lcurve_band_edges_are_mean_plus_minus_std() -> None:
+    ax = kx.plot(CURVES["size"], TRAIN, VAL, "lcurve")
+    train, val = ax.lines
+    assert list(train.get_ydata()) == pytest.approx(list(TRAIN.mean(axis=1)))
+    assert list(val.get_ydata()) == pytest.approx(list(VAL.mean(axis=1)))
+    edges = ax.collections[1].get_paths()[0].vertices[:, 1]     # the validation band
+    lo, hi = VAL.mean(axis=1) - VAL.std(axis=1, ddof=0), VAL.mean(axis=1) + VAL.std(axis=1, ddof=0)
+    assert edges.min() == pytest.approx(lo.min())
+    assert edges.max() == pytest.approx(hi.max())
+    assert to_hex(ax.collections[1].get_facecolor()[0][:3]) == to_hex(val.get_color())
+    assert _legend(ax) == ["train", "validation"]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("size", "score")
+
+
+def test_lcurve_one_fold_is_a_line_without_a_band() -> None:
+    ax = kx.plot([10, 20, 30], [0.9, 0.8, 0.8], np.array([[0.5], [0.6], [0.7]]), "lcurve")
+    assert len(ax.lines) == 2
+    assert len(ax.collections) == 0
+    assert ax.get_xlabel() == "training set size"
+
+
+def test_vcurve_only_changes_the_x_label() -> None:
+    ax = kx.plot(np.logspace(-3, 1, 10), TRAIN.to_numpy(), VAL.to_numpy(), "vcurve-logx")
+    assert ax.get_xlabel() == "parameter"
+    assert ax.get_xscale() == "log"
+    assert len(ax.collections) == 2
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot([1, 2, 3], TRAIN, VAL, "lcurve"), r"train has shape \(10, 5\) but x has 3 values"),
+    (lambda: kx.plot(CURVES["size"], TRAIN, VAL.iloc[:5], "vcurve"), "validation has shape"),
+])
+def test_lcurve_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 

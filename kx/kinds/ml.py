@@ -26,7 +26,7 @@ from .._metrics import (
 from .._metrics import gain as gains
 from .._spec import kind
 from .._util import COLOUR, label
-from .basic import _bars, _check_scatter, scatter
+from .basic import _bars, _check_scatter, band, scatter
 from .dist import _hist
 from .table import _matrix, hexbin
 
@@ -358,3 +358,46 @@ def loss(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any
     ax.set_xlabel("epoch")
     ax.set_ylabel(metric.removeprefix("val_"))
     ax.legend()
+
+
+def _folds(a: ArrayLike, n: int, name: str) -> tuple[np.ndarray, np.ndarray | None]:
+    """Mean and standard deviation across folds (columns) at each x, NaN folds left out. 1-D: the values, no std."""
+    v = np.asarray(a, dtype=float)
+    if v.ndim > 2 or v.shape[0] != n:
+        raise ValueError(f"{name} has shape {v.shape} but x has {n} values; pass one row per x and one column "
+                         "per fold, as scikit-learn's learning_curve and validation_curve return")
+    if v.ndim == 1 or v.shape[1] == 1:
+        return v.ravel(), None
+    return np.nanmean(v, axis=1), np.nanstd(v, axis=1)
+
+
+def _cv(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, xlabel: str, **kw: Any) -> None:
+    """lcurve and vcurve: the mean train (y) and validation (z) score per x, each with a ± 1 std band."""
+    xs = np.asarray(x, dtype=float).ravel()
+    for scores, name in ((y, "train"), (z, "validation")):
+        if scores is None:
+            continue
+        mean, std = _folds(scores, len(xs), name)
+        if std is None:                         # one fold: a line without a band
+            ax.plot(xs, mean, **{"label": name, **kw})
+        else:
+            band(ax, xs, pd.Series(mean, name=name), std, set(), **kw)
+            ax.collections[-1].set_label("_band")              # one legend entry per curve, not per band
+    ax.set_xlabel(label(x, xlabel))
+    ax.set_ylabel("score")
+    ax.legend()
+
+
+@kind("lcurve")
+def lcurve(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """Learning curve: kx.plot(sizes, train_scores, val_scores, 'lcurve'), the shapes scikit-learn's learning_curve
+    returns: one row per training set size and one column per fold. The mean is a line and ± 1 standard deviation
+    a band; a gap that stays wide means more data would help less than a simpler model. kw: the lines (ax.plot)."""
+    _cv(ax, x, y, z, "training set size", **kw)
+
+
+@kind("vcurve")
+def vcurve(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """Validation curve: kx.plot(param_range, train_scores, val_scores, 'vcurve-logx'), as lcurve with a
+    hyperparameter on x, as scikit-learn's validation_curve returns. kw: the lines (ax.plot)."""
+    _cv(ax, x, y, z, "parameter", **kw)
