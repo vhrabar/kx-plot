@@ -944,6 +944,48 @@ def test_lcurve_errors(call: Callable[[], Axes], match: str) -> None:
         call()
 
 
+KS = np.arange(1, 9)
+INERTIA = pd.Series([100, 50, 20, 15, 12, 10, 9, 8.0], name="inertia")
+
+
+def test_knee_is_scale_free_and_needs_three_points() -> None:
+    assert kx._metrics.knee(KS, INERTIA) == 2
+    assert kx._metrics.knee(KS * 10, INERTIA * 1000) == 2
+    assert kx._metrics.knee(np.arange(1, 11), 1000 / np.arange(1, 11)) == 2
+    with pytest.raises(ValueError, match="at least 3 points"):
+        kx._metrics.knee([1, 2], [3, 1])
+
+
+def test_elbow_best_marks_the_knee() -> None:
+    ax = kx.plot(KS, INERTIA, "elbow-best")
+    best, = _dashed(ax)
+    assert list(best.get_xdata()) == [3, 3]
+    assert _legend(ax) == ["inertia", "knee at k = 3"]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("k", "inertia")
+    assert ax.lines[0].get_marker() == "o"
+
+
+def test_elbow_z_on_a_twin_axis() -> None:
+    silhouette = pd.Series([0.2, 0.45, 0.6, 0.5, 0.4, 0.35, 0.3, 0.3], name="silhouette")
+    ax = kx.plot(KS, INERTIA, silhouette, "elbow-best")
+    twin, = (a for a in ax.figure.axes if a is not ax)
+    assert twin.get_ylabel() == "silhouette"
+    assert list(twin.lines[0].get_ydata()) == list(silhouette)
+    assert ax.get_shared_x_axes().joined(ax, twin)
+    assert [t.get_text() for t in twin.get_legend().get_texts()] == ["inertia", "silhouette", "knee at k = 3"]
+    assert ax.get_legend() is None
+    assert len(kx.plot(KS, INERTIA, "elbow").figure.axes) == 1
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot([1, 2], [5, 3], "elbow-best"), "at least 3 points"),
+    (lambda: kx.plot(KS, INERTIA, [0.1, 0.2], "elbow"), "x has 8 values but z has 2"),
+])
+def test_elbow_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
 

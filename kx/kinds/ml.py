@@ -17,6 +17,7 @@ from .._metrics import (
     classes,
     confusion,
     fit_errors,
+    knee,
     pr_ap,
     pr_curve,
     roc_auc,
@@ -401,3 +402,32 @@ def vcurve(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set
     """Validation curve: kx.plot(param_range, train_scores, val_scores, 'vcurve-logx'), as lcurve with a
     hyperparameter on x, as scikit-learn's validation_curve returns. kw: the lines (ax.plot)."""
     _cv(ax, x, y, z, "parameter", **kw)
+
+
+@kind("elbow", flags=("best",))
+def elbow(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """Choosing k: kx.plot(ks, inertia, 'elbow'), with z (such as the silhouette score) on a second y axis on the
+    right. best = a dashed line at the knee, the point farthest from the line between the first and last points.
+    kw: the inertia line (ax.plot)."""
+    xs, ys = np.asarray(x, dtype=float).ravel(), np.asarray(y, dtype=float).ravel()
+    if len(xs) != len(ys):
+        raise ValueError(f"x has {len(xs)} values but y has {len(ys)}")
+    order = np.argsort(xs, kind="stable")
+    xs, ys = xs[order], ys[order]
+    ln, = ax.plot(xs, ys, **{"marker": "o", "label": label(y, "inertia"), **kw})
+    ax.set_xlabel(label(x, "k"))
+    ax.set_ylabel(label(y, "inertia"), color=ln.get_color())
+    lines, top = [ln], ax
+    if z is not None:
+        zs = np.asarray(z, dtype=float).ravel()
+        if len(zs) != len(xs):
+            raise ValueError(f"x has {len(xs)} values but z has {len(zs)}")
+        top = ax.twinx()
+        lines += top.plot(xs, zs[order], color="C1", marker="s", linestyle="--", label=label(z, "silhouette"))
+        top.set_ylabel(label(z, "silhouette"), color="C1")
+    if "best" in flags:
+        i = knee(xs, ys)
+        _best(ax, xs[i], f"knee at {label(x, 'k')} = {xs[i]:g}")
+        lines.append(ax.lines[-1])
+    if len(lines) > 1:                          # one legend for both axes, on the one drawn last
+        top.legend(lines, [h.get_label() for h in lines])

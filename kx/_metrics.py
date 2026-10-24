@@ -160,3 +160,17 @@ def gain(y: ArrayLike, s: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
     if not pos:
         raise ValueError("a gain curve needs positives in y_true; it has only negatives")
     return np.r_[0, (tps + fps) / (pos + neg)], np.r_[0, tps / pos]
+
+
+def knee(x: ArrayLike, y: ArrayLike) -> int:
+    """Index of the knee: the point farthest from the straight line between the first and last points, with both
+    axes scaled to 0..1 so the units of x and y do not matter."""
+    xs, ys = np.asarray(x, dtype=float).ravel(), np.asarray(y, dtype=float).ravel()
+    if len(xs) < 3:
+        raise ValueError(f"a knee needs at least 3 points; got {len(xs)}")
+    if not (np.isfinite(xs).all() and np.isfinite(ys).all()):
+        raise ValueError("x or y has NaN or inf values; drop those points first")
+    span = np.ptp(xs) or 1.0, np.ptp(ys) or 1.0
+    u, v = (xs - xs[0]) / span[0], (ys - ys[0]) / span[1]
+    ex, ey = u[-1], v[-1]                       # the chord from the first point to the last
+    return int(np.argmax(np.abs(u * ey - v * ex)))   # distance to the chord, up to its constant length
