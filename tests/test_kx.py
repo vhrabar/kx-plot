@@ -2,6 +2,7 @@ import re
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from statistics import NormalDist
+from typing import Any
 
 import matplotlib as mpl
 import numpy as np
@@ -9,6 +10,7 @@ import pandas as pd
 import pytest
 from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
+from numpy.typing import ArrayLike
 
 import kx
 
@@ -1794,6 +1796,96 @@ def test_grammar_and_source_of_one_kind(capsys: pytest.CaptureFixture[str]) -> N
     out = capsys.readouterr().out
     assert out.lstrip().startswith("@kind(\"band\"")
     assert "def scatter(" not in out
+
+
+@pytest.fixture
+def panel_kind() -> Iterator[None]:
+    """A dummy kind 'quad' that splits ax into 2 x 2 panels, and 'nopanels' that forgets to return them."""
+    def quad(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: Any) -> np.ndarray:
+        axs = kx._util.split(ax, 2, 2)
+        for a in axs:
+            a.plot(x, y, label="y")
+        return axs
+    kx._spec.kind("quad", panels=True)(quad)
+    kx._spec.kind("nopanels", panels=True)(lambda ax, x, y, z, flags, **kw: None)
+    yield
+    del kx._spec.KINDS["quad"], kx._spec.KINDS["nopanels"]
+
+
+def test_panel_kind_returns_its_axes_in_place_of_ax(panel_kind: None) -> None:
+    axs = kx.plot(X, Y, "quad-grid", title="four")
+    assert isinstance(axs, np.ndarray)
+    assert axs.shape == (4,)
+    fig = axs[0].figure
+    assert fig.axes == list(axs)                # the host axes is gone
+    assert all(g.get_visible() for a in axs for g in a.get_xgridlines())   # common flags reach every panel
+    assert fig.get_suptitle() == "four"         # the panels fill the figure: one title over them
+
+
+def test_panel_kind_stays_in_its_grid_cell(panel_kind: None) -> None:
+    left, right = kx.grid(2)
+    cell = right.get_subplotspec()
+    axs = kx.plot(X, Y, "quad", title="four", ax=right)
+    fig = left.figure
+    assert right not in fig.axes
+    assert left in fig.axes
+    assert len(fig.axes) == 5
+    assert all(a.get_subplotspec().get_topmost_subplotspec() == cell for a in axs)
+    assert axs[0].get_title() == "four"        # a title over one cell of a bigger figure: on its first panel
+    assert fig.get_suptitle() == ""
+
+
+def test_panel_kind_must_return_its_axes(panel_kind: None) -> None:
+    with pytest.raises(TypeError, match="must return their axes"):
+        kx.plot(X, Y, "nopanels")
+
+
+def test_split_needs_a_grid_cell() -> None:
+    import matplotlib.pyplot as plt
+    ax = plt.figure().add_axes((0.1, 0.1, 0.8, 0.8))
+    with pytest.raises(TypeError, match="add_axes"):
+        kx._util.split(ax, 1, 2)
+
+
+@pytest.fixture
+def polar_kind() -> Iterator[list]:
+    """A dummy kind 'circle' on polar axes that records the axes it draws on."""
+    seen = []
+    kx._spec.kind("circle", projection="polar")(lambda ax, x, y, z, flags, **kw: seen.append(ax))
+    yield seen
+    del kx._spec.KINDS["circle"]
+
+
+def test_polar_kind_gets_polar_axes(polar_kind: list) -> None:
+    ax = kx.plot(X, Y, "circle", title="round")
+    assert ax.name == "polar"
+    assert polar_kind == [ax]
+    assert ax.get_title() == "round"
+
+
+def test_polar_kind_swaps_a_grid_cell_in_place(polar_kind: list) -> None:
+    left, right = kx.grid(2)
+    cell = right.get_subplotspec()
+    ax = kx.plot(X, Y, "circle", ax=right)
+    assert ax.name == "polar"
+    assert ax.get_subplotspec() == cell
+    assert right not in ax.figure.axes
+    assert left in ax.figure.axes
+    assert left.name == "rectilinear"
+
+
+def test_polar_kind_keeps_polar_axes(polar_kind: list) -> None:
+    import matplotlib.pyplot as plt
+    given = plt.subplots(subplot_kw={"projection": "polar"})[1]
+    assert kx.plot(X, Y, "circle", ax=given) is given
+
+
+def test_grammar_says_how_a_kind_draws(panel_kind: None, polar_kind: list,
+                                       capsys: pytest.CaptureFixture[str]) -> None:
+    kx.grammar("quad")
+    assert "flat array" in capsys.readouterr().out
+    kx.grammar("circle")
+    assert "polar" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("fn", [kx.grammar, kx.source])

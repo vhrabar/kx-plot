@@ -23,6 +23,8 @@ class Kind:
     takes_by: bool = False                      # draw also gets by= (group labels for x)
     value_axis: str = "y"                       # where pct, si and zero apply: "x" for barh
     takes_table: bool = False                   # x is a whole DataFrame (or 2-D array), with no y or z
+    panels: bool = False                        # draw splits ax into several axes (util.split) and returns them
+    projection: str | None = None               # draw needs this projection ("polar"); kx.plot swaps ax for one
 
 
 KINDS: dict[str, Kind] = {}
@@ -30,12 +32,15 @@ KINDS: dict[str, Kind] = {}
 
 def kind(name: str, flags: tuple[str, ...] = (), needs_y: bool = True,
          check: Callable[[Any, Any, set[str]], None] | None = None, takes_by: bool = False,
-         value_axis: str = "y", table: bool = False) -> Callable:
-    """Decorator that registers a draw function as kind `name`. table=True: x is the whole DataFrame."""
+         value_axis: str = "y", table: bool = False, panels: bool = False,
+         projection: str | None = None) -> Callable:
+    """Decorator that registers a draw function as kind `name`. table=True: x is the whole DataFrame.
+    panels=True: draw returns the axes it split ax into. projection='polar': draw gets polar axes."""
     def register(draw: Callable[..., None]) -> Callable[..., None]:
         if name in KINDS or name in COMMON_FLAGS or "-" in name:
             raise ValueError(f"kind name {name!r} is taken or has a '-'")
-        KINDS[name] = Kind(name, draw, frozenset(flags), needs_y and not table, check, takes_by, value_axis, table)
+        KINDS[name] = Kind(name, draw, frozenset(flags), needs_y and not table, check, takes_by, value_axis, table,
+                           panels, projection)
         return draw
     return register
 

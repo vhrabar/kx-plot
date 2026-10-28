@@ -55,3 +55,15 @@ def diagonal(ax: Axes, x: ArrayLike, y: ArrayLike, flags: set[str]) -> None:
     ends = np.geomspace(lo, hi, 100) if logs and lo > 0 else np.linspace(lo, hi, 100)   # straight on any scale
     ax.plot(ends, ends, color=mpl.rcParams["text.color"], linestyle="--", linewidth=1, marker="", alpha=0.6,
             zorder=3)
+
+
+def split(ax: Axes, rows: int, cols: int, projection: str | None = None, **kw: Any) -> np.ndarray:
+    """ax's area as rows x cols new axes, flat and row by row; ax itself is removed. The panels stay inside ax's
+    cell, so a kind with several panels works in a kx.grid panel too. kw: subgridspec (wspace=, width_ratios=)."""
+    spec = ax.get_subplotspec()
+    if spec is None:
+        raise TypeError("a kind with several panels needs axes from plt.subplots or kx.grid, not fig.add_axes")
+    fig = ax.figure
+    ax.remove()
+    cells = spec.subgridspec(rows, cols, **kw)
+    return np.array([fig.add_subplot(cells[r, c], projection=projection) for r in range(rows) for c in range(cols)])

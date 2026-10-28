@@ -88,6 +88,10 @@ def grammar(kind: str | None = None) -> None:
             print("data : takes a DataFrame or 2-D array")
         if k.takes_by:
             print("by=  : group labels for x, one per group")
+        if k.panels:
+            print("axes : draws several panels; kx.plot returns them as a flat array")
+        if k.projection:
+            print(f"axes : {k.projection}; kx.plot swaps a given ax for {k.projection} axes in its place")
         return
     print("kind :", sorted(KINDS))
     print("theme:", styles())

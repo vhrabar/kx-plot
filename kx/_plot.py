@@ -23,7 +23,7 @@ WRAP = 12                                                           # wrap: char
 
 
 def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, title: str | None = None,
-         ax: Axes | None = None, by: ArrayLike | str | None = None, **kwargs: Any) -> Axes:
+         ax: Axes | None = None, by: ArrayLike | str | None = None, **kwargs: Any) -> Axes | np.ndarray:
     """kx.plot(x, y, z, 'scatter-dark-grid-leg')   or   kx.plot(x, y, 'bar-light')
     kx.plot(df, 'month', 'y2025', 'y2026', 'bar')   names columns of a DataFrame.
     kx.plot(df, 'heat')   a table kind takes the whole DataFrame (or a 2-D array) instead.
@@ -34,6 +34,7 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, 
     kx.plot(x, y, 'line', linewidth=3), kx.plot(x, spec='hist', bins=50). kx.grammar(kind) says which call.
 
     A theme in the spec applies to this plot only; kx.use() sets the notebook default.
+    Returns the axes; a kind with several panels returns them as a flat array, in ax's place when ax= is given.
     """
     x, y, z, spec, by = _arrays(data, spec, by)
     name, theme, flags = parse(spec or "line")
@@ -53,13 +54,38 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, 
 
     style = plt.style.context(["default", style_path(theme)]) if theme else contextlib.nullcontext()
     with style:
-        ax = ax or plt.subplots()[1]
-        kind.draw(ax, x, y, z, flags, **({"by": by} if by is not None else {}), **kwargs)
-        _common(ax, name, kind.value_axis, flags)
-        if title:            ax.set_title(title)
-        if "tight" in flags and not isinstance(ax.figure.get_layout_engine(), ConstrainedLayoutEngine):
-            ax.figure.tight_layout()            # a constrained figure (kx.grid) is laid out already
-    return ax
+        ax = ax or plt.subplots(subplot_kw={"projection": kind.projection})[1]
+        if kind.projection:
+            ax = _projected(ax, kind.projection)
+        fig, alone = ax.figure, len(ax.figure.axes) == 1
+        out = kind.draw(ax, x, y, z, flags, **({"by": by} if by is not None else {}), **kwargs)
+        axs = _panels(name, out) if kind.panels else [ax]
+        for a in axs:
+            _common(a, name, kind.value_axis, flags)
+        if title and kind.panels and alone:
+            fig.suptitle(title)                 # the panels fill the figure: one title over them all
+        elif title:
+            axs[0].set_title(title)
+        if "tight" in flags and not isinstance(fig.get_layout_engine(), ConstrainedLayoutEngine):
+            fig.tight_layout()                  # a constrained figure (kx.grid) is laid out already
+    return axs if kind.panels else ax
+
+
+def _projected(ax: Axes, projection: str) -> Axes:
+    """ax, or new axes with that projection in its place (ax is removed): radar on a cell of kx.grid."""
+    if ax.name == projection:
+        return ax
+    fig, spec, box = ax.figure, ax.get_subplotspec(), ax.get_position()
+    ax.remove()
+    return fig.add_subplot(spec, projection=projection) if spec else fig.add_axes(box, projection=projection)
+
+
+def _panels(name: str, out: object) -> np.ndarray:
+    """The axes a kind with several panels returned, as a flat array."""
+    axs = np.asarray(out if out is not None else [], dtype=object).ravel()
+    if not len(axs) or not all(isinstance(a, Axes) for a in axs):
+        raise TypeError(f"kind {name!r} draws several panels and must return their axes, got {out!r}")
+    return axs
 
 
 def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None) -> tuple:

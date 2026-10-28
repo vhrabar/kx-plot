@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Kinds can draw several panels or on polar axes, for the multi-panel and radial kinds to come. A kind registered
+  with `panels=True` splits its axes into a block of new ones with `kx._util.split(ax, rows, cols)`, and
+  `kx.plot` returns them as a flat array, in the place of `ax=` when one is given (so in a cell of `kx.grid`),
+  with the common flags applied to each and `title=` over the whole figure when the panels fill it. A kind
+  registered with `projection="polar"` gets polar axes; a given rectilinear `ax` is swapped for polar axes in the
+  same cell.
+
 ## [0.5.0] - 2026-10-24
 
 ### Added
