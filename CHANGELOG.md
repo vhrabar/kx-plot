@@ -28,6 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `saliency` maps. `scripts/make_embedding.py` and `scripts/make_shapes.py` write them with a fixed seed.
 - `kx.load` reads a `.npz` dataset as a dict of arrays (`kx.load('shapes')['images']`), and `kx.datasets()` lists
   them with the tables.
+- Image input for the image kinds to come, in `kx/_image.py`: an `(N, H, W)` or `(N, H, W, C)` array (channels
+  first, as PyTorch has them, is turned round), one 2-D image, or a list of arrays, PIL images or file paths, with
+  sizes free to differ. Every image becomes 0..1 floats: integers divided by 255 (or 65535 above 255), floats
+  outside 0..1 scaled to fill it, alpha dropped and one channel read as grey. Image panels come as a near-square
+  block in the place of `ax`, with no ticks or frames but room for a class name at the left.
 
 
 ## [0.5.0] - 2026-10-24
