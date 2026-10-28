@@ -1,0 +1,236 @@
+"""Table and 2-D kinds: heat, crosstab, missing, nullmap, hexbin."""
+from collections.abc import Callable
+
+import matplotlib as mpl
+import numpy as np
+import pandas as pd
+import pytest
+from helpers import PASSENGERS
+from matplotlib.axes import Axes
+from matplotlib.colors import to_hex
+
+import kx
+
+# ---------- table kinds ----------
+HEAT = pd.DataFrame({"a": [1.0, 2, 3], "b": [4.0, 5, 6], "c": [9.0, 7, 8]}, index=["r1", "r2", "r3"])
+
+
+def test_heat_draws_the_frame_with_its_labels() -> None:
+    ax = kx.plot(HEAT, "heat")
+    im = ax.images[0]
+    assert im.get_array().shape == HEAT.shape
+    assert (im.get_array() == HEAT.to_numpy()).all()
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["a", "b", "c"]
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["r1", "r2", "r3"]
+    assert len(ax.figure.axes) == 2             # the colorbar
+
+
+def test_heat_takes_a_2d_array() -> None:
+    ax = kx.plot(np.arange(6).reshape(2, 3), "heat")
+    assert ax.images[0].get_array().shape == (2, 3)
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["0", "1", "2"]
+
+
+def test_heat_corr_is_symmetric_from_minus_one_to_one() -> None:
+    p = kx.load("passengers")
+    ax = kx.plot(p, "heat-corr")
+    r = ax.images[0].get_array()
+    assert r.shape == (4, 4)                    # the numeric columns only
+    assert np.allclose(r, r.T)
+    assert np.allclose(np.diag(r), 1)
+    assert ax.images[0].get_clim() == (-1, 1)
+    assert ax.images[0].get_cmap().name == "rdbu"
+    assert ax.figure.axes[1].get_ylabel() == "r"
+    assert kx.plot(p, "heat-corr-sym").images[0].get_clim() == (-1, 1)
+
+
+def test_heat_ann_writes_every_cell_in_contrasting_ink() -> None:
+    ax = kx.plot(HEAT, "heat-ann", cmap="greys")
+    texts = ax.texts
+    assert len(texts) == HEAT.size
+    assert texts[0].get_text() == "1"
+    assert texts[0].get_color() == "black"      # lowest value: white cell on greys
+    assert texts[2].get_color() == "white"      # 9, the highest: black cell
+
+
+def test_heat_ann_keeps_three_digits_and_corr_two_decimals() -> None:
+    texts = [t.get_text() for t in kx.plot(HEAT * 40, "heat-ann").texts]
+    assert texts[:3] == ["40", "160", "360"]    # not 1.6e+02
+    corr = [t.get_text() for t in kx.plot(HEAT, "heat-corr-ann").texts]
+    assert corr[0] == "1.00"
+    assert all(len(t.lstrip("-")) == 4 for t in corr)
+
+
+def test_heat_colour_flags() -> None:
+    lo, hi = kx.plot(HEAT - 5, "heat-sym").images[0].get_clim()
+    assert lo == -hi == -4
+    assert isinstance(kx.plot(HEAT, "heat-logc").images[0].norm, mpl.colors.LogNorm)
+    assert len(kx.plot(HEAT, "heat-nocb").figure.axes) == 1
+
+
+@pytest.mark.parametrize(("spec", "data", "match"), [
+    ("heat-corr-logc", HEAT, "do not go together"),
+    ("heat-logc", HEAT - 5, "needs z > 0"),
+    ("heat", HEAT.assign(g=["x", "y", "z"]), r"columns \['g'\] are not"),
+])
+def test_heat_errors(spec: str, data: pd.DataFrame, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(data, spec)
+
+
+def test_crosstab_counts_match_pandas() -> None:
+    ax = kx.plot(PASSENGERS, "sex", "pclass", "crosstab-ann")
+    want = pd.crosstab(PASSENGERS.pclass, PASSENGERS.sex)
+    assert (ax.images[0].get_array() == want.to_numpy()).all()
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["female", "male"]
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["1", "2", "3"]
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("sex", "pclass")
+    assert [t.get_text() for t in ax.texts] == [str(v) for v in want.to_numpy().ravel()]
+    assert ax.figure.axes[1].get_ylabel() == "count"
+
+
+def test_crosstab_norm_gives_shares_within_each_x() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "deck", "crosstab-norm-ann")
+    shares = ax.images[0].get_array()
+    assert np.allclose(shares.sum(axis=0), 1)
+    assert all(t.get_text().endswith("%") for t in ax.texts)
+    cb = ax.figure.axes[1]
+    assert cb.get_ylabel() == "share"
+    assert isinstance(cb.yaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+
+
+def test_crosstab_logc_leaves_empty_pairs_blank() -> None:
+    x, y = ["a", "a", "b"], ["u", "v", "u"]     # (b, v) never occurs
+    ax = kx.plot(x, y, "crosstab-logc-ann-nocb")
+    assert np.ma.is_masked(ax.images[0].get_array()[1, 1])
+    assert len(ax.texts) == 3
+    assert len(ax.figure.axes) == 1
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(PASSENGERS, "sex", spec="crosstab"), "needs both x and y"),
+    (lambda: kx.plot(PASSENGERS, "sex", "pclass", "port", "crosstab"), "takes no z"),
+])
+def test_crosstab_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
+def test_missing_shows_columns_with_nans_most_missing_on_top() -> None:
+    ax = kx.plot(PASSENGERS, "missing")
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["deck", "age", "port"]
+    assert ax.yaxis_inverted()                      # deck, the first label, is drawn on top
+    want = PASSENGERS.isna().mean()
+    assert [p.get_width() for p in ax.patches] == pytest.approx([want.deck, want.age, want.port])
+    assert isinstance(ax.xaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+
+
+def test_missing_all_and_ann() -> None:
+    ax = kx.plot(PASSENGERS, "missing-all-ann")
+    labels = [t.get_text() for t in ax.get_yticklabels()]
+    assert len(labels) == PASSENGERS.shape[1]
+    assert labels[:3] == ["deck", "age", "port"]
+    assert labels[3:] == ["fare", "sex", "pclass", "ticket_type", "survived"]   # ties keep column order
+    texts = [t.get_text() for t in ax.texts]
+    assert texts[0] == f"{PASSENGERS.deck.isna().mean():.1%}"
+    assert all(t.endswith("%") for t in texts)
+
+
+def test_missing_without_nans_says_so() -> None:
+    ax = kx.plot(HEAT, "missing-ann")
+    assert not ax.patches
+    assert [t.get_text() for t in ax.texts] == ["no missing values"]
+
+
+def _bars_and_texts(ax: Axes) -> tuple:
+    return ([t.get_text() for t in ax.get_yticklabels()], [p.get_width() for p in ax.patches],
+            [t.get_text() for t in ax.texts])
+
+
+def test_missing_shortcut_is_the_long_form() -> None:
+    assert _bars_and_texts(kx.missing(PASSENGERS)) == _bars_and_texts(kx.plot(PASSENGERS, "missing-ann"))
+    assert "missing" in kx.__all__
+
+
+def test_missing_shortcut_passes_theme_flags_and_keywords() -> None:
+    ax = kx.missing(PASSENGERS, "dark-all-wrap", title="gaps", color="red")
+    assert len(ax.patches) == PASSENGERS.shape[1]
+    assert ax.get_title() == "gaps"
+    assert to_hex(ax.patches[0].get_facecolor()) == "#ff0000"
+    assert to_hex(ax.get_facecolor()) == "#111418"          # the dark theme, for this plot only
+    with pytest.raises(ValueError, match="unknown tokens"):
+        kx.missing(PASSENGERS, "dakr")
+
+
+def test_nullmap_image_is_where_the_nans_are() -> None:
+    ax = kx.plot(PASSENGERS, "nullmap")
+    im = ax.images[0]
+    assert (im.get_array() == PASSENGERS.isna().to_numpy()).all()
+    assert [t.get_text() for t in ax.get_xticklabels()] == list(PASSENGERS.columns)
+    assert len(ax.get_yticks()) <= 12           # row positions, not 500 ticks
+    assert im.get_interpolation() == "nearest"
+    assert ax.get_aspect() == "auto"
+
+
+def test_nullmap_sort_puts_most_missing_rows_first_and_groups_patterns() -> None:
+    gaps = kx.plot(PASSENGERS, "nullmap-sort").images[0].get_array().astype(bool)
+    counts = gaps.sum(axis=1)
+    assert (np.diff(counts) <= 0).all()
+    assert sorted(map(tuple, gaps)) == sorted(map(tuple, PASSENGERS.isna().to_numpy()))   # the same rows
+    patterns = [tuple(r) for r in gaps]
+    runs = [p for i, p in enumerate(patterns) if i == 0 or p != patterns[i - 1]]
+    assert len(runs) == len(set(patterns))      # each pattern is one block
+
+
+def test_nullmap_colours_follow_theme_and_palette() -> None:
+    with kx.context("dark", palette=["#e9c46a", "#264653"]):
+        ax = kx.plot(PASSENGERS, "nullmap")
+        cmap = ax.images[0].get_cmap()
+        assert to_hex(cmap(0.0)) == to_hex(ax.get_facecolor())     # present: the background
+        assert to_hex(cmap(1.0)) == "#e9c46a"                       # missing: the first palette colour
+    assert ax.images[0].get_clim() == (0, 1)
+
+
+def test_nullmap_without_nans_is_all_background() -> None:
+    im = kx.plot(HEAT, "nullmap").images[0]
+    assert not im.get_array().any()
+    assert to_hex(im.to_rgba(im.get_array())[0, 0]) == to_hex(im.get_cmap()(0.0))
+
+
+CLUMPS = pd.DataFrame({"x": [0, 0, 0, 10, 10, np.nan], "y": [0, 0, 0, 10, 10, 5],
+                       "heat": [1, 2, 3, 4, 6, 100]})       # two clumps of points, and a row with a NaN
+
+
+def test_hexbin_counts_points_per_hexagon() -> None:
+    cloud = kx.load("cloud")
+    ax = kx.plot(cloud, "x", "y", "hexbin", gridsize=10)
+    assert ax.collections[0].get_array().sum() == len(cloud)
+    assert ax.figure.axes[1].get_ylabel() == "count"
+    counts = kx.plot(CLUMPS, "x", "y", "hexbin").collections[0].get_array()
+    assert sorted(counts) == [2, 3]                 # the NaN row is left out, empty cells are not drawn
+
+
+def test_hexbin_z_is_the_mean_per_hexagon() -> None:
+    ax = kx.plot(CLUMPS, "x", "y", "heat", "hexbin")
+    assert sorted(ax.collections[0].get_array()) == [2, 5]
+    assert ax.figure.axes[1].get_ylabel() == "heat"
+
+
+def test_hexbin_colour_flags() -> None:
+    cloud = kx.load("cloud")
+    ax = kx.plot(cloud, "x", "y", "hexbin-logc-nocb")
+    assert isinstance(ax.collections[0].norm, mpl.colors.LogNorm)
+    assert ax.collections[0].get_array().sum() == len(cloud)       # counts, not log10 counts
+    assert len(ax.figure.axes) == 1
+    lo, hi = kx.plot(cloud, "x", "y", "z", "hexbin-sym").collections[0].get_clim()
+    assert lo == -hi
+
+
+@pytest.mark.parametrize(("spec", "cols", "match"), [
+    ("hexbin-logc", ("x", "y", "z"), "needs z > 0"),
+    ("hexbin-sym", ("x", "y"), "counts are never below 0"),
+    ("hexbin", ("x",), "needs both x and y"),
+])
+def test_hexbin_errors(spec: str, cols: tuple[str, ...], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(kx.load("cloud"), *cols, spec)
