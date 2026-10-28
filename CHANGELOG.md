@@ -14,6 +14,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   with the common flags applied to each and `title=` over the whole figure when the panels fill it. A kind
   registered with `projection="polar"` gets polar axes; a given rectilinear `ax` is swapped for polar axes in the
   same cell.
+- Statistics in numpy for the significance, association and clustering kinds to come, in `kx/_stats.py`, with no
+  scipy needed and checked against scipy: ranks with ties, the Kruskal-Wallis test, the pairwise Mann-Whitney U
+  test (normal approximation with tie and continuity corrections), the chi² survival function, Holm-adjusted
+  p-values, Cramér's V with Bergsma's bias correction, and single, complete, average and Ward linkage in scipy's
+  format with its leaf order, from points or a distance matrix (at most 1,000 rows, as it is O(n³)).
+
 
 ## [0.5.0] - 2026-10-24
 
