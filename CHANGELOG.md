@@ -19,6 +19,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   test (normal approximation with tie and continuity corrections), the chi² survival function, Holm-adjusted
   p-values, Cramér's V with Bergsma's bias correction, and single, complete, average and Ward linkage in scipy's
   format with its leaf order, from points or a distance matrix (at most 1,000 rows, as it is O(n³)).
+- **Datasets** `embedding` and `shapes`. `embedding` is 600 rows of a 2-D embedding (`x`, `y`) in 5 imbalanced
+  clusters (`label`), with an unrelated `group`, a numeric `size` that grows along `x`, and the 10 features `f0..f9`
+  it came from, so PCA of them finds the clusters again. `shapes` is a small image-classification set: 210 RGB
+  40×40 images of 7 imbalanced classes (`blob`, `ring`, `square`, `cross`, `stripes`, `dots`, `crescent`) on a
+  varying skin-like background, some with a dark border or a hair-like line (`artifact`), with each shape's
+  `masks`, a model's `proba` and `pred` (about 73% right, mistakes likelier with an artifact) and coarse 10×10
+  `saliency` maps. `scripts/make_embedding.py` and `scripts/make_shapes.py` write them with a fixed seed.
+- `kx.load` reads a `.npz` dataset as a dict of arrays (`kx.load('shapes')['images']`), and `kx.datasets()` lists
+  them with the tables.
 
 
 ## [0.5.0] - 2026-10-24

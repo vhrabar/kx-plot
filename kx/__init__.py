@@ -23,6 +23,7 @@ Palettes (kx.use(theme, palette="okabe")): any file name in styles/palettes/
 Colormaps (kx.use(theme, cmap="magma")):  kx.cmaps()
 with kx.context(theme, ...): the same as kx.use, for one block only.
 kx.save("fig.png"): saves to /kaggle/working on Kaggle, the current folder elsewhere.
+kx.load("passengers"): a demo table; kx.load("shapes"): a dict of image arrays. kx.datasets() lists them.
 kx.missing(df): the share of missing values per column, the same as kx.plot(df, 'missing-ann').
 kx.grid(5): a figure of 5 panels as a flat array of axes, for kx.plot(..., ax=).
 kx.roc_auc(y_true, score) and kx.pr_ap(y_true, score): area under the ROC curve and average precision, in numpy.

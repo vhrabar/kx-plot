@@ -2234,6 +2234,57 @@ def test_load_unknown() -> None:
         kx.load("nope")
 
 
+def test_embedding_clusters_by_label() -> None:
+    e = kx.load("embedding")
+    assert e.shape == (600, 15)
+    assert list(e.columns) == ["x", "y", "label", "group", "size", *(f"f{k}" for k in range(10))]
+    assert set(e.label) == {"alpha", "beta", "gamma", "delta", "epsilon"}
+    assert e.label.value_counts().is_monotonic_decreasing                # imbalanced, largest first
+    assert set(e.group) == {"batch_a", "batch_b"}
+    centres = e.groupby("label")[["x", "y"]].mean()
+    spread = e.groupby("label")[["x", "y"]].std().mean(axis=1)
+    assert np.hypot(*(centres.loc["alpha"] - centres.loc["beta"])) > 4 * spread.max()
+    assert e["size"].corr(e.x) > 0.8
+    f = e.filter(regex=r"^f\d$").to_numpy()
+    s = np.linalg.svd(f - f.mean(0), compute_uv=False) ** 2
+    assert s[:2].sum() / s.sum() > 0.8                                    # PCA finds the 2-D layout again
+
+
+def test_shapes_is_a_dict_of_image_arrays() -> None:
+    d = kx.load("shapes")
+    assert isinstance(d, dict)
+    assert set(d) == {"images", "masks", "labels", "pred", "proba", "saliency", "artifact", "classes"}
+    n = 210
+    assert (d["images"].shape, d["images"].dtype) == ((n, 40, 40, 3), np.uint8)
+    assert (d["masks"].shape, d["masks"].dtype) == ((n, 40, 40), np.bool_)
+    assert d["proba"].shape == (n, 7)
+    assert d["saliency"].shape == (n, 10, 10)
+    assert d["saliency"].min() == 0
+    assert d["saliency"].max() == 1
+    assert list(d["classes"]) == ["blob", "ring", "square", "cross", "stripes", "dots", "crescent"]
+    counts = pd.Series(d["labels"]).value_counts()
+    assert list(counts[list(d["classes"])]) == [60, 40, 30, 25, 20, 20, 15]
+    assert np.allclose(d["proba"].sum(axis=1), 1, atol=1e-5)
+    assert (d["pred"] == d["classes"][d["proba"].argmax(axis=1)]).all()
+    assert 0.6 < (d["pred"] == d["labels"]).mean() < 0.9                 # some mistakes for miscls
+    assert set(d["artifact"]) == {"", "border", "line"}
+    assert all(d["masks"][i].any() for i in range(n))
+    ink = d["images"].astype(float).mean(axis=3)
+    assert all(ink[i][d["masks"][i]].mean() < ink[i][~d["masks"][i]].mean() for i in range(n))  # dark shapes
+
+
+def test_datasets_lists_npz(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "data").mkdir()
+    pd.DataFrame({"a": [1]}).to_csv(tmp_path / "data" / "tab.csv", index=False)
+    np.savez(tmp_path / "data" / "arr.npz", v=np.arange(3))
+    monkeypatch.setattr(kx._files, "root", str(tmp_path))
+    assert kx.datasets() == ["arr", "tab"]
+    assert list(kx.load("arr")["v"]) == [0, 1, 2]
+    assert isinstance(kx.load("tab"), pd.DataFrame)
+    with pytest.raises(ValueError, match="unknown dataset"):
+        kx.load("nope")
+
+
 def test_version_comes_from_pyproject() -> None:
     toml = (Path(kx.__file__).parent.parent / "pyproject.toml").read_text()
     assert f'\nversion = "{kx.__version__}"\n' in toml
