@@ -1,4 +1,4 @@
-"""Table and 2-D kinds: heat, crosstab, missing, nullmap, hexbin, pair, cluster."""
+"""Table and 2-D kinds: heat, crosstab, missing, nullmap, hexbin, pair, cluster, mosaic."""
 from collections.abc import Callable
 
 import matplotlib as mpl
@@ -400,3 +400,77 @@ def test_cluster_one_row_keeps_its_place() -> None:
 def test_cluster_errors(frame: pd.DataFrame, kw: dict, match: str) -> None:
     with pytest.raises(ValueError, match=match):
         kx.plot(frame, "cluster", **kw)
+
+
+# ---------- mosaic ----------
+def _tiles(ax: Axes) -> list[mpl.patches.Rectangle]:
+    """The drawn tiles, without the empty legend handles."""
+    return [p for p in ax.patches if p.get_height() > 0 or p.get_width() > 0]
+
+
+def test_mosaic_widths_follow_x_and_heights_y_within_x() -> None:
+    x = ["a"] * 6 + ["b"] * 2
+    y = ["u", "u", "v", "v", "v", "v", "u", "v"]
+    ax = kx.plot(x, y, "mosaic")
+    a_u, a_v, b_u, b_v = _tiles(ax)
+    gap = kx.kinds.table.GAP
+    assert a_u.get_width() / b_u.get_width() == pytest.approx(3)          # a is 6 rows, b is 2
+    assert a_u.get_width() + b_u.get_width() == pytest.approx(1 - gap)
+    assert a_v.get_height() / a_u.get_height() == pytest.approx(2)        # within a: 4 v, 2 u
+    assert b_v.get_height() == pytest.approx(b_u.get_height())
+    assert a_u.get_y() > a_v.get_y()                                      # the first y on top
+    assert to_hex(a_u.get_facecolor()) == to_hex(b_u.get_facecolor()) != to_hex(a_v.get_facecolor())
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["a", "b"]
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["u", "v"]
+
+
+def test_mosaic_tile_areas_are_counts() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "sex", "mosaic-ann")
+    counts = pd.crosstab(PASSENGERS.pclass, PASSENGERS.sex).to_numpy().ravel()
+    areas = np.array([p.get_width() * p.get_height() for p in _tiles(ax)])
+    assert areas / areas.sum() == pytest.approx(counts / counts.sum(), rel=0.1)   # gaps bend it a little
+    assert [t.get_text() for t in ax.texts] == [f"{c:g}" for c in counts]
+    assert all(t.get_color() in ("black", "white") for t in ax.texts)
+    assert ax.get_xlabel() == "pclass"
+    assert ax.get_legend().get_title().get_text() == "sex"
+
+
+def test_mosaic_z_splits_tiles_in_shades_of_the_y_colour() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "sex", "survived", spec="mosaic")
+    tiles = _tiles(ax)
+    assert len(tiles) == 3 * 2 * 2
+    first, second = tiles[:2]                                             # pclass 1, female, survived 0 and 1
+    assert first.get_y() == second.get_y()
+    assert second.get_x() > first.get_x()
+    want = pd.crosstab([PASSENGERS.pclass, PASSENGERS.sex], PASSENGERS.survived).iloc[0]
+    assert first.get_width() / second.get_width() == pytest.approx(want[0] / want[1])
+    assert first.get_facecolor() != second.get_facecolor()
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["female / 0", "female / 1", "male / 0",
+                                                                   "male / 1"]
+    assert ax.get_legend().get_title().get_text() == "sex / survived"
+
+
+def test_mosaic_counts_nan_and_leaves_slivers_unlabelled() -> None:
+    ax = kx.plot(PASSENGERS, "port", "sex", "survived", spec="mosaic-ann")
+    assert [t.get_text() for t in ax.get_xticklabels()][-1] == "NaN"
+    assert all(p.get_width() >= 0 for p in ax.patches)                   # a thin column never goes negative
+    labelled = {t.get_text() for t in ax.texts}
+    assert {"144", "73", "10"} <= labelled
+    filled = [p for p in _tiles(ax) if p.get_width() * p.get_height() > 0]
+    assert len(ax.texts) < len(filled)                                   # the NaN column's slivers stay bare
+
+
+def test_mosaic_alone_keeps_its_legend_and_in_a_grid_leaves_the_layout() -> None:
+    ax = kx.plot(["a", "b"], ["u", "v"], "mosaic")
+    assert ax.figure.get_layout_engine() is not None
+    left, _ = kx.grid(2)
+    engine = left.figure.get_layout_engine()
+    kx.plot(["a", "b"], ["u", "v"], "mosaic", ax=left)
+    assert left.figure.get_layout_engine() is engine
+
+
+def test_mosaic_errors() -> None:
+    with pytest.raises(ValueError, match="x has 2 values but y has 3"):
+        kx.plot(["a", "b"], ["u", "v", "w"], "mosaic")
+    with pytest.raises(ValueError, match="y has 2 values but z has 1"):
+        kx.plot(["a", "b"], ["u", "v"], ["p"], "mosaic")

@@ -298,3 +298,74 @@ def cluster(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], method
         cax = corner.inset_axes([0.1, 0.1, 0.12, 0.8])
         corner.figure.colorbar(im, cax=cax, label="r" if "corr" in flags else "")
     return np.array([top, left, cells])
+
+
+GAP = 0.02                                      # mosaic: space between columns and between tiles, axes fraction
+
+
+def _check_mosaic(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if z is not None and np.size(z) != np.size(y):
+        raise ValueError(f"y has {np.size(y)} values but z has {np.size(z)}")
+
+
+def _shade(color: str, step: int, steps: int) -> tuple[float, ...]:
+    """color mixed towards the background: step 0 is the colour itself, later steps lighter (darker on dark)."""
+    back = np.array(mpl.colors.to_rgb(plt.rcParams["axes.facecolor"]))
+    t = 0.6 * step / max(steps - 1, 1)
+    return tuple((1 - t) * np.array(mpl.colors.to_rgb(color)) + t * back)
+
+
+@kind("mosaic", flags=("ann",), check=_check_mosaic)
+def mosaic(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """Two or three categoricals as tiles whose areas are their counts: one column per category of x, as wide as
+    its share; in each, one tile per category of y, as tall as its share within that x; z splits each tile again
+    side by side. Colours follow y (z in lighter shades of it); missing values count as 'NaN'.
+    ann = the count in each tile big enough to hold it. kw: the tiles (ax.add_patch Rectangle)."""
+    if np.size(x) != np.size(y):
+        raise ValueError(f"x has {np.size(x)} values but y has {np.size(y)}")
+    xs, xm = _levels(x)
+    ys, ym = _levels(y)
+    zs, zm = _levels(z) if z is not None else ([None], [np.ones(np.size(x), dtype=bool)])
+    counts = np.array([[[np.sum(a & b & c) for c in zm] for b in ym] for a in xm], dtype=float)   # x, y, z
+    total = counts.sum()
+    cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    width = 1 - GAP * (len(xs) - 1)
+    left = 0.0
+    centres = []
+    for i in range(len(xs)):
+        w = width * counts[i].sum() / total
+        centres.append(left + w / 2)
+        top = 1.0                               # the first y category on top, read like a table
+        column = counts[i].sum()
+        for j in range(len(ys)):
+            h = (1 - GAP * (len(ys) - 1)) * counts[i, j].sum() / column
+            gap = min(GAP / 2, 0.2 * w / max(len(zs) - 1, 1))    # a thin column gets thin gaps, never negative
+            inner = w - gap * (len(zs) - 1)
+            x0 = left
+            for k in range(len(zs)):
+                n = counts[i, j, k]
+                part = inner * n / counts[i, j].sum() if counts[i, j].sum() else 0
+                color = _shade(cycle[j % len(cycle)], k, len(zs))
+                ax.add_patch(mpl.patches.Rectangle((x0, top - h), part, h, **{"facecolor": color,
+                                                                                "linewidth": 0, **kw}))
+                if "ann" in flags and n and part > 0.018 and h > 0.04:   # a sliver has no room for a number
+                    ax.text(x0 + part / 2, top - h / 2, f"{n:g}", ha="center", va="center", color=ink(color),
+                            fontsize="small")
+                x0 += part + gap
+            top -= h + GAP
+        left += w + GAP
+    for j, name in enumerate(ys):               # one legend entry per colour: y, or y / z with a z
+        for k, zname in enumerate(zs):
+            ax.add_patch(mpl.patches.Rectangle((0, 0), 0, 0, facecolor=_shade(cycle[j % len(cycle)], k, len(zs)),
+                                               label=name if zname is None else f"{name} / {zname}"))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_xticks(centres, xs)
+    ax.set_yticks([])
+    ax.spines[:].set_visible(False)
+    ax.tick_params(axis="x", length=0)
+    ax.set_xlabel(label(x, "x"))
+    title = label(y, "y") if z is None else f"{label(y, 'y')} / {label(z, 'z')}"
+    ax.legend(title=title, loc="center left", bbox_to_anchor=(1, 0.5))   # the tiles fill the axes
+    if len(ax.figure.axes) == 1 and ax.figure.get_layout_engine() is None:
+        ax.figure.set_layout_engine("constrained")       # a figure of its own keeps the legend when saved

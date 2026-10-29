@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   diagonal and shared axes. `cols=` picks the columns (at most 8).
 - **Plot kind** `cluster`: `heat` with similar rows and columns side by side and dendrograms showing how they
   group; `cluster-corr` groups correlated features. `method=` picks the linkage.
+- **Plot kind** `mosaic`: two or three categoricals as tiles sized by their counts, `kx.plot(df, 'port', 'sex',
+  'survived', spec='mosaic')`. `ann` writes the counts.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 
