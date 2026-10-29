@@ -8,8 +8,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.collections import LineCollection
+from matplotlib.image import AxesImage
 from numpy.typing import ArrayLike
 
+from .. import _stats
 from .._spec import kind
 from .._util import COLOUR, colorbar, diagonal, ink, label, norm, split
 from .basic import _bars, _levels
@@ -23,15 +26,20 @@ def heat(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any
     """The table's values as coloured cells, columns along x and index labels down y.
     corr = correlations of the numeric columns (rdbu, ±1), ann = the value in each cell,
     nocb = no colorbar, sym = colours symmetric around 0, logc = log colour scale. kw: ax.imshow."""
+    frame, style = _heat_frame(x, flags, "heat")
+    _matrix(ax, frame, flags, "r" if "corr" in flags else "", "{:.2f}" if "corr" in flags else "{:.3g}",
+            **{**style, **kw})
+
+
+def _heat_frame(x: pd.DataFrame, flags: set[str], name: str) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """The numbers heat and cluster colour (corr = the correlations) and their colour scale."""
     frame = x.corr(numeric_only=True) if "corr" in flags else x
     text = [str(c) for c in frame.columns if not pd.api.types.is_numeric_dtype(frame[c])]
     if text:
-        raise ValueError(f"kind 'heat' colours numbers; columns {text} are not. "
+        raise ValueError(f"kind {name!r} colours numbers; columns {text} are not. "
                          "Pass df.select_dtypes('number'), or use 'corr'")
     corr = {"cmap": "rdbu", "norm": mpl.colors.Normalize(-1, 1)}  # the scale of r, whatever this data's range
-    style = corr if "corr" in flags else {"norm": norm(frame.to_numpy(dtype=float), flags)}
-    _matrix(ax, frame, flags, "r" if "corr" in flags else "", "{:.2f}" if "corr" in flags else "{:.3g}",
-            **{**style, **kw})
+    return frame, corr if "corr" in flags else {"norm": norm(frame.to_numpy(dtype=float), flags)}
 
 
 def _check_crosstab(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
@@ -113,7 +121,8 @@ def hexbin(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set
         diagonal(ax, xs, ys, flags)
 
 
-def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: str = "{:.2g}", **kw: Any) -> None:
+def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: str = "{:.2g}",
+            **kw: Any) -> AxesImage:
     """frame as an image: column labels along x, index labels down y, a colorbar, ann = fmt in each cell."""
     values = frame.to_numpy(dtype=float)
     im = ax.imshow(values, **kw)
@@ -128,6 +137,7 @@ def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: s
         for (i, j), v in np.ndenumerate(values):
             if np.isfinite(v):
                 ax.text(j, i, fmt.format(v), ha="center", va="center", color=ink(im.cmap(float(im.norm(v)))))
+    return im
 
 
 def _pair_columns(x: pd.DataFrame, cols: list[str] | None) -> pd.DataFrame:
@@ -217,3 +227,74 @@ def pair(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: Array
         for h in legend.legend_handles:
             h.set_alpha(1)                      # the faded points at full colour
     return axs.ravel()
+
+
+def _dendrogram(ax: Axes, z: np.ndarray, side: str) -> None:
+    """The linkage z as a tree over leaves at 0, 1, 2, ... (the heat map's cells), root away from the cells:
+    side 'top' grows up from the columns, 'left' grows left from the rows."""
+    n = len(z) + 1
+    place = {leaf: float(i) for i, leaf in enumerate(_stats.leaves(z))}
+    height = dict.fromkeys(range(n), 0.0)
+    segments = []
+    for k, (a, b, h, _) in enumerate(z):
+        a, b = int(a), int(b)
+        xa, xb = place[a], place[b]
+        segments.append([(xa, height[a]), (xa, h), (xb, h), (xb, height[b])])   # the U joining a and b
+        place[n + k], height[n + k] = (xa + xb) / 2, h
+    if side == "left":                          # rows run down y, heights grow to the left
+        segments = [[(-hh, pos) for pos, hh in seg] for seg in segments]
+    ax.add_collection(LineCollection(segments, color=plt.rcParams["text.color"], linewidth=0.8))
+    top = float(z[:, 2].max()) or 1.0
+    if side == "top":
+        ax.set_ylim(0, top * 1.05)
+    else:
+        ax.set_xlim(-top * 1.05, 0)
+    ax.set_axis_off()
+
+
+@kind("cluster", flags=("corr", "ann", *COLOUR), table=True, panels=True)
+def cluster(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], method: str = "average",
+            **kw: Any) -> np.ndarray:
+    """heat with the rows and the columns reordered so that similar ones sit together, and the dendrograms that
+    order comes from above and left: kx.plot(df, 'cluster-corr') groups features that move together.
+    Rows are compared by their values (euclidean), columns likewise; with corr both by 1 - |r|, so strongly
+    negative correlation counts as similar. method= single, complete, average (default) or ward.
+    ann, nocb, sym and logc as in heat. Returns the panels: top tree, left tree, heat map. kw: ax.imshow."""
+    frame, style = _heat_frame(x, flags, "cluster")
+    values = frame.to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("kind 'cluster' needs every cell; fill or drop the NaNs first (df.dropna())")
+    trees = {}
+    if "corr" in flags:                         # one order for both: the matrix stays symmetric
+        if len(frame) > 1:
+            trees["rows"] = trees["cols"] = _stats.linkage(1 - np.abs(values), method, distances=True)
+    else:
+        if values.shape[0] > 1:
+            trees["rows"] = _stats.linkage(values, method)
+        if values.shape[1] > 1:
+            trees["cols"] = _stats.linkage(values.T, method)
+    rows = _stats.leaves(trees["rows"]) if "rows" in trees else list(range(values.shape[0]))
+    cols = _stats.leaves(trees["cols"]) if "cols" in trees else list(range(values.shape[1]))
+    corner, top, left, cells = split(ax, 2, 2, width_ratios=[1, 5], height_ratios=[1, 5], wspace=0.02,
+                                     hspace=0.02)
+    top.sharex(cells)
+    left.sharey(cells)
+    im = _matrix(cells, frame.iloc[rows, cols], flags | {"nocb"}, "", "{:.2f}" if "corr" in flags else "{:.3g}",
+                 **{**style, "aspect": "auto", **kw})
+    cells.yaxis.tick_right()                    # the left side belongs to the tree
+    cells.yaxis.set_label_position("right")
+    if "cols" in trees:
+        _dendrogram(top, trees["cols"], "top")
+    else:
+        top.set_axis_off()
+    if "rows" in trees:
+        _dendrogram(left, trees["rows"], "left")
+    else:
+        left.set_axis_off()
+    if "nocb" in flags:
+        corner.remove()
+    else:                                       # the empty corner holds the colorbar
+        corner.set_axis_off()
+        cax = corner.inset_axes([0.1, 0.1, 0.12, 0.8])
+        corner.figure.colorbar(im, cax=cax, label="r" if "corr" in flags else "")
+    return np.array([top, left, cells])

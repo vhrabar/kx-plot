@@ -1,4 +1,4 @@
-"""Table and 2-D kinds: heat, crosstab, missing, nullmap, hexbin, pair."""
+"""Table and 2-D kinds: heat, crosstab, missing, nullmap, hexbin, pair, cluster."""
 from collections.abc import Callable
 
 import matplotlib as mpl
@@ -10,6 +10,7 @@ from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
 
 import kx
+import kx._stats
 
 # ---------- table kinds ----------
 HEAT = pd.DataFrame({"a": [1.0, 2, 3], "b": [4.0, 5, 6], "c": [9.0, 7, 8]}, index=["r1", "r2", "r3"])
@@ -321,3 +322,81 @@ def test_pair_constant_column_draws_no_density() -> None:
 def test_pair_errors(frame: pd.DataFrame, kw: dict, match: str) -> None:
     with pytest.raises(ValueError, match=match):
         kx.plot(frame, "pair", **kw)
+
+
+# ---------- cluster ----------
+MEANS = EMBEDDING.groupby("label")[[f"f{k}" for k in range(6)]].mean()
+
+
+def _labels(axis: mpl.axis.Axis) -> list[str]:
+    return [t.get_text() for t in axis.get_majorticklabels()]
+
+
+def test_cluster_orders_rows_and_columns_by_their_linkage() -> None:
+    *_, cells = kx.plot(MEANS, "cluster")
+    values = MEANS.to_numpy()
+    rows = kx._stats.leaves(kx._stats.linkage(values))
+    cols = kx._stats.leaves(kx._stats.linkage(values.T))
+    assert _labels(cells.yaxis) == [MEANS.index[i] for i in rows]
+    assert _labels(cells.xaxis) == [MEANS.columns[j] for j in cols]
+    assert np.array_equal(cells.images[0].get_array(), values[np.ix_(rows, cols)])
+    assert cells.yaxis.get_ticks_position() == "right"           # the left side is the tree's
+
+
+def test_cluster_trees_have_one_join_per_merge_on_the_cells() -> None:
+    top, left, cells = kx.plot(MEANS, "cluster")
+    (cols,), (rows,) = top.collections, left.collections
+    assert len(cols.get_segments()) == MEANS.shape[1] - 1
+    assert len(rows.get_segments()) == len(MEANS) - 1
+    ends = np.concatenate(cols.get_segments())
+    assert set(ends[ends[:, 1] == 0, 0]) == set(range(MEANS.shape[1]))   # every leaf sits on a column centre
+    ends = np.concatenate(rows.get_segments())
+    assert set(ends[ends[:, 0] == 0, 1]) == set(range(len(MEANS)))
+    assert top.get_shared_x_axes().joined(top, cells)
+    assert left.get_shared_y_axes().joined(left, cells)
+    assert not top.axison
+    assert not left.axison
+
+
+def test_cluster_corr_one_symmetric_order_with_r_colorbar() -> None:
+    frame = EMBEDDING.select_dtypes("number")
+    *_, cells = kx.plot(frame, "cluster-corr-ann")
+    r = frame.corr().to_numpy()
+    order = kx._stats.leaves(kx._stats.linkage(1 - np.abs(r), distances=True))
+    assert _labels(cells.xaxis) == _labels(cells.yaxis) == [frame.columns[i] for i in order]
+    shown = cells.images[0].get_array()
+    assert np.allclose(shown, shown.T)
+    assert cells.images[0].norm.vmin == -1
+    assert len(cells.texts) == frame.shape[1] ** 2
+    bar = cells.images[0].colorbar
+    assert bar.ax.get_ylabel() == "r"
+    assert bar.ax.get_position().x1 < cells.get_position().x0   # in the corner, left of the cells
+
+
+def test_cluster_nocb_and_method_and_title_over_the_block() -> None:
+    top, _, cells = kx.plot(MEANS, "cluster-nocb", method="ward", title="means")
+    assert len(cells.figure.axes) == 3
+    assert top.get_title() == ""
+    assert cells.figure._suptitle.get_text() == "means"
+    ward = kx._stats.leaves(kx._stats.linkage(MEANS.to_numpy(), "ward"))
+    assert _labels(cells.yaxis) == [MEANS.index[i] for i in ward]
+    _, grid_cell = kx.grid(2)
+    axs = kx.plot(MEANS, "cluster", title="cell", ax=grid_cell)
+    assert axs[0].get_title() == "cell"                          # in a bigger figure: over the top tree
+
+
+def test_cluster_one_row_keeps_its_place() -> None:
+    top, left, cells = kx.plot(MEANS.iloc[:1], "cluster")
+    assert _labels(cells.yaxis) == [MEANS.index[0]]
+    assert not left.collections
+    assert len(top.collections[0].get_segments()) == MEANS.shape[1] - 1
+
+
+@pytest.mark.parametrize(("frame", "kw", "match"), [
+    (EMBEDDING, {}, r"columns \['label', 'group'\] are not"),
+    (MEANS.where(MEANS > 0), {}, "fill or drop the NaNs"),
+    (MEANS, {"method": "median"}, "unknown method"),
+])
+def test_cluster_errors(frame: pd.DataFrame, kw: dict, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(frame, "cluster", **kw)

@@ -26,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   the ends. `by=` colours the lines by group and `mean` adds each group's mean.
 - **Plot kind** `pair`: a scatter matrix of the numeric columns, coloured by `by=`, with a KDE per group on the
   diagonal and shared axes. `cols=` picks the columns (at most 8).
+- **Plot kind** `cluster`: `heat` with similar rows and columns side by side and dendrograms showing how they
+  group; `cluster-corr` groups correlated features. `method=` picks the linkage.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 

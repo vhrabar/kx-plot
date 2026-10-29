@@ -46,7 +46,7 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 |-------|-----------------------------------------------------------------------------------------------|
 | kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
 |       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap` `pie` `donut` `radar`     |
-|       | `parallel` `pair`                                                                             |
+|       | `parallel` `pair` `cluster`                                                                   |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
 |       | `lcurve` `vcurve` `elbow`                                                                     |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
@@ -73,6 +73,7 @@ kx.missing(df)                                     # share of NaNs per column, t
 kx.plot(df, 'nullmap-sort')                        # where the NaNs are: one pixel row per table row
 kx.plot(df, 'heat-corr-ann')                       # correlations of the numeric columns, -1 to 1
 kx.plot(df, 'heat')                                # any numeric DataFrame or 2-D array as coloured cells
+kx.plot(df, 'cluster-corr')                        # correlations, similar columns side by side, with trees
 kx.plot(df, 'pclass', spec='count', by='survived') # rows per category, split by a second column
 kx.plot(df, 'pclass', 'port', 'crosstab-norm-ann') # how often each pair of categories occurs
 kx.plot(df, 'age', 'fare', 'hexbin-logc')          # points per hexagon; with a z, its mean per hexagon
@@ -82,9 +83,9 @@ kx.plot(df[['age', 'fare', 'pclass', 'sex']], 'parallel-mean', by='sex')     # e
 kx.plot(df, 'pair', by='sex')                      # every numeric column against every other
 ```
 
-`heat`, `missing`, `nullmap`, `radar`, `parallel` and `pair` take the whole table and no column names (`radar`,
-`parallel` and `pair` take `by=`, a column of groups); `kx.plot(df[cols], 'heat')` for some
-columns. `wrap` breaks long tick labels onto several lines.
+`heat`, `cluster`, `missing`, `nullmap`, `radar`, `parallel` and `pair` take the whole table and no column names
+(`radar`, `parallel` and `pair` take `by=`, a column of groups); `kx.plot(df[cols], 'heat')` for some columns.
+`wrap` breaks long tick labels onto several lines.
 
 ### Machine learning
 
