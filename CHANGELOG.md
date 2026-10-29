@@ -8,47 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-- Kinds can draw several panels or on polar axes, for the multi-panel and radial kinds to come. A kind registered
-  with `panels=True` splits its axes into a block of new ones with `kx._util.split(ax, rows, cols)`, and
-  `kx.plot` returns them as a flat array, in the place of `ax=` when one is given (so in a cell of `kx.grid`),
-  with the common flags applied to each and `title=` over the whole figure when the panels fill it. A kind
-  registered with `projection="polar"` gets polar axes; a given rectilinear `ax` is swapped for polar axes in the
-  same cell.
-- Statistics in numpy for the significance, association and clustering kinds to come, in `kx/_stats.py`, with no
-  scipy needed and checked against scipy: ranks with ties, the Kruskal-Wallis test, the pairwise Mann-Whitney U
-  test (normal approximation with tie and continuity corrections), the chi² survival function, Holm-adjusted
-  p-values, Cramér's V with Bergsma's bias correction, and single, complete, average and Ward linkage in scipy's
-  format with its leaf order, from points or a distance matrix (at most 1,000 rows, as it is O(n³)).
-- **Datasets** `embedding` and `shapes`. `embedding` is 600 rows of a 2-D embedding (`x`, `y`) in 5 imbalanced
-  clusters (`label`), with an unrelated `group`, a numeric `size` that grows along `x`, and the 10 features `f0..f9`
-  it came from, so PCA of them finds the clusters again. `shapes` is a small image-classification set: 210 RGB
-  40×40 images of 7 imbalanced classes (`blob`, `ring`, `square`, `cross`, `stripes`, `dots`, `crescent`) on a
-  varying skin-like background, some with a dark border or a hair-like line (`artifact`), with each shape's
-  `masks`, a model's `proba` and `pred` (about 73% right, mistakes likelier with an artifact) and coarse 10×10
-  `saliency` maps. `scripts/make_embedding.py` and `scripts/make_shapes.py` write them with a fixed seed.
-- `kx.load` reads a `.npz` dataset as a dict of arrays (`kx.load('shapes')['images']`), and `kx.datasets()` lists
-  them with the tables.
-- Image input for the image kinds to come, in `kx/_image.py`: an `(N, H, W)` or `(N, H, W, C)` array (channels
-  first, as PyTorch has them, is turned round), one 2-D image, or a list of arrays, PIL images or file paths, with
-  sizes free to differ. Every image becomes 0..1 floats: integers divided by 255 (or 65535 above 255), floats
-  outside 0..1 scaled to fill it, alpha dropped and one channel read as grey. Image panels come as a near-square
-  block in the place of `ax`, with no ticks or frames but room for a class name at the left.
-- **Plot kinds** `pie` and `donut`: shares of a whole, `kx.plot(df, 'port', 'pie')` counting the categories of x
-  (missing values as `NaN`), or `kx.plot(labels, values, 'pie')` summing y per category. The slices start at
-  12 o'clock and go clockwise, labelled beside them; with `leg` the legend names them instead, beside the pie.
-  `ann` writes each share in its slice, in black or white for its colour, and `sort` puts the largest first. Past
-  `top=` slices (7) the smallest fold into one grey `other`. `donut` is a ring (`hole=`, 0.55 of the radius) with
-  the total in its middle.
-- **Plot kind** `radar`: one polygon per row over the numeric columns of a table, or with `by=` the mean of each
-  group's rows, `kx.plot(df, 'radar', by='class')`, on polar axes (a given `ax` in a `kx.grid` is swapped for
-  polar axes in its cell). Each column is scaled to 0..1 over the polygons shown, with its range under its name;
-  `raw` keeps the values, for columns in one unit. More than 10 polygons raise, with a hint to group them.
-- **Plot kind** `parallel`: parallel coordinates, one line per row across the numeric columns, each scaled to 0..1
-  with its real minimum and maximum at the ends of its axis, `kx.plot(df, 'parallel', by='class')`. `by=`
-  colours the lines by group, the lines fade as the rows grow, and `mean` draws each group's mean as a thick line
-  on top.
-- Table kinds that group (`radar`, `parallel`) take `by=` as a column of the table, which is then left out of the
-  columns drawn, or as an array.
+- `kx.plot` can draw a plot made of several panels (such as `pair`), returned as a flat array of axes in the place
+  of `ax=`, or a polar plot (such as `radar`), swapping a given `ax` for polar axes in the same cell.
+- Statistics for the significance, association and clustering plots, in numpy without scipy and checked against
+  it: Kruskal-Wallis and pairwise Mann-Whitney tests, Holm-adjusted p-values, Cramér's V and hierarchical linkage.
+- **Datasets** `embedding` (a 2-D embedding in 5 clusters, with the 10 features behind it) and `shapes` (210 small
+  images in 7 classes, some with artifacts, with masks, a model's predictions and saliency maps).
+- `kx.load` reads a `.npz` dataset as a dict of arrays: `kx.load('shapes')['images']`.
+- Image input for the image plots: an array of images (channels last or first), or a list of arrays, PIL images
+  or file paths, scaled to 0..1 whatever the dtype.
+- **Plot kinds** `pie` and `donut`: shares of a whole, counting the categories of x or summing y per category.
+  `ann` writes the percent in each slice, `sort` puts the largest first, and past `top=` (7) slices the rest fold
+  into `other`. `donut` shows the total in its hole.
+- **Plot kind** `radar`: one polygon per row of a table, or per group mean with `by=`, each column scaled to 0..1
+  with its range under its name; `raw` keeps the values.
+- **Plot kind** `parallel`: parallel coordinates, one line per row, each axis scaled with its real min and max at
+  the ends. `by=` colours the lines by group and `mean` adds each group's mean.
+- **Plot kind** `pair`: a scatter matrix of the numeric columns, coloured by `by=`, with a KDE per group on the
+  diagonal and shared axes. `cols=` picks the columns (at most 8).
+- Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 
 ## [0.5.0] - 2026-10-24

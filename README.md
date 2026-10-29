@@ -46,7 +46,7 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 |-------|-----------------------------------------------------------------------------------------------|
 | kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
 |       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap` `pie` `donut` `radar`     |
-|       | `parallel`                                                                                    |
+|       | `parallel` `pair`                                                                             |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
 |       | `lcurve` `vcurve` `elbow`                                                                     |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
@@ -79,10 +79,11 @@ kx.plot(df, 'age', 'fare', 'hexbin-logc')          # points per hexagon; with a 
 kx.plot(df, 'port', 'donut-ann')                   # shares of a whole, the total in the hole
 kx.plot(df[['age', 'fare', 'pclass', 'survived']], 'radar', by='survived')    # each group's profile
 kx.plot(df[['age', 'fare', 'pclass', 'sex']], 'parallel-mean', by='sex')     # every row across columns
+kx.plot(df, 'pair', by='sex')                      # every numeric column against every other
 ```
 
-`heat`, `missing`, `nullmap`, `radar` and `parallel` take the whole table and no column names (`radar` and
-`parallel` take `by=`, a column of groups); `kx.plot(df[cols], 'heat')` for some
+`heat`, `missing`, `nullmap`, `radar`, `parallel` and `pair` take the whole table and no column names (`radar`,
+`parallel` and `pair` take `by=`, a column of groups); `kx.plot(df[cols], 'heat')` for some
 columns. `wrap` breaks long tick labels onto several lines.
 
 ### Machine learning

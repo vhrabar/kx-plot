@@ -4,14 +4,18 @@ Table kinds: a whole DataFrame (or 2-D array) as the data.
 from typing import Any
 
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
 from .._spec import kind
-from .._util import COLOUR, colorbar, diagonal, ink, label, norm
-from .basic import _bars
+from .._util import COLOUR, colorbar, diagonal, ink, label, norm, split
+from .basic import _bars, _levels
+from .dist import bandwidth, density
+
+MAX_PAIRS = 8
 
 
 @kind("heat", flags=("corr", "ann", *COLOUR), table=True)
@@ -124,3 +128,92 @@ def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: s
         for (i, j), v in np.ndenumerate(values):
             if np.isfinite(v):
                 ax.text(j, i, fmt.format(v), ha="center", va="center", color=ink(im.cmap(float(im.norm(v)))))
+
+
+def _pair_columns(x: pd.DataFrame, cols: list[str] | None) -> pd.DataFrame:
+    """The columns of a scatter matrix: cols= in its order, else every numeric (not bool) column; 2 to 8 of them."""
+    if cols is not None:
+        missing = [c for c in cols if c not in x.columns]
+        if missing:
+            raise ValueError(f"cols= names {missing}, which the table does not have. Columns: {list(x.columns)}")
+        text = [str(c) for c in cols if not pd.api.types.is_numeric_dtype(x[c]) or pd.api.types.is_bool_dtype(x[c])]
+        if text:
+            raise ValueError(f"kind 'pair' plots numbers; cols= {text} are not. Pass a category as by=")
+        frame = x[list(cols)]
+    else:
+        frame = x[[c for c in x.columns
+                   if pd.api.types.is_numeric_dtype(x[c]) and not pd.api.types.is_bool_dtype(x[c])]]
+    if frame.shape[1] < 2:
+        raise ValueError(f"kind 'pair' needs at least 2 numeric columns, got {frame.shape[1]}")
+    if frame.shape[1] > MAX_PAIRS:
+        raise ValueError(f"kind 'pair' with {frame.shape[1]} numeric columns is {frame.shape[1] ** 2} panels; "
+                         f"pick at most {MAX_PAIRS} with cols=[...]")
+    return frame.astype(float)
+
+
+@kind("pair", table=True, takes_by=True, panels=True)
+def pair(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
+         cols: list[str] | None = None, **kw: Any) -> np.ndarray:
+    """A scatter matrix: every numeric column against every other, and on the diagonal each column's density
+    (a KDE per group), x shared down each column and y along each row: kx.plot(df, 'pair', by='class').
+    cols= picks and orders the columns (at most 8). Returns the k x k panels, row by row. kw: ax.scatter."""
+    frame = _pair_columns(x, cols)
+    k, n = frame.shape[1], len(frame)
+    groups, masks = _levels(by) if by is not None else ([None], [np.ones(n, dtype=bool)])
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    fig = ax.figure
+    if len(fig.axes) == 1:                      # a figure of its own: sized to the matrix, legend kept inside
+        side = max(plt.rcParams["figure.figsize"][1], 1.8 * k)
+        fig.set_size_inches(side + (1.5 if by is not None else 0), side)
+        if fig.get_layout_engine() is None:
+            fig.set_layout_engine("constrained")
+    axs = split(ax, k, k, wspace=0.08, hspace=0.08).reshape(k, k)
+    for r in range(k):
+        for c in range(k):
+            a = axs[r, c]
+            if r:
+                a.sharex(axs[0, c])
+            if c != (1 if r == 0 else 0):       # y shared along the row; the diagonal's density has its own inset
+                a.sharey(axs[r, 1 if r == 0 else 0])
+            a.tick_params(labelbottom=r == k - 1, labelleft=c == 0)
+            if r == k - 1:
+                a.set_xlabel(str(frame.columns[c]))
+            if c == 0:
+                a.set_ylabel(str(frame.columns[r]))
+    values = frame.to_numpy()
+    size = 0.3 * plt.rcParams["lines.markersize"] ** 2
+    alpha = float(np.clip(300 / max(n, 1), 0.2, 0.8))
+    for i, (g, m) in enumerate(zip(groups, masks, strict=True)):
+        color = colors[i % len(colors)]
+        rows = values[np.asarray(m)]
+        for r in range(k):
+            for c in range(k):
+                if r != c:
+                    axs[r, c].scatter(rows[:, c], rows[:, r],
+                                      **{"s": size, "color": color, "alpha": alpha, "linewidths": 0,
+                                         "label": g, **kw})
+    for c in range(k):                          # the density on an inset sharing x only, so the row keeps its y
+        dens = axs[c, c].inset_axes([0, 0, 1, 1], sharex=axs[c, c])
+        dens.set_axis_off()
+        col = values[:, c]
+        finite = col[np.isfinite(col)]
+        if len(finite) < 2 or finite.min() == finite.max():
+            continue
+        limits = axs[c, c].get_xlim()
+        grid = np.linspace(*limits, 256)
+        for i, m in enumerate(masks):
+            v = col[np.asarray(m)]
+            v = v[np.isfinite(v)]
+            if len(v) < 2 or v.min() == v.max():
+                continue                        # one value has no spread to smooth
+            d = density(v, grid, bandwidth(v))
+            dens.plot(grid, d, color=colors[i % len(colors)], linewidth=1.5)
+            dens.fill_between(grid, d, color=colors[i % len(colors)], alpha=0.15, linewidth=0)
+        dens.set_ylim(bottom=0)
+        axs[c, c].set_xlim(limits)              # the curve's margins must not widen the shared column
+    if by is not None:                          # one legend for the matrix, beside its top-right panel
+        legend = axs[0, -1].legend(*axs[0, 1].get_legend_handles_labels(), title=label(by, "by"),
+                                   loc="upper left", bbox_to_anchor=(1.05, 1), markerscale=2)
+        for h in legend.legend_handles:
+            h.set_alpha(1)                      # the faded points at full colour
+    return axs.ravel()

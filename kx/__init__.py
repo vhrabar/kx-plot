@@ -3,7 +3,7 @@ kx: tiny matplotlib helper.
 
 Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
   kind  : line | step | area | band | scatter | bar | barh | hist | kde | ridge | ecdf | box | violin | strip
-          | qq | heat | crosstab | count | missing | nullmap | hexbin | pie | donut | radar | parallel
+          | qq | heat | crosstab | count | missing | nullmap | hexbin | pie | donut | radar | parallel | pair
           | cm | roc | pr | calib | proba | thresh | gain | lift | pva | resid | imp | loss
           | lcurve | vcurve | elbow
   theme : any file name in styles/
@@ -16,8 +16,8 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           nocb sym logc (resid), ann sort (pie, donut), raw (radar), mean (parallel).
           kx.grammar(kind) lists them.
 by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count);
-         for radar and parallel a column of the table: kx.plot(df, 'radar', by='class')
-table  : heat, missing, nullmap, loss, radar and parallel take a whole DataFrame or 2-D array, with no columns:
+         for radar, parallel and pair a column of the table: kx.plot(df, 'radar', by='class')
+table  : heat, missing, nullmap, loss, radar, parallel and pair take a whole DataFrame or 2-D array, no columns:
          kx.plot(df, 'heat-corr'); a dict or a Keras History works too: kx.plot(model.fit(...), 'loss')
 
 Palettes (kx.use(theme, palette="okabe")): any file name in styles/palettes/

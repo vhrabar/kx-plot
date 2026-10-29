@@ -1,4 +1,4 @@
-"""Table and 2-D kinds: heat, crosstab, missing, nullmap, hexbin."""
+"""Table and 2-D kinds: heat, crosstab, missing, nullmap, hexbin, pair."""
 from collections.abc import Callable
 
 import matplotlib as mpl
@@ -234,3 +234,90 @@ def test_hexbin_colour_flags() -> None:
 def test_hexbin_errors(spec: str, cols: tuple[str, ...], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         kx.plot(kx.load("cloud"), *cols, spec)
+
+
+# ---------- pair ----------
+EMBEDDING = kx.load("embedding")
+FOUR = ["x", "y", "size", "f0"]
+
+
+def _offsets(ax: Axes) -> list[np.ndarray]:
+    return [c.get_offsets() for c in ax.collections]
+
+
+def test_pair_scatters_off_the_diagonal_one_colour_per_group() -> None:
+    axs = kx.plot(EMBEDDING, "pair", by="label", cols=FOUR)
+    assert isinstance(axs, np.ndarray)
+    assert axs.shape == (16,)
+    groups = sorted(EMBEDDING.label.unique())
+    below = axs[2 * 4 + 1]                                   # row size, column y
+    assert len(below.collections) == len(groups)
+    alpha = EMBEDDING[EMBEDDING.label == groups[0]]
+    assert np.array_equal(_offsets(below)[0], alpha[["y", "size"]].to_numpy())
+    assert len({to_hex(c.get_facecolor()[0]) for c in below.collections}) == len(groups)
+    for i in range(4):
+        assert not axs[i * 5].collections                     # the diagonal holds densities, not points
+
+
+def test_pair_diagonal_density_per_group_on_an_inset_sharing_x() -> None:
+    axs = kx.plot(EMBEDDING, "pair", by="label", cols=FOUR)
+    diag = axs[0]
+    inset = diag.child_axes[0]
+    assert len(inset.lines) == EMBEDDING.label.nunique()
+    assert inset.get_shared_x_axes().joined(inset, diag)
+    lo, hi = diag.get_xlim()
+    assert all(lo <= ln.get_xdata().min() and ln.get_xdata().max() <= hi for ln in inset.lines)
+    assert inset.get_ylim()[0] == 0
+    assert diag.get_ylim() == axs[1].get_ylim()                # the diagonal keeps its row's y, for the labels
+
+
+def test_pair_shares_x_down_columns_and_y_along_rows_labels_outside() -> None:
+    axs = kx.plot(EMBEDDING, "pair", cols=FOUR).reshape(4, 4)
+    for r in range(4):
+        for c in range(4):
+            assert axs[r, c].get_shared_x_axes().joined(axs[r, c], axs[0, c])
+            assert axs[r, c].get_shared_y_axes().joined(axs[r, c], axs[r, 0 if r else 1])
+    assert [a.get_xlabel() for a in axs[-1]] == FOUR
+    assert [a.get_ylabel() for a in axs[:, 0]] == FOUR
+    assert not any(a.get_xlabel() or a.get_ylabel() for a in axs[:-1, 1:].ravel())
+
+
+def test_pair_takes_numeric_columns_and_legends_groups_beside() -> None:
+    axs = kx.plot(PASSENGERS, "pair", by="sex", title="passengers")
+    assert [a.get_xlabel() for a in axs[-4:]] == ["age", "fare", "pclass", "survived"]
+    legend = axs[3].get_legend()
+    assert [t.get_text() for t in legend.get_texts()] == ["female", "male"]
+    assert legend.get_title().get_text() == "sex"
+    assert all(h.get_alpha() == 1 for h in legend.legend_handles)
+    fig = axs[0].figure
+    assert fig._suptitle.get_text() == "passengers"
+    assert fig.get_figwidth() > fig.get_figheight() >= 4 * 1.8    # sized to the matrix, room for the legend
+    assert kx.plot(PASSENGERS, "pair")[3].get_legend() is None
+
+
+def test_pair_in_a_grid_cell_keeps_the_figure() -> None:
+    left, right = kx.grid(2)
+    fig = left.figure
+    size = tuple(fig.get_size_inches())
+    axs = kx.plot(EMBEDDING, "pair", cols=["x", "y"], ax=right)
+    assert tuple(fig.get_size_inches()) == size
+    assert len(fig.axes) == 1 + 4
+    assert all(a.get_subplotspec().get_topmost_subplotspec() == right.get_subplotspec() for a in axs)
+
+
+def test_pair_constant_column_draws_no_density() -> None:
+    frame = pd.DataFrame({"a": [1.0, 2, 3, 4], "b": [5.0, 5, 5, 5]})
+    axs = kx.plot(frame, "pair")
+    assert len(axs[0].child_axes[0].lines) == 1
+    assert not axs[3].child_axes[0].lines
+
+
+@pytest.mark.parametrize(("frame", "kw", "match"), [
+    (EMBEDDING, {"cols": ["x", "nope"]}, r"cols= names \['nope'\]"),
+    (EMBEDDING, {"cols": ["x", "label"]}, r"cols= \['label'\] are not"),
+    (EMBEDDING[["x", "label"]], {}, "at least 2 numeric columns"),
+    (EMBEDDING, {}, "13 numeric columns is 169 panels"),
+])
+def test_pair_errors(frame: pd.DataFrame, kw: dict, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(frame, "pair", **kw)
