@@ -1,4 +1,4 @@
-"""Table and 2-D kinds: heat, crosstab, missing, nullmap, hexbin, pair, cluster, mosaic."""
+"""Table and 2-D kinds: heat, crosstab, missing, nullmap, hexbin, pair, cluster, mosaic, treemap, sunburst."""
 from collections.abc import Callable
 
 import matplotlib as mpl
@@ -11,6 +11,7 @@ from matplotlib.colors import to_hex
 
 import kx
 import kx._stats
+from kx.kinds.table import _hierarchy, squarify
 
 # ---------- table kinds ----------
 HEAT = pd.DataFrame({"a": [1.0, 2, 3], "b": [4.0, 5, 6], "c": [9.0, 7, 8]}, index=["r1", "r2", "r3"])
@@ -474,3 +475,93 @@ def test_mosaic_errors() -> None:
         kx.plot(["a", "b"], ["u", "v", "w"], "mosaic")
     with pytest.raises(ValueError, match="y has 2 values but z has 1"):
         kx.plot(["a", "b"], ["u", "v"], ["p"], "mosaic")
+
+
+# ---------- treemap and sunburst ----------
+
+@pytest.mark.parametrize("box", [(0, 0, 1, 1), (0.2, 0.1, 3, 0.5)])
+def test_squarify_tiles_the_box_with_areas_in_proportion(box: tuple[float, ...]) -> None:
+    sizes = [6, 6, 4, 3, 2, 2, 1]
+    rects = squarify(sizes, *box)
+    x0, y0, w, h = box
+    areas = [r[2] * r[3] for r in rects]
+    assert areas == pytest.approx([s * w * h / sum(sizes) for s in sizes])
+    assert sum(areas) == pytest.approx(w * h)                      # no gaps, so no overlaps either
+    for rx, ry, rw, rh in rects:
+        assert x0 - 1e-9 <= rx
+        assert rx + rw <= x0 + w + 1e-9
+        assert y0 - 1e-9 <= ry
+        assert ry + rh <= y0 + h + 1e-9
+    worst = max(max(r[2] / r[3], r[3] / r[2]) for r in rects)
+    strips = [(w * size / sum(sizes), h) for size in sizes]        # the plain layout, side by side
+    assert worst <= max(max(a / b, b / a) for a, b in strips) + 1e-9   # never worse than strips
+    if w == h:
+        assert worst < 5                                           # in a square, strips run 24 to 1
+
+
+def test_hierarchy_counts_largest_first_and_drops_empty_branches() -> None:
+    tree = _hierarchy(PASSENGERS.pclass, PASSENGERS.sex, None)
+    assert [n for n, _, _ in tree] == ["3", "1", "2"]
+    assert [c for _, c, _ in tree] == list(PASSENGERS.pclass.value_counts())
+    for _, count, children in tree:
+        assert sum(c for _, c, _ in children) == count
+        assert [c for _, c, _ in children] == sorted((c for _, c, _ in children), reverse=True)
+    assert _hierarchy(["a", "a", "b"], ["u", "u", "v"], None) == [("a", 2, [("u", 2, [])]), ("b", 1, [("v", 1, [])])]
+
+
+def test_treemap_areas_are_leaf_counts_and_colours_follow_x() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "sex", spec="treemap-ann")
+    tiles = [p for p in ax.patches if p.get_width() > 0]
+    assert len(tiles) == 3 + 6                                     # 3 classes, 2 sexes each
+    tree = _hierarchy(PASSENGERS.pclass, PASSENGERS.sex, None)
+    leaves = [p for p in tiles if p.get_linewidth() == pytest.approx(1.5)]
+    want = [c for _, _, kids in tree for _, c, _ in kids]
+    assert [p.get_width() * p.get_height() for p in leaves] == pytest.approx([c / 500 for c in want])
+    first_class, *_ = (p for p in tiles if p.get_linewidth() == pytest.approx(2.5))
+    assert to_hex(first_class.get_facecolor()) == to_hex(mpl.rcParams["axes.prop_cycle"].by_key()["color"][0])
+    assert to_hex(leaves[0].get_facecolor()) != to_hex(first_class.get_facecolor())   # lighter a level down
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["3", "1", "2"]
+    assert ax.get_legend().get_title().get_text() == "pclass > sex"
+    assert "male\n152" not in [t.get_text() for t in ax.texts]    # two levels: only the leaf's own name
+    assert any(t.get_text().startswith("male\n") for t in ax.texts)
+
+
+def test_treemap_ann_writes_the_path_below_x() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "sex", "survived", spec="treemap-ann")
+    assert "male / 0\n152" in [t.get_text() for t in ax.texts]
+    assert not ax.axison
+
+
+def test_sunburst_rings_from_twelve_with_the_total_inside() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "sex", spec="sunburst-ann")
+    assert ax.name == "polar"
+    assert ax.get_theta_offset() == pytest.approx(np.pi / 2)
+    assert ax.get_theta_direction() == -1
+    segments = [p for p in ax.patches if p.get_width() > 0]
+    inner = [p for p in segments if p.get_y() == pytest.approx(0.3)]
+    outer = [p for p in segments if p.get_y() > 0.3]
+    assert len(inner) == 3
+    assert len(outer) == 6
+    assert sum(p.get_width() for p in inner) == pytest.approx(2 * np.pi)
+    assert sum(p.get_width() for p in outer) == pytest.approx(2 * np.pi)
+    counts = PASSENGERS.pclass.value_counts()
+    assert [p.get_width() for p in inner] == pytest.approx(list(2 * np.pi * counts / counts.sum()))
+    assert "500" in [t.get_text() for t in ax.texts]
+    assert {"3", "male"} <= {t.get_text() for t in ax.texts}
+
+
+def test_sunburst_in_a_grid_cell_is_polar_in_place() -> None:
+    _, right = kx.grid(2)
+    ax = kx.plot(["a", "b", "b"], spec="sunburst", hole=0, ax=right)
+    assert ax.name == "polar"
+    assert ax.get_subplotspec() == right.get_subplotspec()
+    assert not [t for t in ax.texts if t.get_text() == "3"]       # no hole, no total
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(["a"], spec="sunburst", hole=1), "hole="),
+    (lambda: kx.plot(["a", "b"], ["u"], spec="treemap"), "different lengths"),
+])
+def test_tree_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()

@@ -30,6 +30,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   group; `cluster-corr` groups correlated features. `method=` picks the linkage.
 - **Plot kind** `mosaic`: two or three categoricals as tiles sized by their counts, `kx.plot(df, 'port', 'sex',
   'survived', spec='mosaic')`. `ann` writes the counts.
+- **Plot kinds** `treemap` and `sunburst`: a hierarchy of up to three categoricals sized by count, as nested
+  rectangles or as rings, `kx.plot(df, 'pclass', 'sex', spec='treemap')`. `ann` labels the tiles with room.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 

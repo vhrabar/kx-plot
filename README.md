@@ -46,7 +46,7 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 |-------|-----------------------------------------------------------------------------------------------|
 | kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
 |       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap` `pie` `donut` `radar`     |
-|       | `parallel` `pair` `cluster` `mosaic`                                                          |
+|       | `parallel` `pair` `cluster` `mosaic` `treemap` `sunburst`                                     |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
 |       | `lcurve` `vcurve` `elbow`                                                                     |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
@@ -77,6 +77,7 @@ kx.plot(df, 'cluster-corr')                        # correlations, similar colum
 kx.plot(df, 'pclass', spec='count', by='survived') # rows per category, split by a second column
 kx.plot(df, 'pclass', 'port', 'crosstab-norm-ann') # how often each pair of categories occurs
 kx.plot(df, 'port', 'sex', 'survived', spec='mosaic-ann')  # tiles sized by count, up to 3 categoricals
+kx.plot(df, 'pclass', 'sex', spec='treemap-ann')  # a hierarchy of categories; 'sunburst' as rings
 kx.plot(df, 'age', 'fare', 'hexbin-logc')          # points per hexagon; with a z, its mean per hexagon
 kx.plot(df, 'port', 'donut-ann')                   # shares of a whole, the total in the hole
 kx.plot(df[['age', 'fare', 'pclass', 'survived']], 'radar', by='survived')    # each group's profile

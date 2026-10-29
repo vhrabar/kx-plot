@@ -365,7 +365,150 @@ def mosaic(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set
     ax.spines[:].set_visible(False)
     ax.tick_params(axis="x", length=0)
     ax.set_xlabel(label(x, "x"))
-    title = label(y, "y") if z is None else f"{label(y, 'y')} / {label(z, 'z')}"
-    ax.legend(title=title, loc="center left", bbox_to_anchor=(1, 0.5))   # the tiles fill the axes
+    _legend_beside(ax, label(y, "y") if z is None else f"{label(y, 'y')} / {label(z, 'z')}")
+
+
+def _legend_beside(ax: Axes, title: str) -> None:
+    """A legend right of axes the tiles fill; a figure of its own gets constrained layout, so saving keeps it."""
+    ax.legend(title=title, loc="center left", bbox_to_anchor=(1, 0.5))
     if len(ax.figure.axes) == 1 and ax.figure.get_layout_engine() is None:
-        ax.figure.set_layout_engine("constrained")       # a figure of its own keeps the legend when saved
+        ax.figure.set_layout_engine("constrained")
+
+
+Node = tuple[str, int, list]                    # a category, its count and its children, for treemap and sunburst
+
+
+def _check_tree(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if z is not None and y is None:
+        raise ValueError("a hierarchy goes x, then y, then z: give y before z")
+
+
+def _hierarchy(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None) -> list[Node]:
+    """The rows counted down the levels x > y > z, largest first at each level; empty branches are left out."""
+    levels = [v for v in (x, y, z) if v is not None]
+    if len({np.size(v) for v in levels}) > 1:
+        raise ValueError(f"the levels have different lengths: {[np.size(v) for v in levels]}")
+    split_levels = [_levels(v) for v in levels]
+
+    def grow(mask: np.ndarray, depth: int) -> list[Node]:
+        if depth == len(levels):
+            return []
+        names, masks = split_levels[depth]
+        nodes = [(n, int((mask & m).sum()), grow(mask & m, depth + 1)) for n, m in zip(names, masks, strict=True)]
+        return sorted((nd for nd in nodes if nd[1]), key=lambda nd: -nd[1])
+    return grow(np.ones(np.size(x), dtype=bool), 0)
+
+
+def _depth(nodes: list[Node]) -> int:
+    return 1 + max(_depth(c) for _, _, c in nodes) if nodes else 0
+
+
+def _worst(row: list[float], side: float) -> float:
+    """The worst aspect ratio of a row of areas laid along a side: what squarify keeps low."""
+    total = sum(row)
+    return max(max(side ** 2 * a / total ** 2, total ** 2 / (side ** 2 * a)) for a in row)
+
+
+def squarify(sizes: list[float], x: float, y: float, w: float, h: float) -> list[tuple[float, float, float, float]]:
+    """Rectangles (x, y, w, h) tiling the box, one per size (largest first) with areas in proportion, laid in rows
+    along the shorter side as long as that keeps them closer to squares (Bruls, Huizing and van Wijk, 2000)."""
+    total = sum(sizes)
+    areas = [s * w * h / total for s in sizes]
+    rects = []
+    i = 0
+    while i < len(areas):
+        side = min(w, h)
+        row = [areas[i]]
+        while i + len(row) < len(areas) and _worst([*row, areas[i + len(row)]], side) <= _worst(row, side):
+            row.append(areas[i + len(row)])
+        thick = sum(row) / side
+        pos = 0.0
+        for a in row:                           # the row fills the short side; it eats into the long one
+            long = a / thick
+            rects.append((x, y + pos, thick, long) if w >= h else (x + pos, y + h - thick, long, thick))
+            pos += long
+        if w >= h:
+            x, w = x + thick, w - thick
+        else:
+            h -= thick
+        i += len(row)
+    return rects
+
+
+def _tree_names(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None) -> str:
+    return " > ".join(label(v, n) for v, n in ((x, "x"), (y, "y"), (z, "z")) if v is not None)
+
+
+@kind("treemap", flags=("ann",), needs_y=False, check=_check_tree)
+def treemap(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
+    """A hierarchy of up to three categoricals as nested rectangles with areas by count: x's categories tile the
+    axes, each split by y, and by z: kx.plot(df, 'pclass', 'sex', 'survived', spec='treemap'). Colours follow x,
+    lighter at each level down; missing values count as 'NaN'. ann = each tile's path below x (its colour) and
+    count, where there is room.
+    kw: the tiles (Rectangle)."""
+    nodes = _hierarchy(x, y, z)
+    depth = _depth(nodes)
+    cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    face = plt.rcParams["axes.facecolor"]
+
+    def draw(level: list[Node], box: tuple[float, float, float, float], d: int, base: str | None,
+             path: tuple[str, ...]) -> None:
+        for i, ((name, n, children), rect) in enumerate(zip(level, squarify([nd[1] for nd in level], *box),
+                                                              strict=True)):
+            colour = cycle[i % len(cycle)] if base is None else base
+            fill = _shade(colour, d, depth)
+            ax.add_patch(mpl.patches.Rectangle(rect[:2], *rect[2:], **{"facecolor": fill, "edgecolor": face,
+                                                                       "linewidth": 2.5 - d, **kw}))
+            if d == 0:
+                ax.add_patch(mpl.patches.Rectangle((0, 0), 0, 0, facecolor=fill, label=name))   # legend handle
+            if children:
+                draw(children, rect, d + 1, colour, (*path, name))
+            elif "ann" in flags and rect[2] > 0.08 and rect[3] > 0.07:   # the path below x: colour says x
+                text = " / ".join((*path, name)[1:] if d else (name,))
+                ax.text(rect[0] + rect[2] / 2, rect[1] + rect[3] / 2, f"{text}\n{n:g}", ha="center",
+                        va="center", color=ink(fill), fontsize="small")
+    draw(nodes, (0.0, 0.0, 1.0, 1.0), 0, None, ())
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_axis_off()
+    _legend_beside(ax, _tree_names(x, y, z))
+
+
+@kind("sunburst", flags=("ann",), needs_y=False, check=_check_tree, projection="polar")
+def sunburst(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
+             hole: float = 0.3, **kw: Any) -> None:
+    """The treemap's hierarchy as rings: x innermost, each segment's angle its count, y and z split it outward,
+    starting at 12 o'clock and going clockwise, with the total in the hole (hole=, 0.3 of the radius).
+    ann = the name in each segment with room. kw: the segments (ax.bar)."""
+    if not 0 <= hole < 1:
+        raise ValueError(f"hole= is a share of the radius between 0 and 1, got {hole}")
+    nodes = _hierarchy(x, y, z)
+    depth = _depth(nodes)
+    ring = (1 - hole) / depth
+    total = sum(nd[1] for nd in nodes)
+    cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    face = plt.rcParams["axes.facecolor"]
+
+    def draw(level: list[Node], start: float, d: int, base: str | None) -> None:
+        for i, (name, n, children) in enumerate(level):
+            span = 2 * np.pi * n / total
+            colour = cycle[i % len(cycle)] if base is None else base
+            fill = _shade(colour, d, depth)
+            bottom = hole + d * ring
+            ax.bar(start + span / 2, ring, width=span, bottom=bottom, **{"color": fill, "edgecolor": face,
+                                                                         "linewidth": 1, **kw})
+            if d == 0:
+                ax.bar(0, 0, width=0, color=fill, label=name)                   # legend handle
+            if "ann" in flags and span * (bottom + ring / 2) > 0.25:
+                ax.text(start + span / 2, bottom + ring / 2, str(name), ha="center", va="center",
+                        color=ink(fill), fontsize="small")
+            draw(children, start, d + 1, colour)
+            start += span
+    draw(nodes, 0.0, 0, None)
+    ax.set_theta_offset(np.pi / 2)              # from 12 o'clock, clockwise
+    ax.set_theta_direction(-1)
+    ax.set_ylim(0, 1)
+    ax.set_axis_off()
+    if hole:
+        ax.text(0, 0, f"{total:g}", ha="center", va="center", fontsize="x-large")
+    _legend_beside(ax, _tree_names(x, y, z))
