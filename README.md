@@ -45,13 +45,14 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 | Token | Values                                                                                        |
 |-------|-----------------------------------------------------------------------------------------------|
 | kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
-|       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap`                           |
+|       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap` `pie` `donut` `radar`     |
+|       | `parallel`                                                                                    |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
 |       | `lcurve` `vcurve` `elbow`                                                                     |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
 | flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
 |       | `si`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb` `sym`    |
-|       | `logc` `corr` `all` `diag` `fit` `best`                                                       |
+|       | `logc` `corr` `all` `diag` `fit` `best` `raw`                                                 |
 
 `stack` works with `area`, `bar`, `barh` and `hist`. `norm` is a 100% stack for `area` and a
 density (area 1) for `hist`. `cum` makes `hist` cumulative; `hist-norm-cum` is the CDF.
@@ -75,9 +76,13 @@ kx.plot(df, 'heat')                                # any numeric DataFrame or 2-
 kx.plot(df, 'pclass', spec='count', by='survived') # rows per category, split by a second column
 kx.plot(df, 'pclass', 'port', 'crosstab-norm-ann') # how often each pair of categories occurs
 kx.plot(df, 'age', 'fare', 'hexbin-logc')          # points per hexagon; with a z, its mean per hexagon
+kx.plot(df, 'port', 'donut-ann')                   # shares of a whole, the total in the hole
+kx.plot(df[['age', 'fare', 'pclass', 'survived']], 'radar', by='survived')    # each group's profile
+kx.plot(df[['age', 'fare', 'pclass', 'sex']], 'parallel-mean', by='sex')     # every row across columns
 ```
 
-`heat`, `missing` and `nullmap` take the whole table and no column names; `kx.plot(df[cols], 'heat')` for some
+`heat`, `missing`, `nullmap`, `radar` and `parallel` take the whole table and no column names (`radar` and
+`parallel` take `by=`, a column of groups); `kx.plot(df[cols], 'heat')` for some
 columns. `wrap` breaks long tick labels onto several lines.
 
 ### Machine learning

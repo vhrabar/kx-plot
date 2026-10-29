@@ -39,8 +39,9 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, 
     x, y, z, spec, by = _arrays(data, spec, by)
     name, theme, flags = parse(spec or "line")
     kind = KINDS[name]
-    if kind.takes_table and not (isinstance(x, pd.DataFrame) and y is None and by is None):
-        raise TypeError(f"kind {name!r} takes a whole table and no columns, y, z or by=: kx.plot(df, {name!r}), "
+    if kind.takes_table and not (isinstance(x, pd.DataFrame) and y is None and (by is None or kind.takes_by)):
+        raise TypeError(f"kind {name!r} takes a whole table and no columns, y, z"
+                        f"{'' if kind.takes_by else ' or by='}: kx.plot(df, {name!r}), "
                         f"or kx.plot(df[cols], {name!r}) for some columns")
     if kind.needs_y and y is None:
         raise ValueError(f"kind {name!r} needs both x and y")
@@ -111,7 +112,9 @@ def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None) ->
     elif table and df is None and len(data) == 1 and np.ndim(data[0]) == 2:
         df, data = pd.DataFrame(data[0]), []    # a 2-D array is a table with 0..n labels
     if df is not None:
-        if not data and table:
+        if not data and table:                  # by= names a column: the groups, taken out of the table
+            if isinstance(by, str):
+                by, df = _column(df, by), df.drop(columns=by)
             return df, None, None, spec, by
         if not data:
             tables = ", ".join(sorted(k.name for k in KINDS.values() if k.takes_table))

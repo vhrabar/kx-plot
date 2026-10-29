@@ -28,6 +28,12 @@ def categories(z: ArrayLike) -> list[Any] | None:
     return sorted(s.dropna().unique(), key=str)
 
 
+def ink(rgba: tuple[float, ...]) -> str:
+    """Black on a light colour, white on a dark one (relative luminance), for text on a cell or a slice."""
+    r, g, b = (c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in mpl.colors.to_rgba(rgba)[:3])
+    return "black" if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18 else "white"
+
+
 def norm(values: ArrayLike, flags: set[str]) -> mpl.colors.Normalize | None:
     """sym = limits ±max|z| so 0 sits mid-colormap, logc = log colour scale. None = matplotlib's linear default."""
     v = np.asarray(values, dtype=float)

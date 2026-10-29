@@ -148,7 +148,8 @@ def test_table_kind_rejects_columns_y_z_and_by(table_kind: list, call: Callable[
 
 
 def test_frame_without_columns_hints_table_kinds(table_kind: list) -> None:
-    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: heat, loss, missing, nullmap, tbl"):
+    with pytest.raises(TypeError, match=r"needs the column names.*or a table kind: "
+                                        r"heat, loss, missing, nullmap, parallel, radar, tbl"):
         kx.plot(DF, "line")
 
 

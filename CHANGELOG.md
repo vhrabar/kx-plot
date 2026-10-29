@@ -33,6 +33,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   sizes free to differ. Every image becomes 0..1 floats: integers divided by 255 (or 65535 above 255), floats
   outside 0..1 scaled to fill it, alpha dropped and one channel read as grey. Image panels come as a near-square
   block in the place of `ax`, with no ticks or frames but room for a class name at the left.
+- **Plot kinds** `pie` and `donut`: shares of a whole, `kx.plot(df, 'port', 'pie')` counting the categories of x
+  (missing values as `NaN`), or `kx.plot(labels, values, 'pie')` summing y per category. The slices start at
+  12 o'clock and go clockwise, labelled beside them; with `leg` the legend names them instead, beside the pie.
+  `ann` writes each share in its slice, in black or white for its colour, and `sort` puts the largest first. Past
+  `top=` slices (7) the smallest fold into one grey `other`. `donut` is a ring (`hole=`, 0.55 of the radius) with
+  the total in its middle.
+- **Plot kind** `radar`: one polygon per row over the numeric columns of a table, or with `by=` the mean of each
+  group's rows, `kx.plot(df, 'radar', by='class')`, on polar axes (a given `ax` in a `kx.grid` is swapped for
+  polar axes in its cell). Each column is scaled to 0..1 over the polygons shown, with its range under its name;
+  `raw` keeps the values, for columns in one unit. More than 10 polygons raise, with a hint to group them.
+- **Plot kind** `parallel`: parallel coordinates, one line per row across the numeric columns, each scaled to 0..1
+  with its real minimum and maximum at the ends of its axis, `kx.plot(df, 'parallel', by='class')`. `by=`
+  colours the lines by group, the lines fade as the rows grow, and `mean` draws each group's mean as a thick line
+  on top.
+- Table kinds that group (`radar`, `parallel`) take `by=` as a column of the table, which is then left out of the
+  columns drawn, or as an array.
 
 
 ## [0.5.0] - 2026-10-24

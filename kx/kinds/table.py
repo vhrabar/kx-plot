@@ -10,14 +10,8 @@ from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
 from .._spec import kind
-from .._util import COLOUR, colorbar, diagonal, label, norm
+from .._util import COLOUR, colorbar, diagonal, ink, label, norm
 from .basic import _bars
-
-
-def _ink(rgba: tuple[float, ...]) -> str:
-    """Black on a light cell, white on a dark one (relative luminance of the cell colour)."""
-    r, g, b = (c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgba[:3])
-    return "black" if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18 else "white"
 
 
 @kind("heat", flags=("corr", "ann", *COLOUR), table=True)
@@ -129,4 +123,4 @@ def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: s
     if "ann" in flags:
         for (i, j), v in np.ndenumerate(values):
             if np.isfinite(v):
-                ax.text(j, i, fmt.format(v), ha="center", va="center", color=_ink(im.cmap(float(im.norm(v)))))
+                ax.text(j, i, fmt.format(v), ha="center", va="center", color=ink(im.cmap(float(im.norm(v)))))
