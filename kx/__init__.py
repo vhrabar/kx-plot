@@ -11,7 +11,8 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
   flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si | facet
           and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
           stack norm (count),
-          mean median ann (distributions), nocb sym logc (scatter, heat, hexbin, cluster), corr ann (heat, cluster),
+          mean median ann (distributions), sig (box, violin),
+          nocb sym logc (scatter, heat, hexbin, cluster), corr ann (heat, cluster),
           norm ann nocb logc (crosstab), ann all (missing), sort (nullmap), diag (scatter, hexbin),
           fit (scatter), norm ann nocb (cm), norm (proba), best (thresh, loss, elbow),
           nocb sym logc (resid), ann sort (pie, donut), ann (mosaic, treemap, sunburst), raw (radar), mean (parallel).

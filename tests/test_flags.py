@@ -1,5 +1,6 @@
 """Flags, titles and labels."""
 from collections.abc import Callable
+from itertools import pairwise
 
 import matplotlib as mpl
 import numpy as np
@@ -10,6 +11,8 @@ from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
 
 import kx
+import kx._stats
+import kx.kinds.dist
 
 
 # ---------- flags, title, labels ----------
@@ -309,4 +312,66 @@ def test_facet_in_a_grid_cell() -> None:
 ])
 def test_facet_errors(call: Callable[[], Axes], error: type, match: str) -> None:
     with pytest.raises(error, match=match):
+        call()
+
+
+# ---------- sig ----------
+LOW = np.arange(20.0)
+SAME = LOW + 0.5                                                  # overlaps LOW: no difference
+HIGH = LOW + 30                                                   # above both: differs from each
+
+
+def _brackets(ax: Axes) -> list[tuple[float, float, float]]:
+    """(left, right, height) of each significance bracket: the 4-point lines."""
+    return [(ln.get_xdata()[0], ln.get_xdata()[2], ln.get_ydata()[1]) for ln in ax.lines if len(ln.get_xdata()) == 4]
+
+
+@pytest.mark.parametrize("kind", ["box", "violin"])
+def test_sig_brackets_only_the_pairs_that_differ(kind: str) -> None:
+    ax = kx.plot(LOW, SAME, HIGH, f"{kind}-sig")
+    assert sorted((a, b) for a, b, _ in _brackets(ax)) == [(1, 3), (2, 3)]
+    pairs = [(LOW, SAME), (LOW, HIGH), (SAME, HIGH)]
+    adjusted = kx._stats.holm([kx._stats.mannwhitney(a, b)[1] for a, b in pairs])
+    marks = next(m for limit, m in kx.kinds.dist.STARS if adjusted[1] < limit)
+    assert [t.get_text() for t in ax.texts].count(marks) == 2
+    _, p = kx._stats.kruskal(LOW, SAME, HIGH)
+    assert f"Kruskal-Wallis {kx.kinds.dist._p(p)}" in [t.get_text() for t in ax.texts]
+    assert all(h > HIGH.max() for _, _, h in _brackets(ax))         # above the data
+    assert ax.get_ylim()[1] > max(h for _, _, h in _brackets(ax))   # and inside the axes
+
+
+def test_sig_ann_writes_p_values_and_stacks_without_overlap() -> None:
+    groups = [LOW, LOW + 25, LOW + 50, LOW + 75]
+    ax = kx.plot(np.concatenate(groups), spec="box-sig-ann", by=np.repeat(list("abcd"), 20))
+    brackets = _brackets(ax)
+    assert len(brackets) == 6                                     # every pair differs
+    assert sum(t.get_text().startswith("p ") for t in ax.texts) == 6
+    for h in {h for _, _, h in brackets}:                         # one level: spans never touch
+        spans = sorted((a, b) for a, b, hh in brackets if hh == h)
+        assert all(b1 < a2 for (_, b1), (a2, _) in pairwise(spans))
+    assert min(b - a for a, b, _ in brackets) == 1
+    lowest = min(h for _, _, h in brackets)
+    assert all(b - a == 1 for a, b, h in brackets if h == lowest)   # neighbours sit lowest
+
+
+def test_sig_over_six_groups_is_the_corner_note_only() -> None:
+    values = np.concatenate([LOW + 10 * k for k in range(7)])
+    ax = kx.plot(values, spec="violin-sig", by=np.repeat(list("abcdefg"), 20))
+    assert not _brackets(ax)
+    assert any(t.get_text().startswith("Kruskal-Wallis") for t in ax.texts)
+
+
+def test_sig_works_with_facet_and_by_columns() -> None:
+    axs = kx.plot(PASSENGERS, "fare", spec="box-sig-facet", by="pclass", facet="sex")
+    assert all(_brackets(a) for a in axs)
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(LOW, spec="box-sig"), "2 or more groups"),
+    (lambda: kx.plot(LOW, HIGH, spec="violin-sig-logy"), "linear value axis"),
+    (lambda: kx.plot([1.0, 1.0], [1.0, 1.0], spec="box-sig"), "every value is the same"),
+    (lambda: kx.plot(LOW, spec="kde-sig"), "only works with kind"),
+])
+def test_sig_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
         call()

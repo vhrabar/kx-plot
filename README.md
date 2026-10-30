@@ -52,13 +52,16 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
 | flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
 |       | `si` `facet`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb`  |
-|       | `sym` `logc` `corr` `all` `diag` `fit` `best` `raw`                                           |
+|       | `sym` `logc` `corr` `all` `diag` `fit` `best` `raw` `sig`                                     |
 
 `stack` works with `area`, `bar`, `barh` and `hist`. `norm` is a 100% stack for `area` and a
 density (area 1) for `hist`. `cum` makes `hist` cumulative; `hist-norm-cum` is the CDF.
 `hist` puts every series on the same bins, so the bars line up.
 `diag` adds a dashed `y = x` line to `scatter` and `hexbin`; `fit` adds a least-squares line to `scatter`, with
 its slope and R² in the legend (one line per group with a categorical `z`).
+
+`sig` on `box` and `violin` writes the Kruskal-Wallis p and brackets the pairs that differ, with stars (`ann`: the
+p-values), Holm-corrected.
 
 `facet` draws a plot once per value of a column, `kx.plot(df, 'pclass', 'port', 'crosstab-facet', facet='sex')`,
 with every category in every panel, shared axes, and one colour scale and colorbar for the colour kinds.

@@ -34,6 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   rectangles or as rings, `kx.plot(df, 'pclass', 'sex', spec='treemap')`. `ann` labels the tiles with room.
 - **Flag** `facet`: the plot once per value of `facet=`, `kx.plot(df, 'pclass', 'port', 'crosstab-facet',
   facet='sex')`, with every category in each panel, shared axes and one colour scale.
+- **Flag** `sig` (`box`, `violin`): the Kruskal-Wallis p over the groups and, up to 6 groups, stars over each pair
+  that differs (Mann-Whitney, Holm-corrected); with `ann` the p-values instead.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 

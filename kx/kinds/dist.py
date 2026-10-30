@@ -9,6 +9,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
+from .. import _stats
 from .._spec import kind
 from .._util import categories, label
 
@@ -195,11 +196,55 @@ def _per_group(ax: Axes, series: list[tuple[np.ndarray, str]], flags: set[str], 
             ax.annotate(text, (p + 0.3, np.median(v)), va="center", color=ink, fontsize="small")
 
 
-@kind("box", flags=("mean", "ann"), needs_y=False, takes_by=True)
+SIG_PAIRS = 6                                    # sig: brackets for every pair up to this many groups
+STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))
+
+
+def _check_sig(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if "sig" in flags and flags & {"logy", "logxy", "symlogy"}:
+        raise ValueError("flag 'sig' draws its brackets on a linear value axis; drop the log scale")
+
+
+def _p(p: float) -> str:
+    return "p < 0.001" if p < 0.001 else f"p = {p:.2g}"
+
+
+def _significance(ax: Axes, series: list[tuple[np.ndarray, str]], flags: set[str]) -> None:
+    """sig: the Kruskal-Wallis p over all groups in the corner, and with up to SIG_PAIRS groups a bracket over
+    each pair that differs (Mann-Whitney, Holm-adjusted p < 0.05), stars for the p (ann: the p itself)."""
+    values = [v for v, _ in series]
+    if len(values) < 2:
+        raise ValueError("flag 'sig' compares 2 or more groups; pass y and z, or by=")
+    _, p_all = _stats.kruskal(*values)
+    low, high = min(v.min() for v in values), max(v.max() for v in values)
+    step = 0.08 * ((high - low) or 1)
+    rows: list[list[tuple[int, int]]] = []      # brackets already placed on each level
+    if len(values) <= SIG_PAIRS:
+        pairs = [(i, j) for i in range(len(values)) for j in range(i + 1, len(values))]
+        adjusted = _stats.holm([_stats.mannwhitney(values[i], values[j])[1] for i, j in pairs])
+        found = sorted(((j - i, i, j, p) for (i, j), p in zip(pairs, adjusted, strict=True) if p < 0.05))
+        ink = plt.rcParams["text.color"]
+        for _, i, j, p in found:                # short spans first, each on the lowest level it fits
+            level = next((n for n, row in enumerate(rows) if all(j < a or b < i for a, b in row)), len(rows))
+            if level == len(rows):
+                rows.append([])
+            rows[level].append((i, j))
+            y = high + (level + 1) * step
+            ax.plot([i + 1, i + 1, j + 1, j + 1], [y - step / 4, y, y, y - step / 4], color=ink, linewidth=1,
+                    marker="")
+            text = _p(p) if "ann" in flags else next(mark for limit, mark in STARS if p < limit)
+            ax.text((i + j) / 2 + 1, y, text, ha="center", va="bottom", color=ink, fontsize="small")
+    ax.set_ylim(top=high + (len(rows) + 2) * step)    # room for the brackets and the note above them
+    ax.text(0.02, 0.98, f"Kruskal-Wallis {_p(p_all)}", transform=ax.transAxes, ha="left", va="top",
+            fontsize="small", color=plt.rcParams["text.color"])
+
+
+@kind("box", flags=("mean", "ann", "sig"), needs_y=False, takes_by=True, check=_check_sig)
 def box(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
         by: ArrayLike | None = None, **kw: Any) -> None:
     """Box plots of x, y, z side by side: median, quartile box, whiskers to 1.5 IQR, outliers as points.
     by= splits x into one box per group. mean = a diamond at the mean, ann = the median (and mean) as text.
+    sig = Kruskal-Wallis p in the corner and brackets with stars over the pairs that differ (ann: their p).
     kw: ax.boxplot, e.g. showfliers=False, widths=0.3."""
     series = _split(x, y, z, by)
     _need(series, "box", 1)
@@ -211,13 +256,16 @@ def box(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags:
     for i, patch in enumerate(parts["boxes"]):
         patch.set_facecolor((*mpl.colors.to_rgb(f"C{i}"), 0.7))      # alpha on the fill only, edge stays solid
     _per_group(ax, series, flags, by)
+    if "sig" in flags:
+        _significance(ax, series, flags)
 
 
-@kind("violin", flags=("mean", "ann"), needs_y=False, takes_by=True)
+@kind("violin", flags=("mean", "ann", "sig"), needs_y=False, takes_by=True, check=_check_sig)
 def violin(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
            by: ArrayLike | None = None, **kw: Any) -> None:
     """Violin plots of x, y, z side by side: a mirrored KDE with the median and quartiles marked.
     by= splits x into one violin per group. mean = a diamond at the mean, ann = the median (and mean) as text.
+    sig = Kruskal-Wallis p in the corner and brackets with stars over the pairs that differ (ann: their p).
     kw: ax.violinplot, e.g. widths=0.5."""
     series = _split(x, y, z, by)
     _need(series, "violin", 2)
@@ -231,6 +279,8 @@ def violin(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, fla
     ax.vlines(pos, q1, q3, color=ink, linewidth=3)
     ax.scatter(pos, med, color=plt.rcParams["axes.facecolor"], edgecolor=ink, zorder=3)
     _per_group(ax, series, flags, by)
+    if "sig" in flags:
+        _significance(ax, series, flags)
 
 
 @kind("strip", flags=("mean", "ann"), needs_y=False, takes_by=True)
