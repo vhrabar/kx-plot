@@ -36,7 +36,7 @@ def _split(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None,
     cats = categories(by)
     if cats is None:
         cats = sorted(pd.unique(groups[pd.notna(groups)]))
-    return [(_finite(xs[groups == c]), str(c)) for c in cats]
+    return [(_finite(xs[groups == c]), str(c)) for c in cats if (groups == c).any()]   # unseen: none
 
 
 def _need(series: list[tuple[np.ndarray, str]], kind: str, distinct: int) -> None:

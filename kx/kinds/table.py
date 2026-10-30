@@ -54,6 +54,9 @@ def crosstab(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **k
     nocb = no colorbar, logc = log colour scale (empty cells stay blank). kw: ax.imshow."""
     counts = pd.crosstab(pd.Series(np.asarray(y, dtype=object), name=label(y, "y")),
                          pd.Series(np.asarray(x, dtype=object), name=label(x, "x")))
+    for v, axis in ((y, "index"), (x, "columns")):   # a categorical keeps its unseen categories (facet panels)
+        if isinstance(getattr(v, "dtype", None), pd.CategoricalDtype):
+            counts = counts.reindex(**{axis: list(v.cat.categories)}, fill_value=0)
     if "norm" in flags:
         counts = counts / counts.sum()
     if "logc" in flags:                         # log(0) has no colour: leave those cells empty

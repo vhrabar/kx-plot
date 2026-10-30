@@ -5,7 +5,7 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import pytest
-from helpers import DF, X, Y, Z, _dashed
+from helpers import DF, PASSENGERS, X, Y, Z, _dashed
 from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
 
@@ -214,3 +214,99 @@ def test_series_names_become_labels() -> None:
     df = pd.DataFrame({"x": X, "speed": Y, "accel": Z})
     ax = kx.plot(df.x, df.speed, df.accel, "line-leg")
     assert [t.get_text() for t in ax.get_legend().get_texts()] == ["speed", "accel"]
+
+
+# ---------- facet ----------
+def _shared(axs: np.ndarray, which: str) -> bool:
+    return all(getattr(a, f"get_shared_{which}_axes")().joined(a, axs[0]) for a in axs)
+
+
+def test_facet_crosstab_one_panel_per_value_on_one_colour_scale() -> None:
+    axs = kx.plot(PASSENGERS, "pclass", "port", "crosstab-facet-ann", facet="sex", title="ports")
+    assert isinstance(axs, np.ndarray)
+    assert [a.get_title() for a in axs] == ["sex = female", "sex = male"]
+    for a, sex in zip(axs, ["female", "male"], strict=True):
+        part = PASSENGERS[PASSENGERS.sex == sex]
+        want = pd.crosstab(part.port, part.pclass).to_numpy()
+        assert np.array_equal(a.images[0].get_array(), want)
+    assert axs[0].images[0].get_clim() == axs[1].images[0].get_clim()
+    fig = axs[0].figure
+    bars = [a for a in fig.axes if a not in axs]
+    assert len(bars) == 1                                         # one colorbar for both
+    assert bars[0].get_ylabel() == "count"
+    assert fig._suptitle.get_text() == "ports"
+
+
+def test_facet_keeps_every_category_in_every_panel() -> None:
+    axs = kx.plot(PASSENGERS, "deck", spec="count-facet", facet="pclass")
+    ticks = [[t.get_text() for t in a.get_xticklabels()] for a in axs]
+    assert ticks[0] == ticks[1] == ticks[2] == [*"ABCDEFG", "NaN"]
+    second = PASSENGERS[PASSENGERS.pclass == 2].deck.value_counts(dropna=False)
+    heights = [p.get_height() for p in axs[1].patches]
+    assert heights[0] == second.get("A", 0)                      # a deck missing in this class: a 0 bar
+    assert _shared(axs, "x")
+    assert _shared(axs, "y")
+    assert len({a.get_ylim() for a in axs}) == 1
+
+
+def test_facet_scatter_shares_axes_and_the_z_colour_scale() -> None:
+    frame = kx.load("embedding")
+    axs = kx.plot(frame, "x", "y", "size", spec="scatter-facet", facet="group")
+    assert len(axs) == 2
+    assert axs[0].collections[0].get_clim() == axs[1].collections[0].get_clim()
+    assert axs[0].get_xlim() == axs[1].get_xlim()
+    assert len(axs[0].figure.axes) == 3
+    for a, g in zip(axs, ["batch_a", "batch_b"], strict=True):
+        assert len(a.collections[0].get_offsets()) == (frame.group == g).sum()
+
+
+def test_facet_with_by_and_a_table_kind() -> None:
+    axs = kx.plot(PASSENGERS, "age", spec="kde-facet", by="sex", facet="pclass")
+    assert [len(a.lines) for a in axs] == [2, 2, 2]
+    assert _shared(axs, "x")
+    corr = kx.plot(PASSENGERS[["age", "fare", "pclass", "sex"]], "heat-corr-facet", facet="sex")
+    labels = [t.get_text() for t in corr[0].get_xticklabels()]
+    assert labels == ["age", "fare", "pclass"]                   # the facet column is not a column of the table
+
+
+def test_facet_does_not_share_axes_that_show_different_categories() -> None:
+    frame = pd.DataFrame({"cat": ["a", "b", "c", "d"], "v": [1.0, 2, 3, 4], "g": ["x", "x", "y", "y"]})
+    axs = kx.plot(frame, "cat", "v", "bar-facet", facet="g")
+    assert [t.get_text() for t in axs[0].get_xticklabels()] == ["a", "b"]
+    assert [t.get_text() for t in axs[1].get_xticklabels()] == ["c", "d"]
+    assert not axs[1].get_shared_x_axes().joined(axs[1], axs[0])
+    assert _shared(axs, "y")                                      # the values still share a scale
+
+
+def test_facet_polar_kind_and_layout() -> None:
+    frame = pd.DataFrame({"a": [1.0, 2, 3, 4], "b": [2.0, 1, 4, 3], "c": [3.0, 3, 1, 2], "g": list("pqpq")})
+    axs = kx.plot(frame, "radar-facet", facet="g")
+    assert all(a.name == "polar" for a in axs)
+    many = kx.plot(np.arange(12.0), np.arange(12.0), "scatter-facet", facet=np.repeat(list("abcdef"), 2))
+    assert len(many) == 6
+    gs = many[0].get_subplotspec().get_gridspec()
+    assert (gs.nrows, gs.ncols) == (2, 3)                        # past 4 values: 3 per row
+    w, h = mpl.rcParams["figure.figsize"]
+    assert tuple(many[0].figure.get_size_inches()) == pytest.approx((3 * w, 2 * h))
+
+
+def test_facet_in_a_grid_cell() -> None:
+    left, right = kx.grid(2)
+    size = tuple(left.figure.get_size_inches())
+    axs = kx.plot(X, Y, "line-facet", facet=X > 5, title="split", ax=right)
+    assert len(axs) == 2
+    assert tuple(left.figure.get_size_inches()) == size
+    assert all(a.get_subplotspec().get_topmost_subplotspec() == right.get_subplotspec() for a in axs)
+    assert axs[0].get_title() == "split\nfacet = False"
+
+
+@pytest.mark.parametrize(("call", "error", "match"), [
+    (lambda: kx.plot(X, Y, "line-facet"), ValueError, "needs facet="),
+    (lambda: kx.plot(X, Y, "line", facet=X > 5), ValueError, "add the flag: line-facet"),
+    (lambda: kx.plot(PASSENGERS, "pair-facet", facet="sex"), ValueError, "draws several panels already"),
+    (lambda: kx.plot(X, Y, "line-facet", facet=[1, 2]), ValueError, "facet= has 2 values but the data has 20"),
+    (lambda: kx.plot(X, Y, "line-facet", facet="sex"), TypeError, "needs a DataFrame first"),
+])
+def test_facet_errors(call: Callable[[], Axes], error: type, match: str) -> None:
+    with pytest.raises(error, match=match):
+        call()

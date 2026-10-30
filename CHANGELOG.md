@@ -32,6 +32,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   'survived', spec='mosaic')`. `ann` writes the counts.
 - **Plot kinds** `treemap` and `sunburst`: a hierarchy of up to three categoricals sized by count, as nested
   rectangles or as rings, `kx.plot(df, 'pclass', 'sex', spec='treemap')`. `ann` labels the tiles with room.
+- **Flag** `facet`: the plot once per value of `facet=`, `kx.plot(df, 'pclass', 'port', 'crosstab-facet',
+  facet='sex')`, with every category in each panel, shared axes and one colour scale.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 
