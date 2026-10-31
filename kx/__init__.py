@@ -7,7 +7,7 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           | cluster | mosaic | treemap | sunburst
           | cm | roc | pr | calib | proba | thresh | gain | lift | pva | resid | imp | loss
           | lcurve | vcurve | elbow
-          | imgrid
+          | imgrid | meanimg
   theme : any file name in styles/
   flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si | facet
           and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
@@ -16,7 +16,8 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           nocb sym logc (scatter, heat, hexbin, cluster), corr ann (heat, cluster),
           norm ann nocb logc (crosstab), ann all (missing), sort (nullmap), diag (scatter, hexbin),
           fit (scatter), norm ann nocb (cm), norm (proba), best (thresh, loss, elbow),
-          nocb sym logc (resid), ann sort (pie, donut), ann (mosaic, treemap, sunburst), raw (radar), mean (parallel).
+          nocb sym logc (resid), ann sort (pie, donut), ann (mosaic, treemap, sunburst), raw (radar), mean (parallel),
+          std (meanimg).
           kx.grammar(kind) lists them.
 by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count);
          for radar, parallel and pair a column of the table: kx.plot(df, 'radar', by='class')

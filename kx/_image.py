@@ -1,6 +1,7 @@
 """Images as input: arrays, lists of arrays or file paths, turned into a list of 0..1 float images."""
 import math
 import os
+from collections import Counter
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -74,6 +75,52 @@ def _image(v: Any, i: int) -> np.ndarray:
     if lo >= 0 and hi <= 1:
         return a
     return (a - lo) / (hi - lo) if hi > lo else np.zeros_like(a)
+
+
+def resize(image: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    """image at shape (H, W) by nearest neighbour: each new pixel takes the old one it falls in. A selection, so
+    the resize of a sum is the sum of the resizes."""
+    h, w = image.shape[:2]
+    rows = (np.arange(shape[0]) * h // shape[0]).astype(int)
+    cols = (np.arange(shape[1]) * w // shape[1]).astype(int)
+    return image[rows][:, cols]
+
+
+def as_rgb(image: np.ndarray) -> np.ndarray:
+    """A grey (H, W) image as (H, W, 3); colour stays as it is."""
+    return np.repeat(image[..., None], 3, axis=2) if image.ndim == 2 else image
+
+
+CHUNK = 256
+
+
+def moments(x: Any, groups: list[np.ndarray]) -> tuple[list[tuple[np.ndarray, np.ndarray, int]], tuple[int, int]]:
+    """Per group of image positions: the mean image, the mean of squares, and the count, at the size most images
+    have (nearest neighbour), grey made colour if any image is colour. Reads each image once, CHUNK at a time:
+    sums are kept per size and resized at the end, which equals resizing every image first."""
+    sums: list[dict[tuple[int, ...], list]] = [{} for _ in groups]
+    sizes: Counter[tuple[int, int]] = Counter()
+    for g, idx in enumerate(groups):
+        for start in range(0, len(idx), CHUNK):
+            chunk = [int(i) for i in idx[start:start + CHUNK]]
+            for img in take(x, chunk):
+                sizes[img.shape[:2]] += 1
+                acc = sums[g].setdefault(img.shape, [np.zeros(img.shape), np.zeros(img.shape), 0])
+                acc[0] += img
+                acc[1] += img ** 2
+                acc[2] += 1
+    if not sizes:
+        raise ValueError("no images to average")
+    shape = sizes.most_common(1)[0][0]
+    rgb = any(len(k) == 3 for group in sums for k in group)
+    out = []
+    for group in sums:
+        total, squares, n = 0.0, 0.0, 0
+        for s, q, k in group.values():
+            s, q = (as_rgb(v) if rgb else v for v in (s, q))
+            total, squares, n = total + resize(s, shape), squares + resize(q, shape), n + k
+        out.append((total / n, squares / n, n))
+    return out, shape
 
 
 def tile(ax: Axes, n: int, cols: int | None = None, **kw: Any) -> np.ndarray:

@@ -188,3 +188,60 @@ def test_imgrid_figure_size_and_grid_cell() -> None:
 def test_imgrid_errors(call: Callable[[], object], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         call()
+
+
+# ---------- meanimg ----------
+def test_resize_picks_the_pixel_each_new_one_falls_in() -> None:
+    image = np.arange(12.0).reshape(3, 4)
+    assert kx._image.resize(image, (6, 2)).tolist() == [[0, 2], [0, 2], [4, 6], [4, 6], [8, 10], [8, 10]]
+    assert kx._image.resize(RGB[0], (8, 6)).shape == (8, 6, 3)
+
+
+def test_moments_sum_once_and_resize_the_sums() -> None:
+    small = np.full((2, 2), 0.5)
+    big = np.zeros((4, 4))
+    stats, shape = kx._image.moments([big, big, small], [np.arange(3)])
+    assert shape == (4, 4)                                         # most images are 4 x 4
+    mean, squares, n = stats[0]
+    assert n == 3
+    assert np.allclose(mean, 0.5 / 3)
+    assert np.allclose(squares, 0.25 / 3)
+    stats, _ = kx._image.moments([np.zeros((2, 2)), np.ones((2, 2, 3))], [np.arange(2)])
+    assert stats[0][0].shape == (2, 2, 3)                          # grey joins colour as colour
+
+
+def test_meanimg_is_the_mean_of_each_class() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "meanimg")
+    classes = sorted(set(SHAPES["labels"]))
+    assert len(axs) == len(classes)
+    for a, cls in zip(axs, classes, strict=True):
+        members = SHAPES["images"][SHAPES["labels"] == cls] / 255
+        assert np.allclose(_pixels(a), members.mean(axis=0))
+        assert a.get_title() == f"{cls} (n={len(members)})"
+
+
+def test_meanimg_std_maps_share_one_scale_and_colorbar() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "meanimg-std")
+    members = SHAPES["images"][SHAPES["labels"] == "blob"] / 255
+    assert np.allclose(_pixels(axs[0]), members.std(axis=0).mean(axis=2))
+    assert len({a.images[0].get_clim() for a in axs}) == 1
+    assert axs[0].images[0].get_clim()[0] == 0
+    bars = [a for a in axs[0].figure.axes if a not in axs]
+    assert len(bars) == 1
+    assert bars[0].get_ylabel() == "std"
+
+
+def test_meanimg_without_labels_and_wrapping() -> None:
+    (only,) = kx.plot(RGB, "meanimg")
+    assert only.get_title() == "all (n=5)"
+    assert np.allclose(_pixels(only), RGB.mean(axis=0) / 255)
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "meanimg", cols=3)
+    gs = axs[0].get_subplotspec().get_gridspec()
+    assert (gs.nrows, gs.ncols) == (3, 3)
+
+
+def test_meanimg_errors() -> None:
+    with pytest.raises(ValueError, match="5 images but 2 labels"):
+        kx.plot(RGB, ["a", "b"], "meanimg")
+    with pytest.raises(ValueError, match="'meanimg' takes the images"):
+        kx.plot(RGB, list("abcde"), list("abcde"), "meanimg")

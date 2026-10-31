@@ -38,6 +38,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   that differs (Mann-Whitney, Holm-corrected); with `ann` the p-values instead.
 - **Plot kind** `imgrid`: sample images, `kx.plot(images, labels, 'imgrid')`, one row of `n=` random images per
   class (`seed=` repeats them), or the images at `idx=`. Only the images shown are read.
+- **Plot kind** `meanimg`: the mean image of each class, `kx.plot(images, labels, 'meanimg')`, sizes matched to
+  the most common one; `std` shows how much each pixel varies instead, on one colour scale.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 

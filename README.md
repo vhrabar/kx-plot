@@ -49,7 +49,7 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 |       | `parallel` `pair` `cluster` `mosaic` `treemap` `sunburst`                                     |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
 |       | `lcurve` `vcurve` `elbow`                                                                     |
-|       | Images: `imgrid`                                                                              |
+|       | Images: `imgrid` `meanimg`                                                                    |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
 | flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
 |       | `si` `facet`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb`  |
@@ -105,6 +105,7 @@ or file paths, with the labels as `y`. `kx.load('shapes')` is a small demo set.
 d = kx.load('shapes')
 kx.plot(d['images'], d['labels'], 'imgrid')        # 6 random images per class, one row each
 kx.plot(paths, labels, 'imgrid', idx=[3, 17, 42])  # chosen images, titled with their labels
+kx.plot(d['images'], d['labels'], 'meanimg')       # the mean image of each class; -std: where pixels vary
 ```
 
 ### Machine learning
