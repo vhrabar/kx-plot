@@ -4,6 +4,7 @@ import os
 from collections import Counter
 from typing import Any
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
@@ -121,6 +122,37 @@ def moments(x: Any, groups: list[np.ndarray]) -> tuple[list[tuple[np.ndarray, np
             total, squares, n = total + resize(s, shape), squares + resize(q, shape), n + k
         out.append((total / n, squares / n, n))
     return out, shape
+
+
+RGB_NAMES, HSV_NAMES = ("red", "green", "blue"), ("hue", "saturation", "value")
+
+
+def histograms(x: Any, groups: list[np.ndarray], bins: int, hsv: bool) -> tuple[np.ndarray, list[str]]:
+    """Per group, each channel's histogram over 0..1 as shares of the pixels, averaged over the group's images
+    (so a big image weighs as much as a small one): an array (groups, channels, bins) and the channel names.
+    All grey: one 'grey' channel; grey among colour counts as R = G = B. hsv: hue, saturation, value."""
+    colour = np.zeros((len(groups), 3, bins))
+    grey = np.zeros((len(groups), 1, bins))
+    seen = np.zeros(len(groups), dtype=int)
+    any_colour = False
+
+    def hist(channel: np.ndarray) -> np.ndarray:
+        return np.histogram(channel, bins=bins, range=(0, 1))[0] / channel.size
+    for g, idx in enumerate(groups):
+        for start in range(0, len(idx), CHUNK):
+            for img in take(x, [int(i) for i in idx[start:start + CHUNK]]):
+                seen[g] += 1
+                if img.ndim == 2 and not hsv:
+                    grey[g, 0] += hist(img)
+                    continue
+                any_colour = True
+                img = mpl.colors.rgb_to_hsv(np.clip(as_rgb(img), 0, 1)) if hsv else img
+                colour[g] += [hist(img[..., c]) for c in range(3)]
+    if not seen.all():
+        raise ValueError("a class without images has no histogram")
+    if not any_colour:
+        return grey / seen[:, None, None], ["grey"]
+    return (colour + grey) / seen[:, None, None], list(HSV_NAMES if hsv else RGB_NAMES)
 
 
 def tile(ax: Axes, n: int, cols: int | None = None, **kw: Any) -> np.ndarray:

@@ -2,11 +2,12 @@
 import math
 from typing import Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
-from .._image import bare, count, fit_figure, moments, show, take, tile
+from .._image import bare, count, fit_figure, histograms, moments, show, take, tile
 from .._spec import kind
 from .._util import split
 from .basic import _levels
@@ -100,4 +101,52 @@ def meanimg(ax: Axes, x: Any, y: ArrayLike | None, z: None, flags: set[str], col
             show(a, np.clip(mean, 0, 1), **kw)
     for a, name, (_, _, n) in zip(axs, names, stats, strict=True):
         a.set_title(f"{name} (n={n})", fontsize="small")
+    return axs
+
+
+@kind("colorhist", flags=("hsv", "map"), needs_y=False, panels=True, check=_check_labelled("colorhist"))
+def colorhist(ax: Axes, x: Any, y: ArrayLike | None, z: None, flags: set[str], bins: int = 32,
+              **kw: Any) -> np.ndarray:
+    """How the pixel values are spread in each class (y): one panel per channel (red, green, blue; grey images
+    one), one line per class, each the class's average share of pixels in bins= bins (32) over 0..1.
+    hsv = hue, saturation and value instead; map = a class x value heat map per channel, on one colour scale.
+    kw: the lines (ax.plot) or the heat maps (ax.imshow)."""
+    if bins < 2:
+        raise ValueError(f"bins= needs at least 2 bins, got {bins}")
+    names, groups = _classes(x, y)
+    hists, channels = histograms(x, groups, bins, "hsv" in flags)
+    fig = ax.figure
+    if len(fig.axes) == 1:                      # a figure of its own: each channel the size of a small plot
+        w, h = plt.rcParams["figure.figsize"]
+        fig.set_size_inches(len(channels) * w * 0.7 + 1, h * (0.4 + 0.08 * len(names) if "map" in flags else 0.8))
+        if fig.get_layout_engine() is None:
+            fig.set_layout_engine("constrained")
+    axs = split(ax, 1, len(channels), wspace=0.08)
+    centres = (np.arange(bins) + 0.5) / bins
+    if "map" in flags:
+        top = float(hists.max()) or 1.0
+        for c, (a, channel) in enumerate(zip(axs, channels, strict=True)):
+            im = a.imshow(hists[:, c], **{"cmap": "magma", "vmin": 0, "vmax": top, "aspect": "auto",
+                                          "extent": (0, 1, len(names) - 0.5, -0.5), "interpolation": "nearest",
+                                          **kw})
+            a.set_yticks(range(len(names)), names if c == 0 else [])
+            a.set_title(channel)
+            a.set_xlabel("value")
+        fig.colorbar(im, ax=list(axs), label="share of pixels", shrink=0.8)
+        return axs
+    colours = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    for c, (a, channel) in enumerate(zip(axs, channels, strict=True)):
+        for g, name in enumerate(names):          # past the palette's colours, the lines repeat them dashed
+            a.plot(centres, hists[g, c], **{"label": name, "color": colours[g % len(colours)],
+                                            "linestyle": ("-", "--", ":")[g // len(colours) % 3], **kw})
+        a.set_title(channel)
+        a.set_xlabel("value")
+        a.set_xlim(0, 1)
+        if c:
+            a.sharey(axs[0])
+            a.tick_params(labelleft=False)
+    axs[0].set_ylabel("share of pixels")
+    axs[0].set_ylim(0, float(hists.max()) * 1.05 or 1)   # the highest line of any channel, not just the first
+    if y is not None:
+        axs[-1].legend(title=getattr(y, "name", None), loc="upper left", bbox_to_anchor=(1.02, 1))
     return axs

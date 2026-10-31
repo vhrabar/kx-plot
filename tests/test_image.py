@@ -2,6 +2,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -245,3 +246,54 @@ def test_meanimg_errors() -> None:
         kx.plot(RGB, ["a", "b"], "meanimg")
     with pytest.raises(ValueError, match="'meanimg' takes the images"):
         kx.plot(RGB, list("abcde"), list("abcde"), "meanimg")
+
+
+# ---------- colorhist ----------
+def _hist(image: np.ndarray, bins: int = 32) -> np.ndarray:
+    return np.histogram(image, bins=bins, range=(0, 1))[0] / image.size
+
+
+def test_histograms_average_each_images_shares() -> None:
+    big, small = np.zeros((4, 4)), np.ones((2, 2))
+    hists, channels = kx._image.histograms([big, small], [np.arange(2)], 4, hsv=False)
+    assert channels == ["grey"]
+    assert hists[0, 0].tolist() == [0.5, 0, 0, 0.5]               # each image weighs the same, whatever its size
+    hists, channels = kx._image.histograms([big, np.ones((2, 2, 3))], [np.arange(2)], 4, hsv=False)
+    assert channels == ["red", "green", "blue"]
+    assert all(h.tolist() == [0.5, 0, 0, 0.5] for h in hists[0])  # grey among colour: R = G = B
+
+
+def test_colorhist_one_panel_per_channel_one_line_per_class() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "colorhist")
+    classes = sorted(set(SHAPES["labels"]))
+    assert [a.get_title() for a in axs] == ["red", "green", "blue"]
+    assert [len(a.lines) for a in axs] == [len(classes)] * 3
+    members = SHAPES["images"][SHAPES["labels"] == classes[0]] / 255
+    want = np.mean([_hist(m[..., 1]) for m in members], axis=0)
+    assert np.allclose(axs[1].lines[0].get_ydata(), want)
+    assert all(a.get_ylim() == axs[0].get_ylim() for a in axs)
+    assert axs[0].get_ylim()[1] >= max(ln.get_ydata().max() for a in axs for ln in a.lines)   # no peak cut
+    assert [t.get_text() for t in axs[-1].get_legend().get_texts()] == classes
+    styles = [ln.get_linestyle() for ln in axs[0].lines]
+    colours = len(mpl.rcParams["axes.prop_cycle"].by_key()["color"])
+    assert styles[:colours] == ["-"] * min(colours, len(classes))  # dashed only once the colours run out
+
+
+def test_colorhist_hsv_and_map() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "colorhist-hsv-map", bins=16)
+    assert [a.get_title() for a in axs] == ["hue", "saturation", "value"]
+    shown = axs[2].images[0].get_array()
+    assert shown.shape == (len(set(SHAPES["labels"])), 16)
+    assert np.allclose(shown.sum(axis=1), 1)                      # each class's shares add up to all pixels
+    assert len({a.images[0].get_clim() for a in axs}) == 1
+    assert axs[0].get_yticklabels()[0].get_text() == "blob"
+
+
+def test_colorhist_grey_images_and_errors() -> None:
+    (only,) = kx.plot(RGB[..., 0], "colorhist")
+    assert only.get_title() == "grey"
+    assert only.get_legend() is None
+    with pytest.raises(ValueError, match="at least 2 bins"):
+        kx.plot(RGB, "colorhist", bins=1)
+    with pytest.raises(ValueError, match="'colorhist' takes the images"):
+        kx.plot(RGB, list("abcde"), list("abcde"), "colorhist")
