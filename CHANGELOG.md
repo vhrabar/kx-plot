@@ -36,6 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   facet='sex')`, with every category in each panel, shared axes and one colour scale.
 - **Flag** `sig` (`box`, `violin`): the Kruskal-Wallis p over the groups and, up to 6 groups, stars over each pair
   that differs (Mann-Whitney, Holm-corrected); with `ann` the p-values instead.
+- **Plot kind** `imgrid`: sample images, `kx.plot(images, labels, 'imgrid')`, one row of `n=` random images per
+  class (`seed=` repeats them), or the images at `idx=`. Only the images shown are read.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 

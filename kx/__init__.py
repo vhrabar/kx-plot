@@ -7,6 +7,7 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           | cluster | mosaic | treemap | sunburst
           | cm | roc | pr | calib | proba | thresh | gain | lift | pva | resid | imp | loss
           | lcurve | vcurve | elbow
+          | imgrid
   theme : any file name in styles/
   flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si | facet
           and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
@@ -19,6 +20,8 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           kx.grammar(kind) lists them.
 by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count);
          for radar, parallel and pair a column of the table: kx.plot(df, 'radar', by='class')
+images : image kinds take an (N, H, W[, C]) array or a list of arrays or file paths, labels as y:
+         kx.plot(images, labels, 'imgrid')
 facet= : with the flag facet, one panel per value of a column, on shared axes and one colour scale:
          kx.plot(df, 'pclass', 'port', 'crosstab-facet', facet='sex')
 table  : heat, cluster, missing, nullmap, loss, radar, parallel, pair take a whole DataFrame or 2-D array:

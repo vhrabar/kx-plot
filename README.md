@@ -49,6 +49,7 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 |       | `parallel` `pair` `cluster` `mosaic` `treemap` `sunburst`                                     |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
 |       | `lcurve` `vcurve` `elbow`                                                                     |
+|       | Images: `imgrid`                                                                              |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
 | flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
 |       | `si` `facet`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb`  |
@@ -94,6 +95,17 @@ kx.plot(df, 'pair', by='sex')                      # every numeric column agains
 `heat`, `cluster`, `missing`, `nullmap`, `radar`, `parallel` and `pair` take the whole table and no column names
 (`radar`, `parallel` and `pair` take `by=`, a column of groups); `kx.plot(df[cols], 'heat')` for some columns.
 `wrap` breaks long tick labels onto several lines.
+
+### Images
+
+Image kinds take an `(N, H, W)` or `(N, H, W, C)` array (channels first works too), or a list of arrays, PIL images
+or file paths, with the labels as `y`. `kx.load('shapes')` is a small demo set.
+
+```python
+d = kx.load('shapes')
+kx.plot(d['images'], d['labels'], 'imgrid')        # 6 random images per class, one row each
+kx.plot(paths, labels, 'imgrid', idx=[3, 17, 42])  # chosen images, titled with their labels
+```
 
 ### Machine learning
 

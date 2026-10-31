@@ -34,6 +34,28 @@ def images(x: Any) -> list[np.ndarray]:
     return out
 
 
+def count(x: Any) -> int:
+    """How many images x holds, without reading any: one 2-D array or path is one."""
+    if isinstance(x, (str, os.PathLike)):
+        return 1
+    if isinstance(x, np.ndarray) and x.dtype != object:
+        return 1 if x.ndim == 2 else len(x)
+    return len(x)
+
+
+def take(x: Any, idx: list[int]) -> list[np.ndarray]:
+    """The images at positions idx, read and scaled like images(); the rest are never read."""
+    n = count(x)
+    bad = [i for i in idx if not -n <= i < n]
+    if bad:
+        raise ValueError(f"idx= {bad} is out of range for {n} images")
+    if isinstance(x, (str, os.PathLike)) or (isinstance(x, np.ndarray) and x.dtype != object and x.ndim == 2):
+        return images(x)
+    if isinstance(x, np.ndarray) and x.dtype != object:
+        return images(x[np.asarray(idx, dtype=int)])
+    return images([x[i] for i in idx])
+
+
 def _image(v: Any, i: int) -> np.ndarray:
     """One image as a 0..1 float array, (H, W) or (H, W, 3)."""
     a = plt.imread(os.fspath(v)) if isinstance(v, (str, os.PathLike)) else np.asarray(v)
@@ -64,10 +86,25 @@ def tile(ax: Axes, n: int, cols: int | None = None, **kw: Any) -> np.ndarray:
     for a in axs[n:]:
         a.remove()
     for a in axs[:n]:
-        a.set_xticks([])
-        a.set_yticks([])
-        a.spines[:].set_visible(False)
+        bare(a)
     return axs[:n]
+
+
+def bare(ax: Axes) -> None:
+    """No ticks or frame, but the y label stays for a class name."""
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.spines[:].set_visible(False)
+
+
+def fit_figure(ax: Axes, rows: int, cols: int, side: float = 1.4) -> None:
+    """A figure of its own sized to the image grid (`side` inches an image) and laid out constrained."""
+    fig = ax.figure
+    if len(fig.axes) != 1:
+        return                                  # a cell of a bigger figure keeps that figure
+    fig.set_size_inches(max(2.5, cols * side + 0.6), max(2.0, rows * side + 0.4))
+    if fig.get_layout_engine() is None:
+        fig.set_layout_engine("constrained")
 
 
 def show(ax: Axes, image: np.ndarray, **kw: Any) -> AxesImage:

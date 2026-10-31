@@ -1,4 +1,5 @@
 """Image input (kx/_image.py) and the image kinds."""
+from collections.abc import Callable
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -105,3 +106,85 @@ def test_show_grey_and_colour_on_the_full_scale() -> None:
     assert grey.get_cmap().name == "gray"
     assert grey.get_clim() == (0, 1)
     assert colour.get_interpolation() == "bilinear"          # keywords win
+
+
+# ---------- imgrid ----------
+SHAPES = kx.load("shapes")
+
+
+def _pixels(ax: plt.Axes) -> np.ndarray:
+    return np.asarray(ax.images[0].get_array())
+
+
+def test_imgrid_one_row_of_n_per_class_named_at_the_left() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "imgrid", n=4)
+    classes = sorted(set(SHAPES["labels"]))
+    assert len(axs) == 4 * len(classes)
+    firsts = axs[::4]
+    assert [a.get_ylabel() for a in firsts] == classes
+    for a, cls in zip(firsts, classes, strict=True):              # each row shows its own class
+        row = np.flatnonzero(SHAPES["labels"] == cls)
+        assert any(np.allclose(_pixels(a), SHAPES["images"][i] / 255) for i in row)
+    assert not axs[0].get_xticks().size
+    assert axs[0].images[0].get_interpolation() == "nearest"
+
+
+def test_imgrid_seed_repeats_the_same_picks() -> None:
+    first = [_pixels(a) for a in kx.plot(SHAPES["images"], SHAPES["labels"], "imgrid", seed=3)]
+    again = [_pixels(a) for a in kx.plot(SHAPES["images"], SHAPES["labels"], "imgrid", seed=3)]
+    other = [_pixels(a) for a in kx.plot(SHAPES["images"], SHAPES["labels"], "imgrid", seed=4)]
+    assert all(np.array_equal(a, b) for a, b in zip(first, again, strict=True))
+    assert not all(np.array_equal(a, b) for a, b in zip(first, other, strict=True))
+
+
+def test_imgrid_short_class_leaves_a_short_row() -> None:
+    labels = np.array(["a"] * 5 + ["b"] * 2)
+    axs = kx.plot(RGB[[0, 1, 2, 3, 4, 0, 1]], labels, "imgrid", n=3)
+    assert len(axs) == 3 + 2
+    assert len(axs[0].figure.axes) == 5                           # the empty cell is removed
+
+
+def test_imgrid_without_labels_and_with_idx() -> None:
+    plain = kx.plot(SHAPES["images"], "imgrid", n=9)
+    assert len(plain) == 9
+    assert all(a.get_title() == "" for a in plain)
+    gs = plain[0].get_subplotspec().get_gridspec()
+    assert (gs.nrows, gs.ncols) == (3, 3)
+    picked = [5, 0, 42]
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "imgrid", idx=picked)
+    assert [a.get_title() for a in axs] == [SHAPES["labels"][i] for i in picked]
+    assert np.allclose(_pixels(axs[0]), SHAPES["images"][5] / 255)
+
+
+def test_imgrid_reads_only_the_images_shown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    paths = []
+    for i in range(5):
+        paths.append(tmp_path / f"{i}.png")
+        plt.imsave(paths[-1], RGB[i])
+    read = []
+    real = plt.imread
+    monkeypatch.setattr(kx._image.plt, "imread", lambda p: read.append(p) or real(p))
+    kx.plot(paths, "imgrid", idx=[1, 3])
+    assert read == [str(paths[1]), str(paths[3])]
+
+
+def test_imgrid_figure_size_and_grid_cell() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "imgrid", n=5)
+    w, h = axs[0].figure.get_size_inches()
+    assert w > h * 5 / 7                                          # 5 wide, 7 tall, about 1.4 in each
+    left, right = kx.grid(2)
+    size = tuple(left.figure.get_size_inches())
+    cell = kx.plot(SHAPES["images"], "imgrid", n=4, ax=right)
+    assert tuple(left.figure.get_size_inches()) == size
+    assert all(a.get_subplotspec().get_topmost_subplotspec() == right.get_subplotspec() for a in cell)
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(RGB, ["a", "b"], "imgrid"), "5 images but 2 labels"),
+    (lambda: kx.plot(RGB, "imgrid", idx=[7]), r"idx= \[7\] is out of range"),
+    (lambda: kx.plot(RGB, list("abcde"), list("abcde"), "imgrid"), "no z"),
+    (lambda: kx.plot(np.zeros((21, 2, 2)), [str(i) for i in range(21)], "imgrid"), "21 classes are too many"),
+])
+def test_imgrid_errors(call: Callable[[], object], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
