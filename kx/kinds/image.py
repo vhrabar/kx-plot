@@ -2,12 +2,13 @@
 import math
 from typing import Any
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
-from .._image import bare, count, fit_figure, histograms, moments, show, take, tile
+from .._image import HSV_NAMES, RGB_NAMES, as_rgb, bare, count, fit_figure, histograms, moments, show, take, tile
 from .._spec import kind
 from .._util import split
 from .basic import _levels
@@ -150,3 +151,64 @@ def colorhist(ax: Axes, x: Any, y: ArrayLike | None, z: None, flags: set[str], b
     if y is not None:
         axs[-1].legend(title=getattr(y, "name", None), loc="upper left", bbox_to_anchor=(1.02, 1))
     return axs
+
+
+CHANNEL_INK = {"red": "#d62728", "green": "#2ca02c", "blue": "#1f77b4"}   # imhist: each channel in its colour
+
+
+def _picks(x: Any, n: int | None, seed: int, idx: list[int] | None, default: int) -> list[int]:
+    """The image positions to show: idx= as given, else n= (default) random ones, the same for the same seed."""
+    if idx is not None:
+        return list(idx)
+    total = count(x)
+    return sorted(int(i) for i in np.random.default_rng(seed).choice(total, min(n or default, total), replace=False))
+
+
+@kind("imhist", flags=("hsv",), needs_y=False, panels=True, check=_check_labelled("imhist"))
+def imhist(ax: Axes, x: Any, y: ArrayLike | None, z: None, flags: set[str], n: int | None = None, seed: int = 0,
+           idx: list[int] | None = None, bins: int = 64, **kw: Any) -> np.ndarray:
+    """Images beside their histograms, one row each: the image, then the share of its pixels in bins= bins (64)
+    per channel, each line in its channel's colour (grey: one line). hsv = hue, saturation and value instead.
+    Shows the images at idx=, or n= random ones (4, seed=); labels (y) title them. Returns the panels, image and
+    histogram for each row. kw: the histogram lines (ax.plot)."""
+    if bins < 2:
+        raise ValueError(f"bins= needs at least 2 bins, got {bins}")
+    total = count(x)
+    if y is not None and np.size(y) != total:
+        raise ValueError(f"there are {total} images but {np.size(y)} labels")
+    picks = _picks(x, n, seed, idx, 4)
+    names = np.asarray(y, dtype=object).ravel() if y is not None else None
+    fig = ax.figure
+    if len(fig.axes) == 1:                      # a figure of its own: a short row per image
+        fig.set_size_inches(7, 0.4 + 1.9 * len(picks))
+        if fig.get_layout_engine() is None:
+            fig.set_layout_engine("constrained")
+    grid = split(ax, len(picks), 2, width_ratios=[1, 2.2], wspace=0.05, hspace=0.1).reshape(len(picks), 2)
+    edges = np.linspace(0, 1, bins + 1)
+    centres = (edges[:-1] + edges[1:]) / 2
+    ink = plt.rcParams["text.color"]
+    for r, (img, i) in enumerate(zip(take(x, picks), picks, strict=True)):
+        left, right = grid[r]
+        bare(left)
+        show(left, img)
+        if names is not None:
+            left.set_title(str(names[i]), fontsize="small")
+        if "hsv" in flags:
+            values = mpl.colors.rgb_to_hsv(np.clip(as_rgb(img), 0, 1))
+            channels = [(values[..., c], name, None) for c, name in enumerate(HSV_NAMES)]
+        elif img.ndim == 2:
+            channels = [(img, "grey", ink)]
+        else:
+            channels = [(img[..., c], name, CHANNEL_INK[name]) for c, name in enumerate(RGB_NAMES)]
+        for values, name, colour in channels:
+            share = np.histogram(values, bins=edges)[0] / values.size
+            ln, = right.plot(centres, share, **{"label": name, **({"color": colour} if colour else {}), **kw})
+            right.fill_between(centres, share, color=ln.get_color(), alpha=0.15, linewidth=0)
+        right.set_xlim(0, 1)
+        right.set_ylim(bottom=0)
+        right.tick_params(labelbottom=r == len(picks) - 1)
+        if r:
+            right.sharex(grid[0, 1])
+    grid[-1, 1].set_xlabel("value")
+    grid[0, 1].legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize="small")
+    return grid.ravel()

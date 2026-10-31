@@ -6,6 +6,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from matplotlib.colors import to_hex
 
 import kx
 import kx._image
@@ -297,3 +298,42 @@ def test_colorhist_grey_images_and_errors() -> None:
         kx.plot(RGB, "colorhist", bins=1)
     with pytest.raises(ValueError, match="'colorhist' takes the images"):
         kx.plot(RGB, list("abcde"), list("abcde"), "colorhist")
+
+
+# ---------- imhist ----------
+def test_imhist_rows_of_image_and_its_channel_histograms() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "imhist", idx=[4, 9], bins=16)
+    assert len(axs) == 4                                          # image, histogram; image, histogram
+    image, hist = axs[2], axs[3]
+    assert np.allclose(_pixels(image), SHAPES["images"][9] / 255)
+    assert image.get_title() == SHAPES["labels"][9]
+    assert [ln.get_label() for ln in hist.lines] == ["red", "green", "blue"]
+    assert to_hex(hist.lines[0].get_color()) == "#d62728"         # each channel in its own colour
+    assert np.allclose(hist.lines[1].get_ydata(), _hist(SHAPES["images"][9][..., 1] / 255, 16))
+    assert axs[1].get_shared_x_axes().joined(axs[1], hist)
+    assert hist.get_xlabel() == "value"
+    assert axs[1].get_legend() is not None
+
+
+def test_imhist_picks_n_random_images_by_seed() -> None:
+    first = kx.plot(SHAPES["images"], "imhist", n=2, seed=5)
+    again = kx.plot(SHAPES["images"], "imhist", n=2, seed=5)
+    assert len(first) == 4
+    assert all(np.array_equal(_pixels(a), _pixels(b)) for a, b in zip(first[::2], again[::2], strict=True))
+    assert len(kx.plot(RGB, "imhist")) == 2 * 4                   # 4 by default
+
+
+def test_imhist_grey_and_hsv() -> None:
+    (_, grey) = kx.plot(RGB[..., 0], "imhist", idx=[0])
+    assert [ln.get_label() for ln in grey.lines] == ["grey"]
+    (_, hsv) = kx.plot(RGB, "imhist-hsv", idx=[0])
+    assert [ln.get_label() for ln in hsv.lines] == ["hue", "saturation", "value"]
+
+
+def test_imhist_errors() -> None:
+    with pytest.raises(ValueError, match="5 images but 2 labels"):
+        kx.plot(RGB, ["a", "b"], "imhist")
+    with pytest.raises(ValueError, match="at least 2 bins"):
+        kx.plot(RGB, "imhist", bins=1)
+    with pytest.raises(ValueError, match="out of range"):
+        kx.plot(RGB, "imhist", idx=[9])

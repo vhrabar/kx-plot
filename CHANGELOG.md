@@ -42,6 +42,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   the most common one; `std` shows how much each pixel varies instead, on one colour scale.
 - **Plot kind** `colorhist`: each class's average histogram per colour channel, one line per class
   (`kx.plot(images, labels, 'colorhist')`); `hsv` for hue, saturation and value, `map` for heat maps.
+- **Plot kind** `imhist`: images beside their channel histograms, one row each, `kx.plot(images, 'imhist',
+  idx=[0, 1])` or `n=` random ones; `hsv` for hue, saturation and value.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 
