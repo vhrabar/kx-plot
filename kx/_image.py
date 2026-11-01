@@ -77,6 +77,39 @@ def masks(m: Any, idx: list[int]) -> list[np.ndarray]:
     return out
 
 
+def heatmaps(m: Any, idx: list[int]) -> list[np.ndarray]:
+    """The maps at positions idx as float (h, w) arrays scaled to 0..1 each (a saliency map's units mean nothing
+    between methods); a map with channels is averaged over them. A constant map is all 0."""
+    n = count(m)
+    bad = [i for i in idx if not -n <= i < n]
+    if bad:
+        raise ValueError(f"idx= {bad} is out of range for {n} maps")
+    out = []
+    for i in idx:
+        a = np.asarray(m if n == 1 and np.ndim(m) == 2 else m[i], dtype=float)
+        if a.ndim == 3:
+            a = a.mean(axis=2)
+        if a.ndim != 2:
+            raise ValueError(f"map {i} has shape {a.shape}; a map is (h, w)")
+        lo, hi = np.nanmin(a), np.nanmax(a)
+        out.append((a - lo) / (hi - lo) if hi > lo else np.zeros_like(a))
+    return out
+
+
+def bilinear(image: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    """A (h, w) array at shape (H, W) by bilinear interpolation between pixel centres, as a coarse saliency map is
+    smoothed up to its image; the edges hold their value."""
+    h, w = image.shape
+    ys = np.clip((np.arange(shape[0]) + 0.5) * h / shape[0] - 0.5, 0, h - 1)
+    xs = np.clip((np.arange(shape[1]) + 0.5) * w / shape[1] - 0.5, 0, w - 1)
+    y0, x0 = np.floor(ys).astype(int), np.floor(xs).astype(int)
+    y1, x1 = np.minimum(y0 + 1, h - 1), np.minimum(x0 + 1, w - 1)
+    fy, fx = (ys - y0)[:, None], (xs - x0)[None, :]
+    top = image[y0][:, x0] * (1 - fx) + image[y0][:, x1] * fx
+    bottom = image[y1][:, x0] * (1 - fx) + image[y1][:, x1] * fx
+    return top * (1 - fy) + bottom * fy
+
+
 def _image(v: Any, i: int) -> np.ndarray:
     """One image as a 0..1 float array, (H, W) or (H, W, 3)."""
     a = plt.imread(os.fspath(v)) if isinstance(v, (str, os.PathLike)) else np.asarray(v)

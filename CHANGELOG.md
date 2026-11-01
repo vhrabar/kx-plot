@@ -46,6 +46,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   idx=[0, 1])` or `n=` random ones; `hsv` for hue, saturation and value.
 - **Plot kind** `segmask`: images with their segmentation masks, `kx.plot(images, masks, 'segmask')`: the image,
   the mask and an outline over the image; predicted masks as z add a second outline and the IoU.
+- **Plot kind** `saliency`: saliency maps (Grad-CAM or any, computed elsewhere) over their images,
+  `kx.plot(images, maps, 'saliency')`, each scaled to 0..1 and smoothed up to its image; z adds a caption.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 

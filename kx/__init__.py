@@ -7,7 +7,7 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           | cluster | mosaic | treemap | sunburst
           | cm | roc | pr | calib | proba | thresh | gain | lift | pva | resid | imp | loss
           | lcurve | vcurve | elbow
-          | imgrid | meanimg | colorhist | imhist | segmask
+          | imgrid | meanimg | colorhist | imhist | segmask | saliency
   theme : any file name in styles/
   flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si | facet
           and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),

@@ -392,3 +392,54 @@ def test_segmask_errors() -> None:
         kx.plot(SHAPES["images"], SHAPES["masks"], SHAPES["masks"][:3], "segmask")
     with pytest.raises(ValueError, match="needs both x and y"):
         kx.plot(SHAPES["images"], spec="segmask")
+
+
+# ---------- saliency ----------
+def test_heatmaps_scale_each_map_to_0_1() -> None:
+    found = kx._image.heatmaps([np.array([[2.0, 4.0], [6.0, 10.0]]), np.full((2, 2), 3.0)], [0, 1])
+    assert found[0].tolist() == [[0, 0.25], [0.5, 1]]
+    assert found[1].tolist() == [[0, 0], [0, 0]]                    # a constant map has nothing to show
+
+
+def test_bilinear_keeps_values_and_edges() -> None:
+    coarse = np.array([[0.0, 1.0], [2.0, 3.0]])
+    fine = kx._image.bilinear(coarse, (4, 4))
+    assert fine.shape == (4, 4)
+    assert fine[0, 0] == 0                                          # the edges hold their value
+    assert fine[-1, -1] == 3
+    assert fine.mean() == pytest.approx(coarse.mean())              # symmetric: no shift
+    assert np.all(np.diff(fine, axis=1) >= 0)
+    assert kx._image.bilinear(coarse, (2, 2)).tolist() == coarse.tolist()
+
+
+def test_saliency_rows_of_image_and_overlay() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["saliency"], "saliency", idx=[0, 7], alpha=0.4)
+    assert len(axs) == 4
+    image, overlay = axs[2], axs[3]
+    assert np.allclose(_pixels(image), SHAPES["images"][7] / 255)
+    heat = overlay.images[1]
+    assert heat.get_array().shape == (40, 40)                      # 10 x 10 smoothed up to the image
+    assert heat.get_alpha() == 0.4
+    assert heat.get_cmap().name == "inferno"
+    want = kx._image.bilinear(kx._image.heatmaps(SHAPES["saliency"], [7])[0], (40, 40))
+    assert np.allclose(heat.get_array(), want)
+    bars = [a for a in image.figure.axes if a not in axs]
+    assert len(bars) == 1
+    assert bars[0].get_ylabel() == "saliency"
+    assert [a.get_title() for a in axs[:2]] == ["image", "saliency"]
+
+
+def test_saliency_captions_and_cmap() -> None:
+    captions = [f"{t} -> {p}" for t, p in zip(SHAPES["labels"], SHAPES["pred"], strict=True)]
+    axs = kx.plot(SHAPES["images"], SHAPES["saliency"], captions, "saliency", idx=[3], cmap="viridis")
+    assert axs[1].get_title() == captions[3]
+    assert axs[1].images[1].get_cmap().name == "viridis"
+
+
+def test_saliency_errors() -> None:
+    with pytest.raises(ValueError, match="210 images but 2 maps"):
+        kx.plot(SHAPES["images"], SHAPES["saliency"][:2], "saliency")
+    with pytest.raises(ValueError, match="210 images but 1 captions"):
+        kx.plot(SHAPES["images"], SHAPES["saliency"], ["x"], "saliency")
+    with pytest.raises(ValueError, match="alpha= is between 0 and 1"):
+        kx.plot(SHAPES["images"], SHAPES["saliency"], "saliency", alpha=2)

@@ -13,8 +13,10 @@ from .._image import (
     RGB_NAMES,
     as_rgb,
     bare,
+    bilinear,
     count,
     fit_figure,
+    heatmaps,
     histograms,
     masks,
     moments,
@@ -283,4 +285,46 @@ def segmask(ax: Axes, x: Any, y: Any, z: Any | None, flags: set[str], n: int | N
         handles = [mpl.lines.Line2D([], [], color=true_ink, label="true"),
                    mpl.lines.Line2D([], [], color=guess_ink, linestyle="--", label="predicted")]
         grid[0, 2].legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1), fontsize="small")
+    return grid.ravel()
+
+
+@kind("saliency", panels=True)
+def saliency(ax: Axes, x: Any, y: Any, z: ArrayLike | None, flags: set[str], n: int | None = None, seed: int = 0,
+             idx: list[int] | None = None, alpha: float = 0.5, **kw: Any) -> np.ndarray:
+    """Saliency maps (y: Grad-CAM or any per-pixel score, computed elsewhere) over their images (x), one row each:
+    the image, then the image with the map on top (alpha=, 0.5), each map scaled to 0..1 and smoothed up to its
+    image's size (bilinear), with one colorbar. z = a caption per image (say the predicted class).
+    Shows the images at idx=, or n= random ones (4, seed=). kw: the maps (ax.imshow), e.g. cmap='jet'."""
+    total = count(x)
+    if count(y) != total:
+        raise ValueError(f"there are {total} images but {count(y)} maps")
+    if z is not None and np.size(z) != total:
+        raise ValueError(f"there are {total} images but {np.size(z)} captions")
+    if not 0 <= alpha <= 1:
+        raise ValueError(f"alpha= is between 0 and 1, got {alpha}")
+    picks = _picks(x, n, seed, idx, 4)
+    captions = np.asarray(z, dtype=object).ravel() if z is not None else None
+    fig = ax.figure
+    if len(fig.axes) == 1:                      # a figure of its own: a short row per image
+        fig.set_size_inches(5.2, 0.5 + 2.1 * len(picks))
+        if fig.get_layout_engine() is None:
+            fig.set_layout_engine("constrained")
+    grid = split(ax, len(picks), 2, wspace=0.04, hspace=0.12).reshape(len(picks), 2)
+    shown = None
+    for row, img, heat, i in zip(grid, take(x, picks), heatmaps(y, picks), picks, strict=True):
+        for a in row:
+            bare(a)
+        show(row[0], img)
+        show(row[1], img)
+        heat = bilinear(heat, img.shape[:2]) if heat.shape != img.shape[:2] else heat
+        shown = row[1].imshow(heat, **{"cmap": "inferno", "vmin": 0, "vmax": 1, "alpha": alpha,
+                                       "interpolation": "nearest", **kw})
+        row[0].set_ylabel(f"#{i}", rotation=0, ha="right", va="center")
+        if captions is not None:
+            row[1].set_title(str(captions[i]), fontsize="small")
+    grid[0, 0].set_title("image", fontsize="small")
+    if captions is None:
+        grid[0, 1].set_title("saliency", fontsize="small")
+    scale = mpl.cm.ScalarMappable(norm=shown.norm, cmap=shown.get_cmap())   # full colour, not the overlay's alpha
+    fig.colorbar(scale, ax=list(grid[:, 1]), label="saliency", shrink=0.8)
     return grid.ravel()
