@@ -8,7 +8,21 @@ import numpy as np
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
-from .._image import HSV_NAMES, RGB_NAMES, as_rgb, bare, count, fit_figure, histograms, moments, show, take, tile
+from .._image import (
+    HSV_NAMES,
+    RGB_NAMES,
+    as_rgb,
+    bare,
+    count,
+    fit_figure,
+    histograms,
+    masks,
+    moments,
+    resize,
+    show,
+    take,
+    tile,
+)
 from .._spec import kind
 from .._util import split
 from .basic import _levels
@@ -211,4 +225,62 @@ def imhist(ax: Axes, x: Any, y: ArrayLike | None, z: None, flags: set[str], n: i
             right.sharex(grid[0, 1])
     grid[-1, 1].set_xlabel("value")
     grid[0, 1].legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize="small")
+    return grid.ravel()
+
+
+def iou(a: np.ndarray, b: np.ndarray) -> float:
+    """Intersection over union of two bool masks; two empty masks agree fully."""
+    union = np.logical_or(a, b).sum()
+    return float(np.logical_and(a, b).sum() / union) if union else 1.0
+
+
+@kind("segmask", panels=True)
+def segmask(ax: Axes, x: Any, y: Any, z: Any | None, flags: set[str], n: int | None = None, seed: int = 0,
+            idx: list[int] | None = None, **kw: Any) -> np.ndarray:
+    """Segmentation masks (y) with their images (x), one row each: the image, the mask, and the image with the
+    mask shaded and outlined. z = predicted masks, a second dashed outline, with the IoU in the row's title.
+    Masks: bool, integers (non-zero is inside) or floats (above 0.5), resized to their image if they differ.
+    Shows the images at idx=, or n= random ones (4, seed=). kw: the outlines (ax.contour)."""
+    total = count(x)
+    for what, v in (("masks", y), ("predicted masks", z)):
+        if v is not None and count(v) != total:
+            raise ValueError(f"there are {total} images but {count(v)} {what}")
+    picks = _picks(x, n, seed, idx, 4)
+    truth = masks(y, picks)
+    guess = masks(z, picks) if z is not None else [None] * len(picks)
+    cols = 3
+    fig = ax.figure
+    if len(fig.axes) == 1:                      # a figure of its own: a short row per image
+        fig.set_size_inches(6.5, 0.5 + 2.1 * len(picks))
+        if fig.get_layout_engine() is None:
+            fig.set_layout_engine("constrained")
+    grid = split(ax, len(picks), cols, wspace=0.04, hspace=0.12).reshape(len(picks), cols)
+    true_ink, guess_ink = plt.rcParams["axes.prop_cycle"].by_key()["color"][:2]
+    for row, img, i, t, g in zip(grid, take(x, picks), picks, truth, guess, strict=True):
+        size = img.shape[:2]
+        t = resize(t, size) if t.shape != size else t
+        g = resize(g, size) if g is not None and g.shape != size else g
+        for a in row:
+            bare(a)
+        show(row[0], img)
+        row[0].set_ylabel(f"#{i}", rotation=0, ha="right", va="center")
+        row[1].imshow(t, cmap="gray", vmin=0, vmax=1, interpolation="nearest")
+        show(row[2], img)
+        row[2].imshow(np.ma.masked_where(~t, t), cmap=mpl.colors.ListedColormap([true_ink]), alpha=0.3,
+                      interpolation="nearest")
+        if t.any():
+            row[2].contour(t, levels=[0.5], **{"colors": [true_ink], "linewidths": 1.5, **kw})
+        if g is not None:
+            if g.any():
+                row[2].contour(g, levels=[0.5], **{"colors": [guess_ink], "linewidths": 1.5,
+                                                    "linestyles": "--", **kw})
+            row[2].set_title(f"IoU {iou(t, g):.2f}", fontsize="small")
+    grid[0, 0].set_title("image", fontsize="small")
+    grid[0, 1].set_title("mask", fontsize="small")
+    if z is None:
+        grid[0, 2].set_title("outline", fontsize="small")
+    else:
+        handles = [mpl.lines.Line2D([], [], color=true_ink, label="true"),
+                   mpl.lines.Line2D([], [], color=guess_ink, linestyle="--", label="predicted")]
+        grid[0, 2].legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1), fontsize="small")
     return grid.ravel()

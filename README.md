@@ -49,7 +49,7 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 |       | `parallel` `pair` `cluster` `mosaic` `treemap` `sunburst`                                     |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
 |       | `lcurve` `vcurve` `elbow`                                                                     |
-|       | Images: `imgrid` `meanimg` `colorhist` `imhist`                                               |
+|       | Images: `imgrid` `meanimg` `colorhist` `imhist` `segmask`                                     |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
 | flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
 |       | `si` `facet`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb`  |
@@ -108,6 +108,7 @@ kx.plot(paths, labels, 'imgrid', idx=[3, 17, 42])  # chosen images, titled with 
 kx.plot(d['images'], d['labels'], 'meanimg')       # the mean image of each class; -std: where pixels vary
 kx.plot(d['images'], d['labels'], 'colorhist')     # pixel values per channel and class; -hsv, -map
 kx.plot(d['images'], 'imhist', idx=[0, 1])         # images beside their own channel histograms
+kx.plot(d['images'], d['masks'], pred, 'segmask')  # image, mask, outlines; a prediction adds its IoU
 ```
 
 ### Machine learning

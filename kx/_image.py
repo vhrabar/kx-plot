@@ -58,6 +58,25 @@ def take(x: Any, idx: list[int]) -> list[np.ndarray]:
     return images([x[i] for i in idx])
 
 
+def masks(m: Any, idx: list[int]) -> list[np.ndarray]:
+    """The masks at positions idx as bool (H, W) arrays, read without the image scaling: bool as it is, integers
+    non-zero inside (a label map's classes all count), floats above 0.5. Colour masks: any channel inside."""
+    n = count(m)
+    bad = [i for i in idx if not -n <= i < n]
+    if bad:
+        raise ValueError(f"idx= {bad} is out of range for {n} masks")
+    out = []
+    for i in idx:
+        v = m if n == 1 and (isinstance(m, (str, os.PathLike)) or np.ndim(m) == 2) else m[i]
+        a = plt.imread(os.fspath(v)) if isinstance(v, (str, os.PathLike)) else np.asarray(v)
+        if a.ndim == 3:
+            a = a[..., :3].max(axis=2) if a.shape[-1] in (3, 4) else a[..., 0]
+        if a.ndim != 2:
+            raise ValueError(f"mask {i} has shape {a.shape}; a mask is (H, W)")
+        out.append(a if a.dtype == bool else a != 0 if np.issubdtype(a.dtype, np.integer) else a > 0.5)
+    return out
+
+
 def _image(v: Any, i: int) -> np.ndarray:
     """One image as a 0..1 float array, (H, W) or (H, W, 3)."""
     a = plt.imread(os.fspath(v)) if isinstance(v, (str, os.PathLike)) else np.asarray(v)

@@ -10,6 +10,7 @@ from matplotlib.colors import to_hex
 
 import kx
 import kx._image
+import kx.kinds.image
 from kx._image import images, show, tile
 
 RGB = np.random.default_rng(0).integers(0, 256, (5, 8, 6, 3), dtype=np.uint8)
@@ -337,3 +338,57 @@ def test_imhist_errors() -> None:
         kx.plot(RGB, "imhist", bins=1)
     with pytest.raises(ValueError, match="out of range"):
         kx.plot(RGB, "imhist", idx=[9])
+
+
+# ---------- segmask ----------
+def test_masks_read_without_image_scaling() -> None:
+    labels = np.array([[0, 1], [3, 0]], dtype=np.uint8)            # a label map: every class is inside
+    floats = np.array([[0.2, 0.7], [0.5, 1.0]])
+    found = kx._image.masks([labels, floats, labels.astype(bool)], [0, 1, 2])
+    assert found[0].tolist() == [[False, True], [True, False]]
+    assert found[1].tolist() == [[False, True], [False, True]]
+    assert found[2].dtype == bool
+    assert kx._image.masks(np.stack([labels] * 3, axis=2)[None], [0])[0].tolist() == found[0].tolist()
+
+
+def test_iou() -> None:
+    a = np.array([[1, 1, 0, 0]], dtype=bool)
+    b = np.array([[0, 1, 1, 0]], dtype=bool)
+    assert kx.kinds.image.iou(a, b) == pytest.approx(1 / 3)
+    assert kx.kinds.image.iou(~a & a, ~b & b) == 1.0              # both empty: they agree
+
+
+def test_segmask_rows_of_image_mask_and_outline() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["masks"], "segmask", idx=[3, 8])
+    assert len(axs) == 2 * 3
+    image, mask, outline = axs[3:]
+    assert np.allclose(_pixels(image), SHAPES["images"][8] / 255)
+    assert np.array_equal(_pixels(mask), SHAPES["masks"][8])
+    assert len(outline.images) == 2                               # the image and the shaded mask over it
+    assert outline.collections                                    # the outline
+    assert image.get_ylabel() == "#8"
+    assert [a.get_title() for a in axs[:3]] == ["image", "mask", "outline"]
+
+
+def test_segmask_prediction_outline_and_iou_in_the_title() -> None:
+    pred = np.roll(SHAPES["masks"], 2, axis=2)
+    axs = kx.plot(SHAPES["images"], SHAPES["masks"], pred, "segmask", idx=[5])
+    want = kx.kinds.image.iou(SHAPES["masks"][5], pred[5])
+    assert axs[2].get_title() == f"IoU {want:.2f}"
+    assert len(axs[2].collections) == 2                           # true and predicted outlines
+    assert [t.get_text() for t in axs[2].get_legend().get_texts()] == ["true", "predicted"]
+
+
+def test_segmask_resizes_a_mask_to_its_image() -> None:
+    small = SHAPES["masks"][:, ::2, ::2]                           # 20 x 20 masks for 40 x 40 images
+    axs = kx.plot(SHAPES["images"], small, "segmask", idx=[0])
+    assert _pixels(axs[1]).shape == (40, 40)
+
+
+def test_segmask_errors() -> None:
+    with pytest.raises(ValueError, match="210 images but 2 masks"):
+        kx.plot(SHAPES["images"], SHAPES["masks"][:2], "segmask")
+    with pytest.raises(ValueError, match="210 images but 3 predicted masks"):
+        kx.plot(SHAPES["images"], SHAPES["masks"], SHAPES["masks"][:3], "segmask")
+    with pytest.raises(ValueError, match="needs both x and y"):
+        kx.plot(SHAPES["images"], spec="segmask")

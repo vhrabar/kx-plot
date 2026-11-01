@@ -44,6 +44,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   (`kx.plot(images, labels, 'colorhist')`); `hsv` for hue, saturation and value, `map` for heat maps.
 - **Plot kind** `imhist`: images beside their channel histograms, one row each, `kx.plot(images, 'imhist',
   idx=[0, 1])` or `n=` random ones; `hsv` for hue, saturation and value.
+- **Plot kind** `segmask`: images with their segmentation masks, `kx.plot(images, masks, 'segmask')`: the image,
+  the mask and an outline over the image; predicted masks as z add a second outline and the IoU.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 
