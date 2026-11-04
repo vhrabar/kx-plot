@@ -6,7 +6,7 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           | qq | heat | crosstab | count | missing | nullmap | hexbin | pie | donut | radar | parallel | pair
           | cluster | mosaic | treemap | sunburst
           | cm | roc | pr | calib | proba | thresh | gain | lift | pva | resid | imp | loss
-          | lcurve | vcurve | elbow
+          | lcurve | vcurve | elbow | embed
           | imgrid | meanimg | colorhist | imhist | segmask | saliency | miscls
   theme : any file name in styles/
   flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si | facet
@@ -17,7 +17,7 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           norm ann nocb logc (crosstab), ann all (missing), sort (nullmap), diag (scatter, hexbin),
           fit (scatter), norm ann nocb (cm), norm (proba), best (thresh, loss, elbow),
           nocb sym logc (resid), ann sort (pie, donut), ann (mosaic, treemap, sunburst), raw (radar), mean (parallel),
-          std (meanimg), hsv map (colorhist), hsv (imhist).
+          std (meanimg), hsv map (colorhist), hsv (imhist), ann nocb sym logc (embed).
           kx.grammar(kind) lists them.
 by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count);
          for radar, parallel and pair a column of the table: kx.plot(df, 'radar', by='class')
@@ -37,6 +37,8 @@ kx.missing(df): the share of missing values per column, the same as kx.plot(df, 
 kx.grid(5): a figure of 5 panels as a flat array of axes, for kx.plot(..., ax=).
 kx.roc_auc(y_true, score) and kx.pr_ap(y_true, score): area under the ROC curve and average precision, in numpy.
 kx.evaluate(y_true, score): a model report, the panels picked from the data (binary, multiclass or regression).
+kx.embed(df, by='label'): the rows in 2-D (PCA; method='tsne' or 'umap' with pip install 'kx-plot[embed]').
+kx.cramers(df): how strongly each pair of categorical columns goes together (Cramér's V), as a heat map.
 kx.grammar("area") and kx.source("area") explain one kind; kx.parse(spec) shows how a spec is read.
 """
 import glob
@@ -49,7 +51,9 @@ from typing import Any
 import pandas as pd
 from matplotlib.axes import Axes
 
+from ._cramers import cramers
 from ._data import datasets, load
+from ._embed import embed
 from ._evaluate import evaluate
 from ._grid import grid
 from ._metrics import pr_ap, roc_auc
@@ -58,9 +62,9 @@ from ._save import save
 from ._spec import COMMON_FLAGS, KINDS, Spec, all_flags, parse
 from ._theme import BREWER_CMAPS, BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
 
-__all__ = ["BREWER_CMAPS", "BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "datasets",
-           "evaluate", "grammar", "grid", "load", "missing", "palette", "palettes", "parse", "plot", "pr_ap", "roc_auc",
-           "save", "show", "source", "styles", "use"]
+__all__ = ["BREWER_CMAPS", "BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "cramers",
+           "datasets", "embed", "evaluate", "grammar", "grid", "load", "missing", "palette", "palettes", "parse",
+           "plot", "pr_ap", "roc_auc", "save", "show", "source", "styles", "use"]
 
 
 def _version() -> str:

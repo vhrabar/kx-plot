@@ -1,4 +1,5 @@
 """Transparency (show, grammar, source), kx.grid and kx.save."""
+from collections.abc import Callable
 from pathlib import Path
 
 import matplotlib as mpl
@@ -7,6 +8,7 @@ import pytest
 from helpers import X, Y, Z
 
 import kx
+import kx._stats
 
 
 # ---------- transparency ----------
@@ -107,3 +109,105 @@ def test_save_without_extension_uses_theme_format(kaggle: Path) -> None:
     assert Path(path).read_bytes().startswith(b"%PDF")
     kx.plot(X, Y, "line")
     assert kx.save("fig2", format="svg").endswith("fig2.svg")
+
+
+# ---------- kx.embed ----------
+EMBEDDING = kx.load("embedding")
+FEATURES = EMBEDDING[[f"f{k}" for k in range(10)]]
+
+
+def test_embed_pca_matches_svd_with_variance_in_the_labels() -> None:
+    ax = kx.embed(FEATURES, by=EMBEDDING.label)
+    z = (FEATURES - FEATURES.mean()) / FEATURES.std(ddof=0)
+    u, s, _ = np.linalg.svd(z.to_numpy(), full_matrices=False)
+    for k in range(2):                                            # the same axes up to sign
+        assert abs(np.corrcoef(ax.embedding[:, k], u[:, k])[0, 1]) == pytest.approx(1)
+    share = s ** 2 / (s ** 2).sum()
+    assert ax.get_xlabel() == f"PC1 ({share[0]:.0%})"
+    assert len(ax.collections) == EMBEDDING.label.nunique()
+    again = kx.embed(FEATURES, by=EMBEDDING.label)
+    assert np.array_equal(again.embedding, ax.embedding)         # signs fixed: the same picture each run
+
+
+def test_embed_takes_a_column_name_spec_and_images() -> None:
+    ax = kx.embed(EMBEDDING.drop(columns=["x", "y", "group"]), by="label", spec="ann", title="pca")
+    assert ax.get_title() == "pca"
+    assert {t.get_text() for t in ax.texts} == set(EMBEDDING.label)
+    assert ax.embedding.shape == (600, 2)                         # label left out of the features
+    shapes = kx.load("shapes")
+    pics = kx.embed(shapes["images"], by=shapes["labels"])
+    assert pics.embedding.shape == (210, 2)
+
+
+def test_embed_tsne_and_umap_when_installed() -> None:
+    pytest.importorskip("sklearn")
+    ax = kx.embed(FEATURES.iloc[:100], method="tsne", by=EMBEDDING.label.iloc[:100], perplexity=10)
+    assert ax.get_xlabel() == "t-SNE 1"
+    assert ax.embedding.shape == (100, 2)
+    pytest.importorskip("umap")
+    ax = kx.embed(FEATURES.iloc[:100], method="umap", n_neighbors=10)
+    assert ax.get_xlabel() == "UMAP 1"
+
+
+def test_embed_says_what_to_install(monkeypatch: pytest.MonkeyPatch) -> None:
+    import builtins
+    real = builtins.__import__
+
+    def missing(name: str, *args: object, **kw: object) -> object:
+        if name.startswith("sklearn"):
+            raise ImportError(name)
+        return real(name, *args, **kw)
+    monkeypatch.setattr(builtins, "__import__", missing)
+    with pytest.raises(ImportError, match=r"needs scikit-learn: pip install 'kx-plot\[embed\]'"):
+        kx.embed(FEATURES, method="tsne")
+
+
+@pytest.mark.parametrize(("call", "error", "match"), [
+    (lambda: kx.embed(FEATURES, method="mds"), ValueError, "unknown method"),
+    (lambda: kx.embed(FEATURES, perplexity=5), TypeError, "takes no options"),
+    (lambda: kx.embed(FEATURES.assign(f0=np.nan)), ValueError, "fill or drop the NaNs"),
+    (lambda: kx.embed(EMBEDDING[["label"]]), ValueError, "needs numeric columns"),
+    (lambda: kx.embed(FEATURES, by="nope"), ValueError, "no column 'nope'"),
+    (lambda: kx.embed(FEATURES.to_numpy(), by="label"), TypeError, "needs a DataFrame"),
+    (lambda: kx.embed(FEATURES.iloc[:2]), ValueError, "at least 3 rows"),
+    (lambda: kx.embed([np.zeros((4, 4)), np.zeros((5, 5)), np.zeros((4, 4))]), ValueError, "one size"),
+])
+def test_embed_errors(call: Callable[[], object], error: type, match: str) -> None:
+    with pytest.raises(error, match=match):
+        call()
+
+
+# ---------- kx.cramers ----------
+PASSENGERS = kx.load("passengers")
+
+
+def test_cramers_matrix_of_the_categorical_columns() -> None:
+    v = kx.cramers(PASSENGERS, plot=False)
+    assert list(v.columns) == ["sex", "pclass", "port", "deck", "ticket_type", "survived"]   # no age, no fare
+    assert np.allclose(v.to_numpy(), v.to_numpy().T)
+    assert np.allclose(np.diag(v), 1)
+    assert v.loc["sex", "survived"] == pytest.approx(kx._stats.cramers_v(PASSENGERS.sex, PASSENGERS.survived))
+    assert v.loc["sex", "survived"] > 0.3 > v.loc["sex", "port"]
+
+
+def test_cramers_heat_map_on_0_1_with_two_decimals() -> None:
+    ax = kx.cramers(PASSENGERS, cols=["sex", "survived", "pclass"], title="V")
+    image = ax.images[0]
+    assert image.norm.vmin == 0
+    assert image.norm.vmax == 1
+    assert image.colorbar.ax.get_ylabel() == "Cramér's V"
+    assert "1.00" in [t.get_text() for t in ax.texts]
+    assert ax.get_title() == "V"
+
+
+def test_cramers_cluster_puts_associated_columns_together() -> None:
+    order = list(kx.cramers(PASSENGERS, cluster=True, plot=False).columns)
+    assert abs(order.index("pclass") - order.index("ticket_type")) == 1
+    assert abs(order.index("sex") - order.index("survived")) == 1
+
+
+def test_cramers_errors() -> None:
+    with pytest.raises(ValueError, match=r"cols= names \['nope'\]"):
+        kx.cramers(PASSENGERS, cols=["sex", "nope"])
+    with pytest.raises(ValueError, match="compares pairs"):
+        kx.cramers(PASSENGERS[["age", "fare", "sex"]])

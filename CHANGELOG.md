@@ -50,6 +50,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `kx.plot(images, maps, 'saliency')`, each scaled to 0..1 and smoothed up to its image; z adds a caption.
 - **Plot kind** `miscls`: the images a model got wrong, `kx.plot(images, y_true, y_pred, 'miscls')`, captioned
   'true -> predicted'; with a 2-D score as z, the most confident mistakes first.
+- **Plot kind** `embed`: a 2-D embedding coloured by label, `kx.plot(xy, labels, 'embed')`, with no ticks and
+  equal aspect; `ann` names each group where it sits.
+- `kx.embed(df, by='label')`: PCA (or `method='tsne'`, `'umap'` with the new `embed` extra) of a table or images,
+  then the `embed` plot; the coordinates are `ax.embedding`.
+- `kx.cramers(df)`: Cramér's V between every pair of categorical columns as a heat map, `cluster=True` to group
+  them, `plot=False` for the matrix.
+- `heat` takes `fmt=` for its `ann` numbers.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 

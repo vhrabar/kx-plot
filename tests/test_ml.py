@@ -649,3 +649,51 @@ def test_brier_calibration_and_gain() -> None:
     taken, found = kx._metrics.gain([1, 0, 1, 0], [0.9, 0.8, 0.7, 0.1])
     assert taken.tolist() == [0, 0.25, 0.5, 0.75, 1]
     assert found.tolist() == [0, 0.5, 0.5, 1, 1]
+
+
+# ---------- embed ----------
+EMBEDDING = kx.load("embedding")
+
+
+def test_embed_groups_with_a_legend_no_ticks_equal_aspect() -> None:
+    ax = kx.plot(EMBEDDING, "x", "y", "embed", by="label")
+    groups = sorted(EMBEDDING.label.unique())
+    assert len(ax.collections) == len(groups)
+    alpha = EMBEDDING[EMBEDDING.label == "alpha"]
+    assert np.allclose(ax.collections[0].get_offsets(), alpha[["x", "y"]].to_numpy())
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == groups
+    assert ax.get_legend().get_title().get_text() == "label"
+    assert not len(ax.get_xticks())
+    assert not len(ax.get_yticks())
+    assert ax.get_aspect() == 1
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("x", "y")
+
+
+def test_embed_takes_an_n_by_2_array_and_labels_next() -> None:
+    xy = EMBEDDING[["x", "y"]].to_numpy()
+    ax = kx.plot(xy, EMBEDDING.label.to_numpy(), "embed-ann")
+    assert ax.get_legend() is None                                # ann names the groups where they sit
+    names = {t.get_text(): t.get_position() for t in ax.texts}
+    assert set(names) == set(EMBEDDING.label)
+    gamma = EMBEDDING[EMBEDDING.label == "gamma"]
+    assert names["gamma"] == pytest.approx((gamma.x.median(), gamma.y.median()))
+    assert (ax.get_xlabel(), ax.get_ylabel()) == ("dim 1", "dim 2")
+
+
+def test_embed_numeric_labels_colour_scale_or_groups() -> None:
+    ax = kx.plot(EMBEDDING, "x", "y", "embed", by="size")      # many values: a colour scale
+    assert len(ax.collections) == 1
+    assert ax.collections[0].colorbar is not None
+    few = kx.plot(EMBEDDING.x, EMBEDDING.y, "embed", by=np.arange(len(EMBEDDING)) % 3)   # cluster ids: groups
+    assert len(few.collections) == 3
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(np.zeros((5, 3)), "embed"), r"\(n, 2\)"),
+    (lambda: kx.plot(np.zeros(5), "embed"), "needs both coordinates"),
+    (lambda: kx.plot(np.zeros((5, 2)), ["a", "b"], "embed"), "5 points but 2 labels"),
+    (lambda: kx.plot(np.zeros((5, 2)), list("abcde"), list("abcde"), "embed"), "there is no z"),
+])
+def test_embed_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()

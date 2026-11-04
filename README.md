@@ -48,7 +48,7 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 |       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap` `pie` `donut` `radar`     |
 |       | `parallel` `pair` `cluster` `mosaic` `treemap` `sunburst`                                     |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
-|       | `lcurve` `vcurve` `elbow`                                                                     |
+|       | `lcurve` `vcurve` `elbow` `embed`                                                             |
 |       | Images: `imgrid` `meanimg` `colorhist` `imhist` `segmask` `saliency` `miscls`                 |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
 | flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
@@ -80,6 +80,7 @@ kx.missing(df)                                     # share of NaNs per column, t
 kx.plot(df, 'nullmap-sort')                        # where the NaNs are: one pixel row per table row
 kx.plot(df, 'heat-corr-ann')                       # correlations of the numeric columns, -1 to 1
 kx.plot(df, 'heat')                                # any numeric DataFrame or 2-D array as coloured cells
+kx.cramers(df, cluster=True)                       # Cramér's V of the categorical columns, 0 to 1
 kx.plot(df, 'cluster-corr')                        # correlations, similar columns side by side, with trees
 kx.plot(df, 'pclass', spec='count', by='survived') # rows per category, split by a second column
 kx.plot(df, 'pclass', 'port', 'crosstab-norm-ann') # how often each pair of categories occurs
@@ -112,6 +113,16 @@ kx.plot(d['images'], d['masks'], pred, 'segmask')  # image, mask, outlines; a pr
 kx.plot(d['images'], d['saliency'], 'saliency')    # Grad-CAM or any map over its image, smoothed to fit
 kx.plot(d['images'], d['labels'], d['proba'], 'miscls')  # the mistakes, the most confident first
 ```
+
+### Embeddings
+
+```python
+kx.embed(df, by='label')                           # PCA of the numeric columns, explained variance on the axes
+kx.embed(images, by=labels, method='tsne')         # t-SNE or UMAP: pip install 'kx-plot[embed]'
+kx.plot(xy, labels, 'embed-ann')                   # coordinates you already have, names at each group
+```
+
+`kx.embed` returns the axes, and the coordinates are `ax.embedding`.
 
 ### Machine learning
 

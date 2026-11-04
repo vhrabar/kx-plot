@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.patheffects import withStroke
 from numpy.typing import ArrayLike
 
 from .._metrics import (
@@ -26,8 +27,8 @@ from .._metrics import (
 )
 from .._metrics import gain as gains
 from .._spec import kind
-from .._util import COLOUR, label
-from .basic import _bars, _check_scatter, band, scatter
+from .._util import COLOUR, categories, colorbar, label, norm
+from .basic import _bars, _check_scatter, _legend_right, _levels, band, scatter
 from .dist import _hist
 from .table import _matrix, hexbin
 
@@ -435,3 +436,56 @@ def elbow(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[
         lines.append(ax.lines[-1])
     if len(lines) > 1:                          # one legend for both axes, on the one drawn last
         top.legend(lines, [h.get_label() for h in lines])
+
+
+GROUPS = 10                                     # embed: a numeric by= with up to this many values is groups
+
+
+@kind("embed", flags=("ann", *COLOUR), needs_y=False, takes_by=True)
+def embed(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
+          by: ArrayLike | None = None, **kw: Any) -> None:
+    """A 2-D embedding (PCA, t-SNE or UMAP output) as points coloured by label: kx.plot(xy, labels, 'embed') with
+    xy an (n, 2) array, or kx.plot(df, 'x', 'y', 'embed', by='label'). Labels come from by=, else the argument
+    after the coordinates. Groups get a colour each and a legend; ann = each group's name at its median instead.
+    A numeric label with more than 10 values gets a colour scale (nocb, sym, logc). No ticks: an embedding's axes
+    have no units; equal aspect: its distances do. kw: ax.scatter."""
+    if np.ndim(x) == 2:
+        points = np.asarray(x, dtype=float)
+        if points.shape[1] != 2:
+            raise ValueError(f"an embedding as one array is (n, 2); got shape {points.shape}")
+        if z is not None:
+            raise ValueError("with an (n, 2) array the labels come next (or by=); there is no z")
+        xs, ys = points[:, 0], points[:, 1]
+        names = [str(c) for c in x.columns] if isinstance(x, pd.DataFrame) else ["dim 1", "dim 2"]
+        groups = by if by is not None else y
+    else:
+        if y is None:
+            raise ValueError("kind 'embed' needs both coordinates: x and y, or one (n, 2) array")
+        xs, ys = np.asarray(x, dtype=float).ravel(), np.asarray(y, dtype=float).ravel()
+        names = [label(x, "dim 1"), label(y, "dim 2")]
+        groups = by if by is not None else z
+    if groups is not None and np.size(groups) != len(xs):
+        raise ValueError(f"there are {len(xs)} points but {np.size(groups)} labels")
+    size = 0.5 * plt.rcParams["lines.markersize"] ** 2
+    numeric = groups is not None and categories(groups) is None and len(pd.unique(np.asarray(groups))) > GROUPS
+    if groups is None:
+        ax.scatter(xs, ys, **{"s": size, **kw})
+    elif numeric:
+        sc = ax.scatter(xs, ys, **{"c": np.asarray(groups, dtype=float), "s": size,
+                                   "norm": norm(np.asarray(groups, dtype=float), flags), **kw})
+        colorbar(ax, sc, label(groups, "label"), flags)
+    else:
+        face = plt.rcParams["axes.facecolor"]
+        for name, m in zip(*_levels(groups), strict=True):
+            m = np.asarray(m)
+            pts = ax.scatter(xs[m], ys[m], **{"s": size, "label": name, **kw})
+            if "ann" in flags and m.any():     # the name where the group sits, readable over the points
+                ax.text(np.median(xs[m]), np.median(ys[m]), name, ha="center", va="center", fontweight="bold",
+                        color=pts.get_facecolor()[0], path_effects=[withStroke(linewidth=3, foreground=face)])
+        if "ann" not in flags:
+            _legend_right(ax, label(groups, "") or None)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.set_xlabel(names[0])
+    ax.set_ylabel(names[1])

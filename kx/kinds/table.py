@@ -22,12 +22,13 @@ MAX_PAIRS = 8
 
 
 @kind("heat", flags=("corr", "ann", *COLOUR), table=True)
-def heat(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any) -> None:
+def heat(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], fmt: str | None = None,
+         **kw: Any) -> None:
     """The table's values as coloured cells, columns along x and index labels down y.
-    corr = correlations of the numeric columns (rdbu, ±1), ann = the value in each cell,
+    corr = correlations of the numeric columns (rdbu, ±1), ann = the value in each cell (fmt=, say '{:.0%}'),
     nocb = no colorbar, sym = colours symmetric around 0, logc = log colour scale. kw: ax.imshow."""
     frame, style = _heat_frame(x, flags, "heat")
-    _matrix(ax, frame, flags, "r" if "corr" in flags else "", "{:.2f}" if "corr" in flags else "{:.3g}",
+    _matrix(ax, frame, flags, "r" if "corr" in flags else "", fmt or ("{:.2f}" if "corr" in flags else "{:.3g}"),
             **{**style, **kw})
 
 

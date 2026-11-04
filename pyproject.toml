@@ -34,6 +34,12 @@ dependencies = [
     "pandas>=1.5",
 ]
 
+[project.optional-dependencies]
+embed = [
+    "scikit-learn>=1.2",
+    "umap-learn>=0.5",
+]
+
 [project.urls]
 Homepage = "https://github.com/vhrabar/kx-plot"
 Issues = "https://github.com/vhrabar/kx-plot/issues"
