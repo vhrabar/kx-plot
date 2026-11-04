@@ -1,0 +1,387 @@
+"""Image kinds: a set of images (an array, or a list of arrays or file paths) as the data. See kx/_image.py."""
+import math
+from typing import Any
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.axes import Axes
+from numpy.typing import ArrayLike
+
+from .._image import (
+    HSV_NAMES,
+    RGB_NAMES,
+    as_rgb,
+    bare,
+    bilinear,
+    count,
+    fit_figure,
+    heatmaps,
+    histograms,
+    masks,
+    moments,
+    resize,
+    show,
+    take,
+    tile,
+)
+from .._metrics import classes
+from .._spec import kind
+from .._util import split
+from .basic import _levels
+
+MAX_CLASSES = 20                                # imgrid rows: one per class
+
+
+def _check_labelled(name: str) -> Any:
+    """A check that an image kind got no z."""
+    def check(y: ArrayLike | None, z: ArrayLike | None, flags: set[str]) -> None:
+        if z is not None:
+            raise ValueError(f"kind {name!r} takes the images (x) and maybe their labels (y), no z")
+    return check
+
+
+@kind("imgrid", needs_y=False, panels=True, check=_check_labelled("imgrid"))
+def imgrid(ax: Axes, x: Any, y: ArrayLike | None, z: None, flags: set[str], n: int | None = None, seed: int = 0,
+           idx: list[int] | None = None, cols: int | None = None, **kw: Any) -> np.ndarray:
+    """Sample images: with labels (y), one row per class of n= random images (6), the class at the left;
+    without, a grid of n= random images (16). idx= shows those images instead, titled with their labels.
+    seed= picks the same images each time; only the images shown are read. Returns their panels.
+    kw: ax.imshow."""
+    total = count(x)
+    if y is not None and np.size(y) != total:
+        raise ValueError(f"there are {total} images but {np.size(y)} labels")
+    names = np.asarray(y, dtype=object).ravel() if y is not None else None
+    rng = np.random.default_rng(seed)
+    if idx is not None or y is None:
+        picks = list(idx) if idx is not None else \
+            [int(i) for i in rng.choice(total, min(n or 16, total), replace=False)]
+        cols = min(len(picks), cols or math.ceil(math.sqrt(len(picks))))
+        fit_figure(ax, -(-len(picks) // cols), cols)
+        axs = tile(ax, len(picks), cols)
+        for a, img, i in zip(axs, take(x, picks), picks, strict=True):
+            show(a, img, **kw)
+            if names is not None:
+                a.set_title(str(names[i]), fontsize="small")
+        return axs
+    classes, masks = _levels(y)
+    if len(classes) > MAX_CLASSES:
+        raise ValueError(f"{len(classes)} classes are too many rows; pass idx= or a subset of the classes")
+    per = n or 6
+    rows = [[int(i) for i in rng.permutation(np.flatnonzero(m))[:per]] for m in masks]
+    width = max(len(r) for r in rows)
+    fit_figure(ax, len(classes), width)
+    grid = split(ax, len(classes), width, wspace=0.05, hspace=0.08).reshape(len(classes), width)
+    shown = []
+    for row, cls, picks in zip(grid, classes, rows, strict=True):
+        for a, img in zip(row, take(x, picks), strict=False):
+            bare(a)
+            show(a, img, **kw)
+            shown.append(a)
+        for a in row[len(picks):]:              # a class with fewer images than n leaves its row short
+            a.remove()
+        row[0].set_ylabel(str(cls), rotation=0, ha="right", va="center")
+    return np.array(shown)
+
+
+def _classes(x: Any, y: ArrayLike | None) -> tuple[list[str], list[np.ndarray]]:
+    """Class names and the image positions in each; without labels one group of every image."""
+    total = count(x)
+    if y is None:
+        return ["all"], [np.arange(total)]
+    if np.size(y) != total:
+        raise ValueError(f"there are {total} images but {np.size(y)} labels")
+    names, masks = _levels(y)
+    return names, [np.flatnonzero(m) for m in masks]
+
+
+@kind("meanimg", flags=("std",), needs_y=False, panels=True, check=_check_labelled("meanimg"))
+def meanimg(ax: Axes, x: Any, y: ArrayLike | None, z: None, flags: set[str], cols: int | None = None,
+            **kw: Any) -> np.ndarray:
+    """The mean image of each class (y), or of all images without labels, titled with the class and its count.
+    Sizes that differ are brought to the most common one (nearest neighbour). std = how much each pixel varies
+    instead, the channels averaged, on one colour scale for every class with one colorbar. Up to 8 a row (cols=).
+    kw: ax.imshow."""
+    names, groups = _classes(x, y)
+    stats, _ = moments(x, groups)
+    cols = min(len(names), cols or 8)
+    fit_figure(ax, -(-len(names) // cols), cols, side=1.8)
+    axs = tile(ax, len(names), cols)
+    if "std" in flags:
+        maps = [np.sqrt(np.clip(sq - mean ** 2, 0, None)) for mean, sq, _ in stats]
+        maps = [m.mean(axis=2) if m.ndim == 3 else m for m in maps]
+        top = max(float(m.max()) for m in maps) or 1.0
+        shown = [a.imshow(m, **{"cmap": "magma", "vmin": 0, "vmax": top, "interpolation": "nearest", **kw})
+                 for a, m in zip(axs, maps, strict=True)]
+        axs[0].figure.colorbar(shown[0], ax=list(axs), label="std", shrink=0.8)
+    else:
+        for a, (mean, _, _) in zip(axs, stats, strict=True):
+            show(a, np.clip(mean, 0, 1), **kw)
+    for a, name, (_, _, n) in zip(axs, names, stats, strict=True):
+        a.set_title(f"{name} (n={n})", fontsize="small")
+    return axs
+
+
+@kind("colorhist", flags=("hsv", "map"), needs_y=False, panels=True, check=_check_labelled("colorhist"))
+def colorhist(ax: Axes, x: Any, y: ArrayLike | None, z: None, flags: set[str], bins: int = 32,
+              **kw: Any) -> np.ndarray:
+    """How the pixel values are spread in each class (y): one panel per channel (red, green, blue; grey images
+    one), one line per class, each the class's average share of pixels in bins= bins (32) over 0..1.
+    hsv = hue, saturation and value instead; map = a class x value heat map per channel, on one colour scale.
+    kw: the lines (ax.plot) or the heat maps (ax.imshow)."""
+    if bins < 2:
+        raise ValueError(f"bins= needs at least 2 bins, got {bins}")
+    names, groups = _classes(x, y)
+    hists, channels = histograms(x, groups, bins, "hsv" in flags)
+    fig = ax.figure
+    if len(fig.axes) == 1:                      # a figure of its own: each channel the size of a small plot
+        w, h = plt.rcParams["figure.figsize"]
+        fig.set_size_inches(len(channels) * w * 0.7 + 1, h * (0.4 + 0.08 * len(names) if "map" in flags else 0.8))
+        if fig.get_layout_engine() is None:
+            fig.set_layout_engine("constrained")
+    axs = split(ax, 1, len(channels), wspace=0.08)
+    centres = (np.arange(bins) + 0.5) / bins
+    if "map" in flags:
+        top = float(hists.max()) or 1.0
+        for c, (a, channel) in enumerate(zip(axs, channels, strict=True)):
+            im = a.imshow(hists[:, c], **{"cmap": "magma", "vmin": 0, "vmax": top, "aspect": "auto",
+                                          "extent": (0, 1, len(names) - 0.5, -0.5), "interpolation": "nearest",
+                                          **kw})
+            a.set_yticks(range(len(names)), names if c == 0 else [])
+            a.set_title(channel)
+            a.set_xlabel("value")
+        fig.colorbar(im, ax=list(axs), label="share of pixels", shrink=0.8)
+        return axs
+    colours = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    for c, (a, channel) in enumerate(zip(axs, channels, strict=True)):
+        for g, name in enumerate(names):          # past the palette's colours, the lines repeat them dashed
+            a.plot(centres, hists[g, c], **{"label": name, "color": colours[g % len(colours)],
+                                            "linestyle": ("-", "--", ":")[g // len(colours) % 3], **kw})
+        a.set_title(channel)
+        a.set_xlabel("value")
+        a.set_xlim(0, 1)
+        if c:
+            a.sharey(axs[0])
+            a.tick_params(labelleft=False)
+    axs[0].set_ylabel("share of pixels")
+    axs[0].set_ylim(0, float(hists.max()) * 1.05 or 1)   # the highest line of any channel, not just the first
+    if y is not None:
+        axs[-1].legend(title=getattr(y, "name", None), loc="upper left", bbox_to_anchor=(1.02, 1))
+    return axs
+
+
+CHANNEL_INK = {"red": "#d62728", "green": "#2ca02c", "blue": "#1f77b4"}   # imhist: each channel in its colour
+
+
+def _picks(x: Any, n: int | None, seed: int, idx: list[int] | None, default: int) -> list[int]:
+    """The image positions to show: idx= as given, else n= (default) random ones, the same for the same seed."""
+    if idx is not None:
+        return list(idx)
+    total = count(x)
+    return sorted(int(i) for i in np.random.default_rng(seed).choice(total, min(n or default, total), replace=False))
+
+
+@kind("imhist", flags=("hsv",), needs_y=False, panels=True, check=_check_labelled("imhist"))
+def imhist(ax: Axes, x: Any, y: ArrayLike | None, z: None, flags: set[str], n: int | None = None, seed: int = 0,
+           idx: list[int] | None = None, bins: int = 64, **kw: Any) -> np.ndarray:
+    """Images beside their histograms, one row each: the image, then the share of its pixels in bins= bins (64)
+    per channel, each line in its channel's colour (grey: one line). hsv = hue, saturation and value instead.
+    Shows the images at idx=, or n= random ones (4, seed=); labels (y) title them. Returns the panels, image and
+    histogram for each row. kw: the histogram lines (ax.plot)."""
+    if bins < 2:
+        raise ValueError(f"bins= needs at least 2 bins, got {bins}")
+    total = count(x)
+    if y is not None and np.size(y) != total:
+        raise ValueError(f"there are {total} images but {np.size(y)} labels")
+    picks = _picks(x, n, seed, idx, 4)
+    names = np.asarray(y, dtype=object).ravel() if y is not None else None
+    fig = ax.figure
+    if len(fig.axes) == 1:                      # a figure of its own: a short row per image
+        fig.set_size_inches(7, 0.4 + 1.9 * len(picks))
+        if fig.get_layout_engine() is None:
+            fig.set_layout_engine("constrained")
+    grid = split(ax, len(picks), 2, width_ratios=[1, 2.2], wspace=0.05, hspace=0.1).reshape(len(picks), 2)
+    edges = np.linspace(0, 1, bins + 1)
+    centres = (edges[:-1] + edges[1:]) / 2
+    ink = plt.rcParams["text.color"]
+    for r, (img, i) in enumerate(zip(take(x, picks), picks, strict=True)):
+        left, right = grid[r]
+        bare(left)
+        show(left, img)
+        if names is not None:
+            left.set_title(str(names[i]), fontsize="small")
+        if "hsv" in flags:
+            values = mpl.colors.rgb_to_hsv(np.clip(as_rgb(img), 0, 1))
+            channels = [(values[..., c], name, None) for c, name in enumerate(HSV_NAMES)]
+        elif img.ndim == 2:
+            channels = [(img, "grey", ink)]
+        else:
+            channels = [(img[..., c], name, CHANNEL_INK[name]) for c, name in enumerate(RGB_NAMES)]
+        for values, name, colour in channels:
+            share = np.histogram(values, bins=edges)[0] / values.size
+            ln, = right.plot(centres, share, **{"label": name, **({"color": colour} if colour else {}), **kw})
+            right.fill_between(centres, share, color=ln.get_color(), alpha=0.15, linewidth=0)
+        right.set_xlim(0, 1)
+        right.set_ylim(bottom=0)
+        right.tick_params(labelbottom=r == len(picks) - 1)
+        if r:
+            right.sharex(grid[0, 1])
+    grid[-1, 1].set_xlabel("value")
+    grid[0, 1].legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize="small")
+    return grid.ravel()
+
+
+def iou(a: np.ndarray, b: np.ndarray) -> float:
+    """Intersection over union of two bool masks; two empty masks agree fully."""
+    union = np.logical_or(a, b).sum()
+    return float(np.logical_and(a, b).sum() / union) if union else 1.0
+
+
+@kind("segmask", panels=True)
+def segmask(ax: Axes, x: Any, y: Any, z: Any | None, flags: set[str], n: int | None = None, seed: int = 0,
+            idx: list[int] | None = None, **kw: Any) -> np.ndarray:
+    """Segmentation masks (y) with their images (x), one row each: the image, the mask, and the image with the
+    mask shaded and outlined. z = predicted masks, a second dashed outline, with the IoU in the row's title.
+    Masks: bool, integers (non-zero is inside) or floats (above 0.5), resized to their image if they differ.
+    Shows the images at idx=, or n= random ones (4, seed=). kw: the outlines (ax.contour)."""
+    total = count(x)
+    for what, v in (("masks", y), ("predicted masks", z)):
+        if v is not None and count(v) != total:
+            raise ValueError(f"there are {total} images but {count(v)} {what}")
+    picks = _picks(x, n, seed, idx, 4)
+    truth = masks(y, picks)
+    guess = masks(z, picks) if z is not None else [None] * len(picks)
+    cols = 3
+    fig = ax.figure
+    if len(fig.axes) == 1:                      # a figure of its own: a short row per image
+        fig.set_size_inches(6.5, 0.5 + 2.1 * len(picks))
+        if fig.get_layout_engine() is None:
+            fig.set_layout_engine("constrained")
+    grid = split(ax, len(picks), cols, wspace=0.04, hspace=0.12).reshape(len(picks), cols)
+    true_ink, guess_ink = plt.rcParams["axes.prop_cycle"].by_key()["color"][:2]
+    for row, img, i, t, g in zip(grid, take(x, picks), picks, truth, guess, strict=True):
+        size = img.shape[:2]
+        t = resize(t, size) if t.shape != size else t
+        g = resize(g, size) if g is not None and g.shape != size else g
+        for a in row:
+            bare(a)
+        show(row[0], img)
+        row[0].set_ylabel(f"#{i}", rotation=0, ha="right", va="center")
+        row[1].imshow(t, cmap="gray", vmin=0, vmax=1, interpolation="nearest")
+        show(row[2], img)
+        row[2].imshow(np.ma.masked_where(~t, t), cmap=mpl.colors.ListedColormap([true_ink]), alpha=0.3,
+                      interpolation="nearest")
+        if t.any():
+            row[2].contour(t, levels=[0.5], **{"colors": [true_ink], "linewidths": 1.5, **kw})
+        if g is not None:
+            if g.any():
+                row[2].contour(g, levels=[0.5], **{"colors": [guess_ink], "linewidths": 1.5,
+                                                    "linestyles": "--", **kw})
+            row[2].set_title(f"IoU {iou(t, g):.2f}", fontsize="small")
+    grid[0, 0].set_title("image", fontsize="small")
+    grid[0, 1].set_title("mask", fontsize="small")
+    if z is None:
+        grid[0, 2].set_title("outline", fontsize="small")
+    else:
+        handles = [mpl.lines.Line2D([], [], color=true_ink, label="true"),
+                   mpl.lines.Line2D([], [], color=guess_ink, linestyle="--", label="predicted")]
+        grid[0, 2].legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1), fontsize="small")
+    return grid.ravel()
+
+
+@kind("saliency", panels=True)
+def saliency(ax: Axes, x: Any, y: Any, z: ArrayLike | None, flags: set[str], n: int | None = None, seed: int = 0,
+             idx: list[int] | None = None, alpha: float = 0.5, **kw: Any) -> np.ndarray:
+    """Saliency maps (y: Grad-CAM or any per-pixel score, computed elsewhere) over their images (x), one row each:
+    the image, then the image with the map on top (alpha=, 0.5), each map scaled to 0..1 and smoothed up to its
+    image's size (bilinear), with one colorbar. z = a caption per image (say the predicted class).
+    Shows the images at idx=, or n= random ones (4, seed=). kw: the maps (ax.imshow), e.g. cmap='jet'."""
+    total = count(x)
+    if count(y) != total:
+        raise ValueError(f"there are {total} images but {count(y)} maps")
+    if z is not None and np.size(z) != total:
+        raise ValueError(f"there are {total} images but {np.size(z)} captions")
+    if not 0 <= alpha <= 1:
+        raise ValueError(f"alpha= is between 0 and 1, got {alpha}")
+    picks = _picks(x, n, seed, idx, 4)
+    captions = np.asarray(z, dtype=object).ravel() if z is not None else None
+    fig = ax.figure
+    if len(fig.axes) == 1:                      # a figure of its own: a short row per image
+        fig.set_size_inches(5.2, 0.5 + 2.1 * len(picks))
+        if fig.get_layout_engine() is None:
+            fig.set_layout_engine("constrained")
+    grid = split(ax, len(picks), 2, wspace=0.04, hspace=0.12).reshape(len(picks), 2)
+    shown = None
+    for row, img, heat, i in zip(grid, take(x, picks), heatmaps(y, picks), picks, strict=True):
+        for a in row:
+            bare(a)
+        show(row[0], img)
+        show(row[1], img)
+        heat = bilinear(heat, img.shape[:2]) if heat.shape != img.shape[:2] else heat
+        shown = row[1].imshow(heat, **{"cmap": "inferno", "vmin": 0, "vmax": 1, "alpha": alpha,
+                                       "interpolation": "nearest", **kw})
+        row[0].set_ylabel(f"#{i}", rotation=0, ha="right", va="center")
+        if captions is not None:
+            row[1].set_title(str(captions[i]), fontsize="small")
+    grid[0, 0].set_title("image", fontsize="small")
+    if captions is None:
+        grid[0, 1].set_title("saliency", fontsize="small")
+    scale = mpl.cm.ScalarMappable(norm=shown.norm, cmap=shown.get_cmap())   # full colour, not the overlay's alpha
+    fig.colorbar(scale, ax=list(grid[:, 1]), label="saliency", shrink=0.8)
+    return grid.ravel()
+
+
+def _predicted(y: ArrayLike, z: Any) -> tuple[np.ndarray, np.ndarray | None]:
+    """The predicted label of each image, and with a 2-D score its confidence (the top score). A score's columns
+    are its DataFrame names, else the sorted labels of y, as the ROC kinds read them."""
+    if np.ndim(z) != 2:
+        return np.asarray(z, dtype=object).ravel(), None
+    scores = np.asarray(z, dtype=float)
+    found = classes(y)
+    cols = [str(c) for c in z.columns] if isinstance(z, pd.DataFrame) else None
+    if cols is not None:
+        names = cols
+    elif len(found) == scores.shape[1]:
+        names = found
+    else:
+        raise ValueError(f"the score has {scores.shape[1]} columns but the labels have {len(found)} classes "
+                         f"{found}; pass one column per class, named after the labels or in their sorted order")
+    return np.asarray(names, dtype=object)[scores.argmax(axis=1)], scores.max(axis=1)
+
+
+@kind("miscls", panels=True)
+def miscls(ax: Axes, x: Any, y: ArrayLike, z: Any, flags: set[str], n: int = 16, seed: int = 0,
+           cols: int | None = None, **kw: Any) -> np.ndarray:
+    """The images a model got wrong: kx.plot(images, y_true, y_pred, 'miscls'), each captioned 'true → predicted'.
+    z: predicted labels (n= random mistakes, 16, seed=), or a 2-D score with a column per class: the most
+    confident mistakes first, with the confidence in the caption. No mistakes: a note says so.
+    kw: ax.imshow."""
+    if z is None:
+        raise ValueError("kind 'miscls' needs the predictions as z: kx.plot(images, y_true, y_pred, 'miscls')")
+    total = count(x)
+    truth = np.asarray(y, dtype=object).ravel()
+    if len(truth) != total or len(np.asarray(z)) != total:
+        raise ValueError(f"there are {total} images, {len(truth)} labels and {len(np.asarray(z))} predictions")
+    pred, confidence = _predicted(truth, z)
+    wrong = np.flatnonzero(truth.astype(str) != pred.astype(str))
+    if not len(wrong):
+        ax.text(0.5, 0.5, "no misclassified images", ha="center", va="center", transform=ax.transAxes)
+        ax.set_axis_off()
+        return np.array([ax])
+    if confidence is not None:                  # the most confident mistakes first: what the model is surest of
+        picks = list(wrong[np.argsort(-confidence[wrong], kind="stable")][:n])
+    else:
+        picks = sorted(np.random.default_rng(seed).choice(wrong, min(n, len(wrong)), replace=False))
+    picks = [int(i) for i in picks]
+    alone = len(ax.figure.axes) == 1
+    cols = min(len(picks), cols or math.ceil(math.sqrt(len(picks))))
+    fit_figure(ax, -(-len(picks) // cols), cols, side=1.6)
+    axs = tile(ax, len(picks), cols)
+    for a, img, i in zip(axs, take(x, picks), picks, strict=True):
+        show(a, img, **kw)
+        sure = f" ({confidence[i]:.2f})" if confidence is not None else ""
+        a.set_title(f"{truth[i]} → {pred[i]}{sure}", fontsize="small")
+    if alone:                                   # how many there are in all, under a figure of its own
+        axs[0].figure.supxlabel(f"{len(wrong)} of {total} wrong", fontsize="small")   # the layout leaves it room
+    return axs

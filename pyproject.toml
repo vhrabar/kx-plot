@@ -1,6 +1,6 @@
 [project]
 name = "kx-plot"
-version = "0.5.0"
+version = "0.6.0"
 description = "One-line matplotlib plots, themes and model-evaluation charts for notebooks and scripts, Kaggle-friendly"
 readme = "README.md"
 license = "MIT"
@@ -32,6 +32,12 @@ dependencies = [
     "matplotlib>=3.7",
     "numpy>=1.23",
     "pandas>=1.5",
+]
+
+[project.optional-dependencies]
+embed = [
+    "scikit-learn>=1.2",
+    "umap-learn>=0.5",
 ]
 
 [project.urls]

@@ -28,6 +28,12 @@ def categories(z: ArrayLike) -> list[Any] | None:
     return sorted(s.dropna().unique(), key=str)
 
 
+def ink(rgba: tuple[float, ...]) -> str:
+    """Black on a light colour, white on a dark one (relative luminance), for text on a cell or a slice."""
+    r, g, b = (c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in mpl.colors.to_rgba(rgba)[:3])
+    return "black" if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18 else "white"
+
+
 def norm(values: ArrayLike, flags: set[str]) -> mpl.colors.Normalize | None:
     """sym = limits ±max|z| so 0 sits mid-colormap, logc = log colour scale. None = matplotlib's linear default."""
     v = np.asarray(values, dtype=float)
@@ -55,3 +61,15 @@ def diagonal(ax: Axes, x: ArrayLike, y: ArrayLike, flags: set[str]) -> None:
     ends = np.geomspace(lo, hi, 100) if logs and lo > 0 else np.linspace(lo, hi, 100)   # straight on any scale
     ax.plot(ends, ends, color=mpl.rcParams["text.color"], linestyle="--", linewidth=1, marker="", alpha=0.6,
             zorder=3)
+
+
+def split(ax: Axes, rows: int, cols: int, projection: str | None = None, **kw: Any) -> np.ndarray:
+    """ax's area as rows x cols new axes, flat and row by row; ax itself is removed. The panels stay inside ax's
+    cell, so a kind with several panels works in a kx.grid panel too. kw: subgridspec (wspace=, width_ratios=)."""
+    spec = ax.get_subplotspec()
+    if spec is None:
+        raise TypeError("a kind with several panels needs axes from plt.subplots or kx.grid, not fig.add_axes")
+    fig = ax.figure
+    ax.remove()
+    cells = spec.subgridspec(rows, cols, **kw)
+    return np.array([fig.add_subplot(cells[r, c], projection=projection) for r in range(rows) for c in range(cols)])

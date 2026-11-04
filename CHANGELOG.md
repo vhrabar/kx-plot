@@ -6,6 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `kx.plot` can draw a plot made of several panels (such as `pair`), returned as a flat array of axes in the place
+  of `ax=`, or a polar plot (such as `radar`), swapping a given `ax` for polar axes in the same cell.
+- Statistics for the significance, association and clustering plots, in numpy without scipy and checked against
+  it: Kruskal-Wallis and pairwise Mann-Whitney tests, Holm-adjusted p-values, Cramér's V and hierarchical linkage.
+- **Datasets** `embedding` (a 2-D embedding in 5 clusters, with the 10 features behind it) and `shapes` (210 small
+  images in 7 classes, some with artifacts, with masks, a model's predictions and saliency maps).
+- `kx.load` reads a `.npz` dataset as a dict of arrays: `kx.load('shapes')['images']`.
+- Image input for the image plots: an array of images (channels last or first), or a list of arrays, PIL images
+  or file paths, scaled to 0..1 whatever the dtype.
+- **Plot kinds** `pie` and `donut`: shares of a whole, counting the categories of x or summing y per category.
+  `ann` writes the percent in each slice, `sort` puts the largest first, and past `top=` (7) slices the rest fold
+  into `other`. `donut` shows the total in its hole.
+- **Plot kind** `radar`: one polygon per row of a table, or per group mean with `by=`, each column scaled to 0..1
+  with its range under its name; `raw` keeps the values.
+- **Plot kind** `parallel`: parallel coordinates, one line per row, each axis scaled with its real min and max at
+  the ends. `by=` colours the lines by group and `mean` adds each group's mean.
+- **Plot kind** `pair`: a scatter matrix of the numeric columns, coloured by `by=`, with a KDE per group on the
+  diagonal and shared axes. `cols=` picks the columns (at most 8).
+- **Plot kind** `cluster`: `heat` with similar rows and columns side by side and dendrograms showing how they
+  group; `cluster-corr` groups correlated features. `method=` picks the linkage.
+- **Plot kind** `mosaic`: two or three categoricals as tiles sized by their counts, `kx.plot(df, 'port', 'sex',
+  'survived', spec='mosaic')`. `ann` writes the counts.
+- **Plot kinds** `treemap` and `sunburst`: a hierarchy of up to three categoricals sized by count, as nested
+  rectangles or as rings, `kx.plot(df, 'pclass', 'sex', spec='treemap')`. `ann` labels the tiles with room.
+- **Flag** `facet`: the plot once per value of `facet=`, `kx.plot(df, 'pclass', 'port', 'crosstab-facet',
+  facet='sex')`, with every category in each panel, shared axes and one colour scale.
+- **Flag** `sig` (`box`, `violin`): the Kruskal-Wallis p over the groups and, up to 6 groups, stars over each pair
+  that differs (Mann-Whitney, Holm-corrected); with `ann` the p-values instead.
+- **Plot kind** `imgrid`: sample images, `kx.plot(images, labels, 'imgrid')`, one row of `n=` random images per
+  class (`seed=` repeats them), or the images at `idx=`. Only the images shown are read.
+- **Plot kind** `meanimg`: the mean image of each class, `kx.plot(images, labels, 'meanimg')`, sizes matched to
+  the most common one; `std` shows how much each pixel varies instead, on one colour scale.
+- **Plot kind** `colorhist`: each class's average histogram per colour channel, one line per class
+  (`kx.plot(images, labels, 'colorhist')`); `hsv` for hue, saturation and value, `map` for heat maps.
+- **Plot kind** `imhist`: images beside their channel histograms, one row each, `kx.plot(images, 'imhist',
+  idx=[0, 1])` or `n=` random ones; `hsv` for hue, saturation and value.
+- **Plot kind** `segmask`: images with their segmentation masks, `kx.plot(images, masks, 'segmask')`: the image,
+  the mask and an outline over the image; predicted masks as z add a second outline and the IoU.
+- **Plot kind** `saliency`: saliency maps (Grad-CAM or any, computed elsewhere) over their images,
+  `kx.plot(images, maps, 'saliency')`, each scaled to 0..1 and smoothed up to its image; z adds a caption.
+- **Plot kind** `miscls`: the images a model got wrong, `kx.plot(images, y_true, y_pred, 'miscls')`, captioned
+  'true -> predicted'; with a 2-D score as z, the most confident mistakes first.
+- **Plot kind** `embed`: a 2-D embedding coloured by label, `kx.plot(xy, labels, 'embed')`, with no ticks and
+  equal aspect; `ann` names each group where it sits.
+- `kx.embed(df, by='label')`: PCA (or `method='tsne'`, `'umap'` with the new `embed` extra) of a table or images,
+  then the `embed` plot; the coordinates are `ax.embedding`.
+- `kx.cramers(df)`: Cramér's V between every pair of categorical columns as a heat map, `cluster=True` to group
+  them, `plot=False` for the matrix.
+- `heat` takes `fmt=` for its `ann` numbers.
+- Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
+
+
 ## [0.5.0] - 2026-10-24
 
 ### Added

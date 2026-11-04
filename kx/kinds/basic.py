@@ -6,10 +6,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.collections import LineCollection
+from matplotlib.patheffects import withStroke
 from numpy.typing import ArrayLike
 
 from .._spec import kind
-from .._util import COLOUR, categories, colorbar, diagonal, label, norm
+from .._util import COLOUR, categories, colorbar, diagonal, ink, label, norm
 
 LINES = ("date", "mk")                          # flags of the kinds that draw lines against x
 
@@ -211,3 +213,178 @@ def barh(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[s
     """Like bar, lying down: categories (x) top to bottom, bar lengths along the x axis."""
     bar(ax, x, y, z, flags, horizontal=True, **kw)
     ax.invert_yaxis()                           # first category on top, read like a table
+
+
+def _legend_right(ax: Axes, title: str | None, gap: float = 0.02) -> None:
+    """A legend beside the axes, for kinds that fill them (pie, radar, parallel)."""
+    ax.legend(title=title, loc="upper left", bbox_to_anchor=(1 + gap, 1))
+
+
+def _check_pie(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if z is not None:
+        raise ValueError("kind 'pie' takes the categories (x) and maybe their values (y), no z")
+    if y is not None and (np.asarray(y, dtype=float) < 0).any():
+        raise ValueError("a pie's values are shares of a whole and cannot be negative")
+
+
+def _shares(x: ArrayLike, y: ArrayLike | None, flags: set[str], top: int) -> tuple[list[str], np.ndarray, bool]:
+    """Slice labels and sizes: the counts of x's categories, or y summed per category of x, and whether any were
+    folded. sort = largest first; past `top` slices the smallest fold into one 'other' slice, kept last."""
+    if y is None:
+        cats, masks = _levels(x)
+        sizes = np.array([m.sum() for m in masks], dtype=float)
+    else:
+        xs, ys = np.asarray(x, dtype=object).ravel(), np.asarray(y, dtype=float).ravel()
+        if len(xs) != len(ys):
+            raise ValueError(f"x has {len(xs)} categories but y has {len(ys)} values")
+        sums = pd.Series(ys).groupby(pd.Series(xs).astype(str), sort=False).sum(min_count=1).dropna()
+        cats, sizes = list(sums.index), sums.to_numpy()
+    if not sizes.sum() > 0:
+        raise ValueError("a pie needs a positive total to split")
+    order = np.argsort(-sizes, kind="stable")
+    if len(sizes) > top:                        # keep the top - 1 largest, in their order, and fold the rest
+        keep = np.sort(order[:top - 1]) if "sort" not in flags else order[:top - 1]
+        rest = sizes.sum() - sizes[keep].sum()
+        return [cats[i] for i in keep] + ["other"], np.r_[sizes[keep], rest], True
+    if "sort" in flags:
+        return [cats[i] for i in order], sizes[order], False
+    return cats, sizes, False
+
+
+def _pie(ax: Axes, x: ArrayLike, y: ArrayLike | None, flags: set[str], hole: float, top: int, **kw: Any) -> None:
+    """A pie (hole 0) or a ring (hole 0..1) starting at 12 o'clock, clockwise."""
+    cats, sizes, folded = _shares(x, y, flags, top)
+    colors = [c["color"] for c, _ in zip(plt.rcParams["axes.prop_cycle"], cats, strict=False)]
+    colors = (colors * (len(cats) // len(colors) + 1))[:len(cats)]
+    if folded:
+        colors[-1] = "0.6"                      # the folded rest in neutral grey, not a category colour
+    named = flags & {"leg", "legout"}           # a legend names the slices, so their labels go
+    face = plt.rcParams["axes.facecolor"]
+    wedges, *_ = ax.pie(sizes, **{"labels": None if named else cats, "colors": colors, "startangle": 90,
+                                  "counterclock": False,
+                                  "wedgeprops": {"width": 1 - hole, "edgecolor": face, "linewidth": 1}, **kw})
+    for w, c in zip(wedges, cats, strict=True):
+        w.set_label(c)
+    if "ann" in flags:                          # the share in each slice, black or white for its colour
+        for w, s in zip(wedges, sizes, strict=True):
+            angle = np.deg2rad((w.theta1 + w.theta2) / 2)
+            r = 1 - (1 - hole) / 2 if hole else 0.62
+            ax.text(r * np.cos(angle), r * np.sin(angle), f"{s / sizes.sum():.0%}", ha="center", va="center",
+                    color=ink(w.get_facecolor()))
+    if hole:
+        ax.text(0, 0, f"{sizes.sum():g}", ha="center", va="center", fontsize="x-large")
+    if named:                                   # the pie fills the axes: its legend goes beside it
+        _legend_right(ax, label(x, "") or None)
+
+
+@kind("pie", flags=("ann", "sort"), needs_y=False, check=_check_pie)
+def pie(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str], top: int = 7, **kw: Any) -> None:
+    """Shares of a whole: the counts of x's categories (missing as 'NaN'), or with y their summed values.
+    ann = the percent in each slice, sort = largest first. Past top= slices (7) the smallest fold into 'other'.
+    Starts at 12 o'clock, clockwise. kw: ax.pie."""
+    _pie(ax, x, y, flags, 0, top, **kw)
+
+
+@kind("donut", flags=("ann", "sort"), needs_y=False, check=_check_pie)
+def donut(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str], top: int = 7,
+          hole: float = 0.55, **kw: Any) -> None:
+    """A pie with a hole and the total in it. ann = the percent on each segment, sort = largest first.
+    Past top= slices (7) the smallest fold into 'other'; hole= is the hole's share of the radius (0.55).
+    kw: ax.pie."""
+    if not 0 < hole < 1:
+        raise ValueError(f"hole= is a share of the radius between 0 and 1, got {hole}")
+    _pie(ax, x, y, flags, hole, top, **kw)
+
+
+MAX_PROFILES = 10                               # more polygons than this on one radar is a scribble
+
+
+def _numeric(frame: pd.DataFrame, name: str, least: int) -> pd.DataFrame:
+    """The table's columns, checked to be numbers, at least `least` of them."""
+    text = [str(c) for c in frame.columns if not pd.api.types.is_numeric_dtype(frame[c])]
+    if text:
+        raise ValueError(f"kind {name!r} draws numbers; columns {text} are not. Pass df.select_dtypes('number'), "
+                         "or name a column of groups with by=")
+    if frame.shape[1] < least:
+        raise ValueError(f"kind {name!r} needs at least {least} numeric columns, got {frame.shape[1]}")
+    return frame.astype(float)
+
+
+def _scaled(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """Each column scaled to 0..1 over its min and max (a constant column sits at 0.5), and the mins and maxes."""
+    lo, hi = frame.min(), frame.max()
+    span = (hi - lo).where(hi > lo)
+    return ((frame - lo) / span).fillna({c: 0.5 for c in frame.columns[span.isna()]}), lo, hi
+
+
+@kind("radar", flags=("raw",), table=True, takes_by=True, projection="polar")
+def radar(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
+          **kw: Any) -> None:
+    """One polygon per row over the numeric columns, or with by= the mean of each group's rows:
+    kx.plot(df, 'radar', by='class'). Each column is scaled to 0..1 over the polygons shown, with its range under
+    its name; raw = the values as they are, for columns in one unit. kw: the outlines (ax.plot)."""
+    frame = _numeric(x, "radar", 3)
+    if by is not None:
+        groups, masks = _levels(by)
+        frame = pd.DataFrame([frame[m].mean() for m in masks], index=groups)
+    if len(frame) > MAX_PROFILES:
+        raise ValueError(f"kind 'radar' draws one polygon per row: {len(frame)} rows are too many to read. "
+                         f"Pass by= to average groups, or at most {MAX_PROFILES} rows (df.head())")
+    angles = np.linspace(0, 2 * np.pi, frame.shape[1], endpoint=False)
+    values, lo, hi = (frame, frame.min(), frame.max()) if "raw" in flags else _scaled(frame)
+    for name, row in values.iterrows():
+        v = np.r_[row.to_numpy(), row.iloc[0]]                  # closed: back to the first corner
+        ln, = ax.plot(np.r_[angles, 0], v, **{"label": str(name), **kw})
+        ax.fill(np.r_[angles, 0], v, color=ln.get_color(), alpha=0.15)
+    ax.set_theta_offset(np.pi / 2)              # the first column at 12 o'clock, then clockwise
+    ax.set_theta_direction(-1)
+    names = [str(c) for c in frame.columns]
+    ax.set_xticks(angles, names if "raw" in flags else [f"{n}\n{a:.3g} to {b:.3g}" for n, a, b in zip(names, lo, hi,
+                                                                                                strict=True)])
+    ax.tick_params(axis="x", pad=8)
+    for a, text in zip(angles, ax.get_xticklabels(), strict=True):   # names grow away from the ring
+        side = np.sin(a)                        # clockwise from 12 o'clock: > 0 is the right half
+        text.set_horizontalalignment("left" if side > 0.1 else "right" if side < -0.1 else "center")
+    if "raw" not in flags:                      # rings at quarters of each column's range: no single scale
+        ax.set_ylim(0, 1)
+        ax.set_yticks([0.25, 0.5, 0.75, 1], [])
+    if len(frame) > 1:
+        _legend_right(ax, label(by, "") if by is not None else None, gap=0.3)   # past the right-hand names
+
+
+@kind("parallel", flags=("mean",), table=True, takes_by=True)
+def parallel(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
+             **kw: Any) -> None:
+    """Parallel coordinates: one line per row across the numeric columns, each column scaled to 0..1 with its
+    real min and max at the ends; by= colours the lines by group: kx.plot(df, 'parallel', by='class').
+    Lines fade as rows grow, mean = each group's mean as a thick line on top. kw: the lines (LineCollection)."""
+    frame = _numeric(x, "parallel", 2)
+    values, lo, hi = _scaled(frame)
+    cols = np.arange(frame.shape[1])
+    groups, masks = _levels(by) if by is not None else ([None], [np.ones(len(frame), dtype=bool)])
+    alpha = float(np.clip(40 / max(len(frame), 1), 0.05, 0.8))
+    cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    for i, (g, m) in enumerate(zip(groups, masks, strict=True)):
+        color = cycle[i % len(cycle)]
+        rows = values.to_numpy()[np.asarray(m)]
+        lines = LineCollection([np.c_[cols, r] for r in rows],
+                                               **{"color": color, "alpha": alpha, "linewidth": 1, **kw})
+        ax.add_collection(lines)
+        if g is not None:                       # a legend handle at full colour, not the faded lines
+            ax.plot([], [], color=color, label=g)
+        if "mean" in flags and len(rows):
+            ax.plot(cols, np.nanmean(rows, axis=0), color=color, linewidth=3, zorder=3,
+                    path_effects=[withStroke(linewidth=5, foreground=plt.rcParams["axes.facecolor"])])
+    edge = plt.rcParams["text.color"]
+    ax.vlines(cols, 0, 1, color=edge, linewidth=0.8, zorder=2)
+    for c, a, b in zip(cols, lo, hi, strict=True):
+        ax.text(c, 1.02, f"{b:.3g}", ha="center", va="bottom", fontsize="small")
+        ax.text(c, -0.02, f"{a:.3g}", ha="center", va="top", fontsize="small")
+    ax.set_xticks(cols, [str(c) for c in frame.columns])
+    ax.set_xlim(-0.2, cols[-1] + 0.2)
+    ax.set_ylim(-0.1, 1.1)
+    ax.set_yticks([])
+    ax.spines[:].set_visible(False)
+    ax.tick_params(axis="x", length=0, pad=14)  # room for the min under each axis
+    if by is not None:
+        _legend_right(ax, label(by, "by"))

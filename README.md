@@ -11,6 +11,9 @@ matplotlib, numpy and pandas and works offline, so it also runs in Kaggle compet
 
 ```bash
 pip install kx-plot
+
+# adds t-SNE and UMAP to kx.embed (PCA needs neither)
+pip install 'kx-plot[embed]'
 ```
 
 ```python
@@ -45,19 +48,27 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 | Token | Values                                                                                        |
 |-------|-----------------------------------------------------------------------------------------------|
 | kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
-|       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap`                           |
+|       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap` `pie` `donut` `radar`     |
+|       | `parallel` `pair` `cluster` `mosaic` `treemap` `sunburst`                                     |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
-|       | `lcurve` `vcurve` `elbow`                                                                     |
+|       | `lcurve` `vcurve` `elbow` `embed`                                                             |
+|       | Images: `imgrid` `meanimg` `colorhist` `imhist` `segmask` `saliency` `miscls`                 |
 | theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
 | flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
-|       | `si`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb` `sym`    |
-|       | `logc` `corr` `all` `diag` `fit` `best`                                                       |
+|       | `si` `facet`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb`  |
+|       | `sym` `logc` `corr` `all` `diag` `fit` `best` `raw` `sig`                                     |
 
 `stack` works with `area`, `bar`, `barh` and `hist`. `norm` is a 100% stack for `area` and a
 density (area 1) for `hist`. `cum` makes `hist` cumulative; `hist-norm-cum` is the CDF.
 `hist` puts every series on the same bins, so the bars line up.
 `diag` adds a dashed `y = x` line to `scatter` and `hexbin`; `fit` adds a least-squares line to `scatter`, with
 its slope and R² in the legend (one line per group with a categorical `z`).
+
+`sig` on `box` and `violin` writes the Kruskal-Wallis p and brackets the pairs that differ, with stars (`ann`: the
+p-values), Holm-corrected.
+
+`facet` draws a plot once per value of a column, `kx.plot(df, 'pclass', 'port', 'crosstab-facet', facet='sex')`,
+with every category in every panel, shared axes, and one colour scale and colorbar for the colour kinds.
 
 Unknown tokens raise an error instead of being guessed, with the closest valid tokens as a hint.
 Everything is inspectable: `kx.grammar()`, `kx.grammar('area')`, `kx.parse('leg-scatter')`, `kx.show('dark')`,
@@ -72,13 +83,53 @@ kx.missing(df)                                     # share of NaNs per column, t
 kx.plot(df, 'nullmap-sort')                        # where the NaNs are: one pixel row per table row
 kx.plot(df, 'heat-corr-ann')                       # correlations of the numeric columns, -1 to 1
 kx.plot(df, 'heat')                                # any numeric DataFrame or 2-D array as coloured cells
+kx.cramers(df, cluster=True)                       # Cramér's V of the categorical columns, 0 to 1
+kx.plot(df, 'cluster-corr')                        # correlations, similar columns side by side, with trees
 kx.plot(df, 'pclass', spec='count', by='survived') # rows per category, split by a second column
 kx.plot(df, 'pclass', 'port', 'crosstab-norm-ann') # how often each pair of categories occurs
+kx.plot(df, 'port', 'sex', 'survived', spec='mosaic-ann')  # tiles sized by count, up to 3 categoricals
+kx.plot(df, 'pclass', 'sex', spec='treemap-ann')  # a hierarchy of categories; 'sunburst' as rings
 kx.plot(df, 'age', 'fare', 'hexbin-logc')          # points per hexagon; with a z, its mean per hexagon
+kx.plot(df, 'port', 'donut-ann')                   # shares of a whole, the total in the hole
+kx.plot(df[['age', 'fare', 'pclass', 'survived']], 'radar', by='survived')    # each group's profile
+kx.plot(df[['age', 'fare', 'pclass', 'sex']], 'parallel-mean', by='sex')     # every row across columns
+kx.plot(df, 'pair', by='sex')                      # every numeric column against every other
 ```
 
-`heat`, `missing` and `nullmap` take the whole table and no column names; `kx.plot(df[cols], 'heat')` for some
-columns. `wrap` breaks long tick labels onto several lines.
+`heat`, `cluster`, `missing`, `nullmap`, `radar`, `parallel` and `pair` take the whole table and no column names
+(`radar`, `parallel` and `pair` take `by=`, a column of groups); `kx.plot(df[cols], 'heat')` for some columns.
+`wrap` breaks long tick labels onto several lines.
+
+![kinds with several panels](https://raw.githubusercontent.com/vhrabar/kx-plot/main/previews/dark-panels.png)
+
+### Images
+
+Image kinds take an `(N, H, W)` or `(N, H, W, C)` array (channels first works too), or a list of arrays, PIL images
+or file paths, with the labels as `y`. `kx.load('shapes')` is a small demo set.
+
+```python
+d = kx.load('shapes')
+kx.plot(d['images'], d['labels'], 'imgrid')        # 6 random images per class, one row each
+kx.plot(paths, labels, 'imgrid', idx=[3, 17, 42])  # chosen images, titled with their labels
+kx.plot(d['images'], d['labels'], 'meanimg')       # the mean image of each class; -std: where pixels vary
+kx.plot(d['images'], d['labels'], 'colorhist')     # pixel values per channel and class; -hsv, -map
+kx.plot(d['images'], 'imhist', idx=[0, 1])         # images beside their own channel histograms
+kx.plot(d['images'], d['masks'], pred, 'segmask')  # image, mask, outlines; a prediction adds its IoU
+kx.plot(d['images'], d['saliency'], 'saliency')    # Grad-CAM or any map over its image, smoothed to fit
+kx.plot(d['images'], d['labels'], d['proba'], 'miscls')  # the mistakes, the most confident first
+```
+
+![image kinds](https://raw.githubusercontent.com/vhrabar/kx-plot/main/previews/dark-img.png)
+
+### Embeddings
+
+```python
+kx.embed(df, by='label')                           # PCA of the numeric columns, explained variance on the axes
+kx.embed(images, by=labels, method='tsne')         # t-SNE or UMAP: pip install 'kx-plot[embed]'
+kx.plot(xy, labels, 'embed-ann')                   # coordinates you already have, names at each group
+```
+
+`kx.embed` returns the axes, and the coordinates are `ax.embedding`.
 
 ### Machine learning
 
