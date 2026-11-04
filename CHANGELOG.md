@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-04
+
 ### Added
 
 - `kx.plot` can draw a plot made of several panels (such as `pair`), returned as a flat array of axes in the place
@@ -58,7 +60,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   them, `plot=False` for the matrix.
 - `heat` takes `fmt=` for its `ann` numbers.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
-
 
 ## [0.5.0] - 2026-10-24
 
@@ -324,7 +325,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `kx.use`, `kx.show`, `kx.source`, `kx.grammar`, `kx.load` and the demo CSVs
 - a workflow that publishes the dataset to Kaggle
 
-[Unreleased]: https://github.com/vhrabar/kx-plot/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/vhrabar/kx-plot/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/vhrabar/kx-plot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/vhrabar/kx-plot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vhrabar/kx-plot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vhrabar/kx-plot/compare/v0.2.0...v0.3.0
