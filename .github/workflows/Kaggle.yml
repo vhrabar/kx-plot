@@ -48,10 +48,10 @@ jobs:
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
           MSG: ${{ github.event.head_commit.message || format('manual run {0}', github.sha) }}
         run: |
-          if uvx "$KAGGLE_CLI" datasets status "$DATASET" >/dev/null 2>&1; then
-            out=$(uvx "$KAGGLE_CLI" datasets version -p build -m "$MSG" --dir-mode zip 2>&1) || true
+          if uvx --with six "$KAGGLE_CLI" datasets status "$DATASET" >/dev/null 2>&1; then
+            out=$(uvx --with six "$KAGGLE_CLI" datasets version -p build -m "$MSG" --dir-mode zip 2>&1) || true
           else
-            out=$(uvx "$KAGGLE_CLI" datasets create -p build --public --dir-mode zip 2>&1) || true
+            out=$(uvx --with six "$KAGGLE_CLI" datasets create -p build --public --dir-mode zip 2>&1) || true
           fi
           echo "$out"
 
