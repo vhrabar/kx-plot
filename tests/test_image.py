@@ -5,6 +5,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pytest
 from matplotlib.colors import to_hex
 
@@ -443,3 +444,50 @@ def test_saliency_errors() -> None:
         kx.plot(SHAPES["images"], SHAPES["saliency"], ["x"], "saliency")
     with pytest.raises(ValueError, match="alpha= is between 0 and 1"):
         kx.plot(SHAPES["images"], SHAPES["saliency"], "saliency", alpha=2)
+
+
+# ---------- miscls ----------
+WRONG = np.flatnonzero(SHAPES["labels"] != SHAPES["pred"])
+
+
+def test_miscls_shows_only_mistakes_captioned_true_to_predicted() -> None:
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], SHAPES["pred"], "miscls", n=6)
+    assert len(axs) == 6
+    for a in axs:
+        true, pred = a.get_title().split(" → ")
+        assert true != pred
+        hits = [i for i in WRONG if np.allclose(_pixels(a), SHAPES["images"][i] / 255)]
+        assert hits
+        assert (SHAPES["labels"][hits[0]], SHAPES["pred"][hits[0]]) == (true, pred)
+    assert axs[0].figure._supxlabel.get_text() == f"{len(WRONG)} of 210 wrong"
+
+
+def test_miscls_scores_put_the_most_confident_mistakes_first() -> None:
+    proba = pd.DataFrame(SHAPES["proba"], columns=SHAPES["classes"])
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], proba, "miscls", n=5)
+    sure = [float(a.get_title().rsplit("(", 1)[1].rstrip(")")) for a in axs]
+    assert sure == sorted(sure, reverse=True)
+    top = WRONG[np.argmax(SHAPES["proba"][WRONG].max(axis=1))]
+    assert np.allclose(_pixels(axs[0]), SHAPES["images"][top] / 255)
+
+
+def test_miscls_score_columns_follow_the_sorted_labels() -> None:
+    truth = np.array(["b", "a", "b"])
+    score = np.array([[0.9, 0.1], [0.2, 0.8], [0.3, 0.7]])     # columns a, b in sorted order
+    axs = kx.plot(RGB[:3], truth, score, "miscls")
+    assert [a.get_title() for a in axs] == ["b → a (0.90)", "a → b (0.80)"]
+
+
+def test_miscls_without_mistakes_says_so() -> None:
+    (ax,) = kx.plot(RGB, list("abcde"), list("abcde"), "miscls")
+    assert ax.texts[0].get_text() == "no misclassified images"
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(RGB, list("abcde"), "miscls"), "needs the predictions as z"),
+    (lambda: kx.plot(RGB, list("abcde"), list("abc"), "miscls"), "5 images, 5 labels and 3 predictions"),
+    (lambda: kx.plot(RGB, list("abcde"), np.ones((5, 2)), "miscls"), "2 columns but the labels have 5 classes"),
+])
+def test_miscls_errors(call: Callable[[], object], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()

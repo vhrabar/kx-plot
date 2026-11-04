@@ -48,6 +48,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   the mask and an outline over the image; predicted masks as z add a second outline and the IoU.
 - **Plot kind** `saliency`: saliency maps (Grad-CAM or any, computed elsewhere) over their images,
   `kx.plot(images, maps, 'saliency')`, each scaled to 0..1 and smoothed up to its image; z adds a caption.
+- **Plot kind** `miscls`: the images a model got wrong, `kx.plot(images, y_true, y_pred, 'miscls')`, captioned
+  'true -> predicted'; with a 2-D score as z, the most confident mistakes first.
 - Table kinds that group (`radar`, `parallel`, `pair`) take `by=` as a column name, left out of the columns drawn.
 
 

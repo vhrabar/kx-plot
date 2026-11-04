@@ -5,6 +5,7 @@ from typing import Any
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
@@ -25,6 +26,7 @@ from .._image import (
     take,
     tile,
 )
+from .._metrics import classes
 from .._spec import kind
 from .._util import split
 from .basic import _levels
@@ -328,3 +330,58 @@ def saliency(ax: Axes, x: Any, y: Any, z: ArrayLike | None, flags: set[str], n: 
     scale = mpl.cm.ScalarMappable(norm=shown.norm, cmap=shown.get_cmap())   # full colour, not the overlay's alpha
     fig.colorbar(scale, ax=list(grid[:, 1]), label="saliency", shrink=0.8)
     return grid.ravel()
+
+
+def _predicted(y: ArrayLike, z: Any) -> tuple[np.ndarray, np.ndarray | None]:
+    """The predicted label of each image, and with a 2-D score its confidence (the top score). A score's columns
+    are its DataFrame names, else the sorted labels of y, as the ROC kinds read them."""
+    if np.ndim(z) != 2:
+        return np.asarray(z, dtype=object).ravel(), None
+    scores = np.asarray(z, dtype=float)
+    found = classes(y)
+    cols = [str(c) for c in z.columns] if isinstance(z, pd.DataFrame) else None
+    if cols is not None:
+        names = cols
+    elif len(found) == scores.shape[1]:
+        names = found
+    else:
+        raise ValueError(f"the score has {scores.shape[1]} columns but the labels have {len(found)} classes "
+                         f"{found}; pass one column per class, named after the labels or in their sorted order")
+    return np.asarray(names, dtype=object)[scores.argmax(axis=1)], scores.max(axis=1)
+
+
+@kind("miscls", panels=True)
+def miscls(ax: Axes, x: Any, y: ArrayLike, z: Any, flags: set[str], n: int = 16, seed: int = 0,
+           cols: int | None = None, **kw: Any) -> np.ndarray:
+    """The images a model got wrong: kx.plot(images, y_true, y_pred, 'miscls'), each captioned 'true → predicted'.
+    z: predicted labels (n= random mistakes, 16, seed=), or a 2-D score with a column per class: the most
+    confident mistakes first, with the confidence in the caption. No mistakes: a note says so.
+    kw: ax.imshow."""
+    if z is None:
+        raise ValueError("kind 'miscls' needs the predictions as z: kx.plot(images, y_true, y_pred, 'miscls')")
+    total = count(x)
+    truth = np.asarray(y, dtype=object).ravel()
+    if len(truth) != total or len(np.asarray(z)) != total:
+        raise ValueError(f"there are {total} images, {len(truth)} labels and {len(np.asarray(z))} predictions")
+    pred, confidence = _predicted(truth, z)
+    wrong = np.flatnonzero(truth.astype(str) != pred.astype(str))
+    if not len(wrong):
+        ax.text(0.5, 0.5, "no misclassified images", ha="center", va="center", transform=ax.transAxes)
+        ax.set_axis_off()
+        return np.array([ax])
+    if confidence is not None:                  # the most confident mistakes first: what the model is surest of
+        picks = list(wrong[np.argsort(-confidence[wrong], kind="stable")][:n])
+    else:
+        picks = sorted(np.random.default_rng(seed).choice(wrong, min(n, len(wrong)), replace=False))
+    picks = [int(i) for i in picks]
+    alone = len(ax.figure.axes) == 1
+    cols = min(len(picks), cols or math.ceil(math.sqrt(len(picks))))
+    fit_figure(ax, -(-len(picks) // cols), cols, side=1.6)
+    axs = tile(ax, len(picks), cols)
+    for a, img, i in zip(axs, take(x, picks), picks, strict=True):
+        show(a, img, **kw)
+        sure = f" ({confidence[i]:.2f})" if confidence is not None else ""
+        a.set_title(f"{truth[i]} → {pred[i]}{sure}", fontsize="small")
+    if alone:                                   # how many there are in all, under a figure of its own
+        axs[0].figure.supxlabel(f"{len(wrong)} of {total} wrong", fontsize="small")   # the layout leaves it room
+    return axs
