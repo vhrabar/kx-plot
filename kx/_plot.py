@@ -81,11 +81,20 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, 
             _common(a, name, kind.value_axis, flags)
         if title and kind.panels and alone:
             fig.suptitle(title)                 # the panels fill the figure: one title over them all
+        elif title and kind.panels:
+            _title_over(axs[0], title)
         elif title:
             axs[0].set_title(title)
         if "tight" in flags and not isinstance(fig.get_layout_engine(), ConstrainedLayoutEngine):
             fig.tight_layout()                  # a constrained figure (kx.grid) is laid out already
     return axs if kind.panels else ax
+
+
+def _title_over(ax: Axes, title: str) -> None:
+    """title over the first panel of a block in a bigger figure, above the panel's own title (a class name, a
+    channel, a facet value), which stays."""
+    own = ax.get_title()
+    ax.set_title(f"{title}\n{own}" if own else title)
 
 
 def _projected(ax: Axes, projection: str) -> Axes:
@@ -332,7 +341,7 @@ def _facet(ax: Axes, kind: Any, x: Any, y: Any, z: Any, by: Any, facet: Any, fla
     if title and alone:
         fig.suptitle(title)
     elif title:
-        axs[0].set_title(f"{title}\n{axs[0].get_title()}")
+        _title_over(axs[0], title)
     if "tight" in flags and not isinstance(fig.get_layout_engine(), ConstrainedLayoutEngine):
         fig.tight_layout()
     return np.array(axs)

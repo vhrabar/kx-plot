@@ -11,6 +11,9 @@ matplotlib, numpy and pandas and works offline, so it also runs in Kaggle compet
 
 ```bash
 pip install kx-plot
+
+# adds t-SNE and UMAP to kx.embed (PCA needs neither)
+pip install 'kx-plot[embed]'
 ```
 
 ```python
@@ -97,6 +100,8 @@ kx.plot(df, 'pair', by='sex')                      # every numeric column agains
 (`radar`, `parallel` and `pair` take `by=`, a column of groups); `kx.plot(df[cols], 'heat')` for some columns.
 `wrap` breaks long tick labels onto several lines.
 
+![kinds with several panels](https://raw.githubusercontent.com/vhrabar/kx-plot/main/previews/dark-panels.png)
+
 ### Images
 
 Image kinds take an `(N, H, W)` or `(N, H, W, C)` array (channels first works too), or a list of arrays, PIL images
@@ -113,6 +118,8 @@ kx.plot(d['images'], d['masks'], pred, 'segmask')  # image, mask, outlines; a pr
 kx.plot(d['images'], d['saliency'], 'saliency')    # Grad-CAM or any map over its image, smoothed to fit
 kx.plot(d['images'], d['labels'], d['proba'], 'miscls')  # the mistakes, the most confident first
 ```
+
+![image kinds](https://raw.githubusercontent.com/vhrabar/kx-plot/main/previews/dark-img.png)
 
 ### Embeddings
 

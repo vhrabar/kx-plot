@@ -491,3 +491,9 @@ def test_miscls_without_mistakes_says_so() -> None:
 def test_miscls_errors(call: Callable[[], object], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         call()
+
+
+def test_panel_title_in_a_grid_cell_keeps_the_panels_own_title() -> None:
+    _, right = kx.grid(2)
+    axs = kx.plot(SHAPES["images"], SHAPES["labels"], "meanimg", title="means", ax=right)
+    assert axs[0].get_title() == "means\nblob (n=60)"
