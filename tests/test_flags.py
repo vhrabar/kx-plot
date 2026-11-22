@@ -9,6 +9,7 @@ import pytest
 from helpers import DF, PASSENGERS, X, Y, Z, _dashed
 from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
+from matplotlib.container import BarContainer
 
 import kx
 import kx._stats
@@ -436,5 +437,62 @@ def test_ci_with_z_text_x_and_dates() -> None:
     (lambda: kx.plot(CI_X, CI_Y, "area-ci"), "only works with kind"),
 ])
 def test_ci_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
+def _bar_series(ax: Axes) -> list[BarContainer]:
+    return [c for c in ax.containers if isinstance(c, BarContainer)]
+
+
+def _errbar_ends(ax: Axes, i: int = 0) -> np.ndarray:
+    """The (lo, hi) ends of the i-th bar series' error bars, one row per bar."""
+    segs = _bar_series(ax)[i].errorbar.lines[2][0].get_segments()
+    horizontal = segs[0][0][1] == segs[0][1][1]
+    return np.array([sorted(s[:, 0 if horizontal else 1]) for s in segs])
+
+
+def test_bar_ci_is_the_mean_with_bootstrap_error_bars() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "fare", "bar-ci")
+    groups = PASSENGERS.groupby("pclass").fare
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["1", "2", "3"]
+    assert [r.get_height() for r in ax.patches] == pytest.approx(groups.mean().to_list())
+    want = [kx._stats.bootstrap(g) for _, g in groups]
+    assert _errbar_ends(ax) == pytest.approx(np.array(want))
+    assert to_hex(_bar_series(ax)[0].errorbar.lines[2][0].get_color()[0]) == to_hex(mpl.rcParams["text.color"])
+
+
+def test_bar_ci_with_z_sort_ann_and_nan_category() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "fare", "age", "bar-ci")
+    assert len(_bar_series(ax)) == 2
+    assert _errbar_ends(ax, 1) == pytest.approx(np.array([kx._stats.bootstrap(g) for _, g in
+                                                         PASSENGERS.groupby("pclass").age]))
+    ax = kx.plot(PASSENGERS, "port", "fare", "bar-ci-sort-ann")
+    heights = [r.get_height() for r in ax.patches]
+    assert heights == sorted(heights, reverse=True)
+    assert "NaN" in [t.get_text() for t in ax.get_xticklabels()]  # missing ports, as in count
+    tops = _errbar_ends(ax)[:, 1]
+    assert [t.xy[1] for t in ax.texts] == pytest.approx(tops)   # past the error bar, not the bar
+    assert [t.get_text() for t in ax.texts] == [f"{h:.3g}" for h in heights]
+
+
+def test_barh_ci_first_category_on_top() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "fare", "barh-ci")
+    assert [r.get_width() for r in ax.patches] == pytest.approx(PASSENGERS.groupby("pclass").fare.mean().to_list())
+    assert ax.yaxis_inverted()
+    assert _errbar_ends(ax)[0] == pytest.approx(kx._stats.bootstrap(PASSENGERS.fare[PASSENGERS.pclass == 1]))
+
+
+def test_bar_without_ci_is_unchanged() -> None:
+    ax = kx.plot(["a", "b"], [1, 2], "bar-ann")
+    assert [r.get_height() for r in ax.patches] == [1, 2]
+    assert ax.containers[0].errorbar is None
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(PASSENGERS, "pclass", "fare", "age", "bar-ci-stack"), "do not go together"),
+    (lambda: kx.plot(PASSENGERS, "pclass", "fare", "bar", n_boot=10), "add it"),
+])
+def test_bar_ci_errors(call: Callable[[], Axes], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         call()

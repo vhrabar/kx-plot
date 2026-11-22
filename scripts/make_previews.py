@@ -149,8 +149,9 @@ def render_img(theme: str, out_dir: str) -> str:
     return path
 
 
-def main() -> None:
-    out_dir = os.path.join(_root, "previews")
+def main(out_dir: str | None = None) -> None:
+    """Render every sheet into out_dir, previews/ by default (a check renders into a temporary folder)."""
+    out_dir = out_dir or os.path.join(_root, "previews")
     os.makedirs(out_dir, exist_ok=True)
     for theme in kx.styles():
         print(render(theme, out_dir))
@@ -160,4 +161,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1] if len(sys.argv) > 1 else None)
