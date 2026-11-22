@@ -73,3 +73,68 @@ def split(ax: Axes, rows: int, cols: int, projection: str | None = None, **kw: A
     ax.remove()
     cells = spec.subgridspec(rows, cols, **kw)
     return np.array([fig.add_subplot(cells[r, c], projection=projection) for r in range(rows) for c in range(cols)])
+
+
+ENDLAB_GAP = 1.2
+ENDLAB_PAD = 6
+
+
+class _Spread(mpl.artist.Artist):
+    """endlab: draws nothing; drawn just before the labels (lowest zorder), it spaces them for the final limits,
+    scales and size, which are only known at draw time."""
+
+    def __init__(self, labels: list[mpl.text.Annotation]) -> None:
+        super().__init__()
+        self.labels = labels
+        self.set_in_layout(False)
+        self.set_zorder(-np.inf)
+
+    def draw(self, renderer: Any) -> None:
+        spread(self.labels)
+
+
+def spread(labels: list[mpl.text.Annotation]) -> None:
+    """Each label's vertical offset from its line's end, so labels are at least ENDLAB_GAP label heights apart:
+    overlapping labels merge into a block centred on where their lines end, until no blocks overlap."""
+    if not labels:
+        return
+    ax = labels[0].axes
+    to_pt = 72 / ax.figure.dpi
+    ends = np.array([ax.transData.transform((ax.convert_xunits(a.xy[0]), ax.convert_yunits(a.xy[1])))[1] * to_pt
+                     for a in labels])          # in points, where each line ends
+    gap = ENDLAB_GAP * max(a.get_fontsize() for a in labels)
+    blocks = [[i] for i in np.argsort(ends, kind="stable")]     # bottom to top
+
+    def place(block: list[int]) -> np.ndarray:
+        return ends[block].mean() + gap * (np.arange(len(block)) - (len(block) - 1) / 2)
+
+    merged = True
+    while merged:
+        merged = False
+        for k in range(len(blocks) - 1):
+            if place(blocks[k])[-1] + gap > place(blocks[k + 1])[0]:
+                blocks[k:k + 2] = [blocks[k] + blocks[k + 1]]
+                merged = True
+                break
+    for block in blocks:
+        for i, at in zip(block, place(block), strict=True):
+            labels[i].xyann = (ENDLAB_PAD, at - ends[i])
+
+
+def endlabels(ax: Axes) -> list[mpl.text.Annotation]:
+    """endlab: each labelled line's name at its last finite point, in its colour, instead of a legend."""
+    labels = []
+    for ln in ax.lines:
+        name = ln.get_label()
+        ys = np.asarray(ln.get_ydata(), dtype=float)
+        keep = np.flatnonzero(np.isfinite(ys))
+        if name.startswith("_") or not len(keep):
+            continue
+        xy = (np.asarray(ln.get_xdata())[keep[-1]], ys[keep[-1]])
+        labels.append(ax.annotate(name, xy, xytext=(ENDLAB_PAD, 0), textcoords="offset points", ha="left",
+                                  va="center", color=ln.get_color(), annotation_clip=False))
+    if ax.get_legend() is not None:
+        ax.get_legend().remove()
+    spread(labels) #TODO: review -> interval?
+    ax.add_artist(_Spread(labels))
+    return labels

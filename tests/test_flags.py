@@ -497,3 +497,71 @@ def test_bar_without_ci_is_unchanged() -> None:
 def test_bar_ci_errors(call: Callable[[], Axes], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         call()
+
+
+# ---------- endlab ----------
+def _endlabels(ax: Axes) -> list:
+    return [t for t in ax.texts if isinstance(t, mpl.text.Annotation)]
+
+
+@pytest.mark.parametrize("kind", ["line", "step", "band", "area"])
+def test_endlab_names_each_line_at_its_end(kind: str) -> None:
+    ax = kx.plot(DF, "t", "speed", "accel", f"{kind}-endlab")
+    labels = _endlabels(ax)
+    lines = [ln for ln in ax.lines if not ln.get_label().startswith("_")]
+    assert [t.get_text() for t in labels] == [ln.get_label() for ln in lines]
+    for t, ln in zip(labels, lines, strict=True):
+        assert to_hex(t.get_color()) == to_hex(ln.get_color())
+        assert t.xy == (ln.get_xdata()[-1], ln.get_ydata()[-1])
+    assert ax.get_legend() is None
+
+
+def test_endlab_skips_nans_at_the_end() -> None:
+    y = np.r_[Y[:-3], [np.nan] * 3]
+    t, = _endlabels(kx.plot(X, y, "line-endlab"))
+    assert t.xy == (X[-4], Y[-4])
+
+
+def test_endlab_labels_never_overlap() -> None:
+    same = np.ones_like(X)
+    ax = kx.plot(X, same, same, "line-endlab")
+    ax.figure.canvas.draw()
+    boxes = [t.get_window_extent() for t in _endlabels(ax)]
+    assert not boxes[0].overlaps(boxes[1])
+    ends = [t.xy[1] for t in _endlabels(ax)]
+    offsets = sorted(t.xyann[1] for t in _endlabels(ax))
+    assert ends[0] == ends[1]
+    assert offsets[0] == -offsets[1]
+
+def test_endlab_respaces_after_a_scale_change() -> None:
+    ax = kx.plot(X, Y, Y + 0.01, "line-endlab")
+    ax.figure.canvas.draw()
+    before = [t.xyann[1] for t in _endlabels(ax)]
+    ax.set_ylim(-100, 100)
+    ax.figure.canvas.draw()
+    assert [t.xyann[1] for t in _endlabels(ax)] != before
+    boxes = [t.get_window_extent() for t in _endlabels(ax)]
+    assert not boxes[0].overlaps(boxes[1])
+
+
+def test_endlab_with_dates_text_x_and_ci() -> None:
+    dates = pd.date_range("2026-01-01", periods=len(X))
+    t, = _endlabels(kx.plot(dates, Y, "line-date-endlab"))
+    assert t.get_text() == "y"
+    ax = kx.plot(["a", "b", "c"], [1, 2, 3], [3, 2, 1], "step-endlab")
+    ax.figure.canvas.draw()
+    assert [t.xy for t in _endlabels(ax)] == [("c", 3), ("c", 1)]
+    ax = kx.plot(CI_X, CI_Y, "line-ci-endlab")
+    t, = _endlabels(ax)
+    assert t.xy[1] == pytest.approx(ax.lines[0].get_ydata()[-1])
+
+
+@pytest.mark.parametrize(("spec", "match"), [
+    ("line-endlab-leg", "do not go together"),
+    ("line-endlab-legout", "do not go together"),
+    ("area-endlab-stack", "a stack ends in bands"),
+    ("scatter-endlab", "only works with kind"),
+])
+def test_endlab_errors(spec: str, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(X, Y, Z, spec)

@@ -10,7 +10,7 @@ COMMON_FLAGS = {"grid", "leg", "legout", "tight", "rot", "wrap",           # han
                 "logx", "logy", "logxy", "symlogy", "zero", "eq", "pct", "si", "facet"}
 EXCLUSIVE = ({"logy", "logxy", "symlogy"}, {"logx", "logxy"}, {"zero", "logy"}, {"zero", "logxy"},
              {"pct", "si"}, {"sym", "logc"}, {"corr", "logc"},
-             {"ci", "stack"})                   # pairs that ask for opposite things
+             {"ci", "stack"}, {"endlab", "leg"}, {"endlab", "legout"})     # pairs that ask for opposite things
 
 
 @dataclass(frozen=True)

@@ -14,9 +14,9 @@ from numpy.typing import ArrayLike
 
 from .._spec import kind
 from .._stats import bootstrap
-from .._util import COLOUR, categories, colorbar, diagonal, ink, label, norm
+from .._util import COLOUR, categories, colorbar, diagonal, endlabels, ink, label, norm
 
-LINES = ("date", "mk")                          # flags of the kinds that draw lines against x
+LINES = ("date", "mk", "endlab")                # flags of the kinds that draw lines against x
 
 
 def _mk(flags: set[str]) -> dict[str, str]:
@@ -66,12 +66,15 @@ def _lines(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set
         ln, = draw(keys, mean, **{**where, "label": label(v, name), **_mk(flags), **kw})
         ax.fill_between(keys, lo, hi, color=ln.get_color(), alpha=0.25, linewidth=0,
                         **({"step": "mid"} if drawn else {}))
+    if "endlab" in flags:
+        endlabels(ax)
 
 
 @kind("line", flags=(*LINES, "ci"))
 def line(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], n_boot: int | None = None,
          seed: int | None = None, **kw: Any) -> None:
-    """y and z against x. date = x as dates, mk = a marker on every point.
+    """y and z against x. date = x as dates, mk = a marker on every point, endlab = each line's name at its
+    right end instead of a legend.
     ci = the mean of y at each x with a bootstrap 95% interval as a band (n_boot= resamples, 1000; seed=, 0).
     kw: ax.plot."""
     _lines(ax, x, y, z, flags, False, n_boot, seed, **kw)
@@ -89,6 +92,8 @@ def _check_area(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("flag 'norm' needs two series (y and z) to split 100% between")
     if "mk" in flags and flags & {"stack", "norm"}:
         raise ValueError("flag 'mk' marks the lines of an overlapping area; a stack has no lines")
+    if "endlab" in flags and flags & {"stack", "norm"}:
+        raise ValueError("flag 'endlab' labels the lines of an overlapping area; a stack ends in bands, not points")
 
 
 @kind("area", flags=("stack", "norm", *LINES), check=_check_area)
@@ -107,6 +112,8 @@ def area(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[s
         for v, n in series:
             ln, = ax.plot(x, v, label=n, **_mk(flags))
             ax.fill_between(x, v, **{"color": ln.get_color(), "alpha": 0.3, "linewidth": 0, **kw})
+        if "endlab" in flags:
+            endlabels(ax)
 
 
 def _check_band(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
@@ -121,6 +128,8 @@ def band(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike, flags: set[str], **
     ln, = ax.plot(x, mid, **{"label": label(y, "y"), **_mk(flags), **kw})
     ax.fill_between(x, mid - half, mid + half, color=ln.get_color(), alpha=0.25,
                     linewidth=0, label=f"± {label(z, 'z')}")
+    if "endlab" in flags:
+        endlabels(ax)
 
 
 def _check_scatter(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
