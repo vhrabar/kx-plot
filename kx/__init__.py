@@ -10,7 +10,7 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           | imgrid | meanimg | colorhist | imhist | segmask | saliency | miscls
   theme : any file name in styles/
   flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si | facet
-          and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
+          and per kind: stack norm cum (bars, area, hist), date mk (lines), ci (line, step), sort ann (bars, count),
           stack norm (count),
           mean median ann (distributions), sig (box, violin),
           nocb sym logc (scatter, heat, hexbin, cluster), corr ann (heat, cluster),

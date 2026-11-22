@@ -115,3 +115,29 @@ def test_linkage_heights_rise_and_precomputed_agrees(method: str) -> None:
 def test_linkage_errors(args: list, kw: dict, match: str) -> None:
     with pytest.raises(ValueError, match=match):
         kx._stats.linkage(*args, **kw)
+
+
+# ---------- bootstrap ----------
+def test_bootstrap_width_and_centre() -> None:
+    v = np.random.default_rng(1).normal(10, 2, 200)
+    lo, hi = kx._stats.bootstrap(v)
+    assert lo < v.mean() < hi
+    assert hi - lo == pytest.approx(2 * 1.96 * v.std(ddof=1) / np.sqrt(len(v)), rel=0.1)
+
+
+def test_bootstrap_seed_nans_and_edges() -> None:
+    v = np.random.default_rng(2).normal(0, 1, 50)
+    assert kx._stats.bootstrap(v, seed=3) == kx._stats.bootstrap(v, seed=3)
+    assert kx._stats.bootstrap(v, seed=3) != kx._stats.bootstrap(v, seed=4)
+    assert kx._stats.bootstrap(np.r_[v, np.nan]) == kx._stats.bootstrap(v)
+    assert kx._stats.bootstrap([5.0]) == (5.0, 5.0)
+    assert np.isnan(kx._stats.bootstrap([np.nan])).all()
+    with pytest.raises(ValueError, match="n_boot"):
+        kx._stats.bootstrap(v, n_boot=0)
+
+
+def test_bootstrap_chunks_give_the_same_interval(monkeypatch: pytest.MonkeyPatch) -> None:
+    v = np.random.default_rng(5).normal(0, 1, 100)
+    whole = kx._stats.bootstrap(v, n_boot=300)
+    monkeypatch.setattr(kx._stats, "BOOT_CELLS", 1000)      # 10 resamples per chunk
+    assert kx._stats.bootstrap(v, n_boot=300) == pytest.approx(whole)

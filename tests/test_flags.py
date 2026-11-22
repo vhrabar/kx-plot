@@ -375,3 +375,66 @@ def test_sig_works_with_facet_and_by_columns() -> None:
 def test_sig_errors(call: Callable[[], Axes], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         call()
+
+
+# ---------- ci ----------
+CI_X = np.repeat([3, 1, 2], 20)
+CI_Y = np.random.default_rng(0).normal(0, 1, 60) + CI_X
+
+
+def _band(ax: Axes, i: int = 0) -> tuple[np.ndarray, np.ndarray]:
+    """The lower and upper edges of the i-th fill_between, one value per x."""
+    verts = ax.collections[i].get_paths()[0].vertices
+    xs = np.unique(verts[:, 0])
+    return (np.array([verts[verts[:, 0] == x, 1].min() for x in xs]),
+            np.array([verts[verts[:, 0] == x, 1].max() for x in xs]))
+
+
+@pytest.mark.parametrize("kind", ["line", "step"])
+def test_ci_draws_the_mean_per_x_and_a_band(kind: str) -> None:
+    ax = kx.plot(CI_X, CI_Y, f"{kind}-ci")
+    ln, = ax.lines
+    assert list(ln.get_xdata()) == [1, 2, 3]
+    means = pd.Series(CI_Y).groupby(CI_X).mean()
+    assert ln.get_ydata() == pytest.approx(means.to_numpy())
+    assert len(ax.collections) == 1
+    assert to_hex(ax.collections[0].get_facecolor()[0]) == to_hex(ln.get_color())
+
+
+def test_ci_band_is_the_bootstrap() -> None:
+    lo, hi = _band(kx.plot(CI_X, CI_Y, "line-ci"))
+    want = [kx._stats.bootstrap(g) for _, g in pd.Series(CI_Y).groupby(CI_X)]
+    assert lo == pytest.approx([w[0] for w in want])
+    assert hi == pytest.approx([w[1] for w in want])
+
+
+def test_ci_seed_and_n_boot_reach_the_bootstrap() -> None:
+    same = [_band(kx.plot(CI_X, CI_Y, "line-ci", seed=7))[0] for _ in range(2)]
+    assert np.array_equal(*same)
+    assert not np.array_equal(same[0], _band(kx.plot(CI_X, CI_Y, "line-ci", seed=8))[0])
+    lo, _ = _band(kx.plot(CI_X, CI_Y, "line-ci", n_boot=50))
+    assert lo[0] == pytest.approx(kx._stats.bootstrap(CI_Y[CI_X == 1], n_boot=50)[0])
+
+
+def test_ci_with_z_text_x_and_dates() -> None:
+    ax = kx.plot(CI_X, CI_Y, CI_Y * 2, "line-ci-mk")
+    assert len(ax.lines) == len(ax.collections) == 2
+    assert ax.lines[0].get_marker() == "o"
+    days = np.tile(["Mon", "Tue"], 10)
+    assert list(kx.plot(days, np.arange(20), "line-ci").lines[0].get_xdata()) == ["Mon", "Tue"]
+    cats = pd.Series(pd.Categorical(days, categories=["Tue", "Mon"]))
+    assert list(kx.plot(cats, np.arange(20), "line-ci").lines[0].get_xdata()) == ["Tue", "Mon"]
+    dates = np.repeat(["2026-01-02", "2026-01-01"], 5)
+    ax = kx.plot(dates, np.arange(10), "line-ci-date")
+    assert ax.lines[0].get_ydata() == pytest.approx([7, 2])
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(X, Y, "line-ci"), "each x has one"),
+    (lambda: kx.plot(CI_X, CI_Y, "line", n_boot=10), "add it"),
+    (lambda: kx.plot(CI_X, CI_Y, "step", seed=1), "add it"),
+    (lambda: kx.plot(CI_X, CI_Y, "area-ci"), "only works with kind"),
+])
+def test_ci_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()

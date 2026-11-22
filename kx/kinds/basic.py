@@ -1,4 +1,5 @@
 """Basic kinds: y and z against x."""
+  import warnings
 from typing import Any
 
 import matplotlib as mpl
@@ -11,6 +12,7 @@ from matplotlib.patheffects import withStroke
 from numpy.typing import ArrayLike
 
 from .._spec import kind
+from .._stats import bootstrap
 from .._util import COLOUR, categories, colorbar, diagonal, ink, label, norm
 
 LINES = ("date", "mk")                          # flags of the kinds that draw lines against x
@@ -21,20 +23,64 @@ def _mk(flags: set[str]) -> dict[str, str]:
     return {"marker": "o"} if "mk" in flags else {}
 
 
-@kind("line", flags=LINES)
-def line(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
-    """y and z against x. date = x as dates, mk = a marker on every point. kw: ax.plot."""
-    ax.plot(x, y, **{"label": label(y, "y"), **_mk(flags), **kw})
-    if z is not None:
-        ax.plot(x, z, **{"label": label(z, "z"), **_mk(flags), **kw})
+def _boot(flags: set[str], n_boot: int | None, seed: int | None) -> tuple[int, int]:
+    """n_boot= and seed= for the flag ci, which they only go with."""
+    if "ci" not in flags and (n_boot is not None or seed is not None):
+        raise ValueError("n_boot= and seed= set the bootstrap of the flag ci; add it: line-ci")
+    return (1000 if n_boot is None else n_boot), (0 if seed is None else seed)
 
 
-@kind("step", flags=LINES)
-def step(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
-    """Like line, drawn as steps centred on each x. kw: ax.step."""
-    ax.step(x, y, **{"where": "mid", "label": label(y, "y"), **_mk(flags), **kw})
-    if z is not None:
-        ax.step(x, z, **{"where": "mid", "label": label(z, "z"), **_mk(flags), **kw})
+def _mean_ci(x: ArrayLike, v: ArrayLike, n_boot: int, seed: int) -> tuple[Any, np.ndarray, np.ndarray, np.ndarray]:
+    """ci: x's distinct values (sorted for numbers, dates and categoricals, in order of appearance for text), the
+    mean of v at each, and the bootstrap interval of that mean."""
+    xs = pd.Series(np.asarray(x)) if not isinstance(x, pd.Series) else x.reset_index(drop=True)
+    ordered = (pd.api.types.is_numeric_dtype(xs) or pd.api.types.is_datetime64_any_dtype(xs)
+               or isinstance(xs.dtype, pd.CategoricalDtype))
+    codes, keys = pd.factorize(xs, sort=ordered)
+    vs = np.asarray(v, dtype=float).ravel()
+    if len(keys) == np.count_nonzero(codes >= 0):
+        raise ValueError("ci bootstraps the y values at each x, and each x has one here. "
+                         "For a spread you know, use band: kx.plot(x, y, err, 'band')")
+    groups = [vs[codes == i] for i in range(len(keys))]
+    with np.errstate(invalid="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        mean = np.array([np.nanmean(g) for g in groups])
+    lo, hi = np.array([bootstrap(g, n_boot, seed) for g in groups]).T
+    return np.asarray(keys), mean, lo, hi
+
+
+def _lines(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], drawn: bool,
+           n_boot: int | None, seed: int | None, **kw: Any) -> None:
+    """line and step: y and z against x, as given or (ci) as the mean at each x with its interval as a band."""
+    n_boot, seed = _boot(flags, n_boot, seed)
+    draw = ax.step if drawn else ax.plot
+    where = {"where": "mid"} if drawn else {}
+    for v, name in ((y, "y"), (z, "z")):
+        if v is None:
+            continue
+        if "ci" not in flags:
+            draw(x, v, **{**where, "label": label(v, name), **_mk(flags), **kw})
+            continue
+        keys, mean, lo, hi = _mean_ci(x, v, n_boot, seed)
+        ln, = draw(keys, mean, **{**where, "label": label(v, name), **_mk(flags), **kw})
+        ax.fill_between(keys, lo, hi, color=ln.get_color(), alpha=0.25, linewidth=0,
+                        **({"step": "mid"} if drawn else {}))
+
+
+@kind("line", flags=(*LINES, "ci"))
+def line(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], n_boot: int | None = None,
+         seed: int | None = None, **kw: Any) -> None:
+    """y and z against x. date = x as dates, mk = a marker on every point.
+    ci = the mean of y at each x with a bootstrap 95% interval as a band (n_boot= resamples, 1000; seed=, 0).
+    kw: ax.plot."""
+    _lines(ax, x, y, z, flags, False, n_boot, seed, **kw)
+
+
+@kind("step", flags=(*LINES, "ci"))
+def step(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], n_boot: int | None = None,
+         seed: int | None = None, **kw: Any) -> None:
+    """Like line, drawn as steps centred on each x; ci as for line, the band in steps too. kw: ax.step."""
+    _lines(ax, x, y, z, flags, True, n_boot, seed, **kw)
 
 
 def _check_area(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
