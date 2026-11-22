@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - **Flag** `ci` (`line`, `step`): the mean at each x with a bootstrap 95% band; `n_boot=`, `seed=`.
 - `ci` on `bar` and `barh`: the mean per category with bootstrap 95% error bars.
+- **Plot kind** `errbar`: the mean per series or `by=` group with a bootstrap 95% interval; `sd`, `ann`, `sig`.
 
 ## [0.6.0] - 2026-11-04
 

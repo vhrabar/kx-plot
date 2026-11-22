@@ -2,7 +2,7 @@
 kx: tiny matplotlib helper.
 
 Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
-  kind  : line | step | area | band | scatter | bar | barh | hist | kde | ridge | ecdf | box | violin | strip
+  kind  : line | step | area | band | scatter | bar | barh | hist | kde | ridge | ecdf | box | violin | strip | errbar
           | qq | heat | crosstab | count | missing | nullmap | hexbin | pie | donut | radar | parallel | pair
           | cluster | mosaic | treemap | sunburst
           | cm | roc | pr | calib | proba | thresh | gain | lift | pva | resid | imp | loss
@@ -13,14 +13,14 @@ Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
           and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
           ci (line, step, bar, barh),
           stack norm (count),
-          mean median ann (distributions), sig (box, violin),
+          mean median ann (distributions), sig (box, violin, errbar), ann sd (errbar),
           nocb sym logc (scatter, heat, hexbin, cluster), corr ann (heat, cluster),
           norm ann nocb logc (crosstab), ann all (missing), sort (nullmap), diag (scatter, hexbin),
           fit (scatter), norm ann nocb (cm), norm (proba), best (thresh, loss, elbow),
           nocb sym logc (resid), ann sort (pie, donut), ann (mosaic, treemap, sunburst), raw (radar), mean (parallel),
           std (meanimg), hsv map (colorhist), hsv (imhist), ann nocb sym logc (embed).
           kx.grammar(kind) lists them.
-by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count);
+by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, errbar, qq, count);
          for radar, parallel and pair a column of the table: kx.plot(df, 'radar', by='class')
 images : image kinds take an (N, H, W[, C]) array or a list of arrays or file paths, labels as y:
          kx.plot(images, labels, 'imgrid')

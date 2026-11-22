@@ -327,7 +327,7 @@ def _brackets(ax: Axes) -> list[tuple[float, float, float]]:
     return [(ln.get_xdata()[0], ln.get_xdata()[2], ln.get_ydata()[1]) for ln in ax.lines if len(ln.get_xdata()) == 4]
 
 
-@pytest.mark.parametrize("kind", ["box", "violin"])
+@pytest.mark.parametrize("kind", ["box", "violin", "errbar"])
 def test_sig_brackets_only_the_pairs_that_differ(kind: str) -> None:
     ax = kx.plot(LOW, SAME, HIGH, f"{kind}-sig")
     assert sorted((a, b) for a, b, _ in _brackets(ax)) == [(1, 3), (2, 3)]
@@ -337,7 +337,8 @@ def test_sig_brackets_only_the_pairs_that_differ(kind: str) -> None:
     assert [t.get_text() for t in ax.texts].count(marks) == 2
     _, p = kx._stats.kruskal(LOW, SAME, HIGH)
     assert f"Kruskal-Wallis {kx.kinds.dist._p(p)}" in [t.get_text() for t in ax.texts]
-    assert all(h > HIGH.max() for _, _, h in _brackets(ax))         # above the data
+    top = HIGH.max() if kind != "errbar" else kx._stats.bootstrap(HIGH)[1]
+    assert all(h > top for _, _, h in _brackets(ax))                # above what is drawn
     assert ax.get_ylim()[1] > max(h for _, _, h in _brackets(ax))   # and inside the axes
 
 
