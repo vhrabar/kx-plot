@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-24
+
 ### Added
 
 - **Flag** `ci` (`line`, `step`): the mean at each x with a bootstrap 95% band; `n_boot=`, `seed=`.
@@ -336,7 +338,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `kx.use`, `kx.show`, `kx.source`, `kx.grammar`, `kx.load` and the demo CSVs
 - a workflow that publishes the dataset to Kaggle
 
-[Unreleased]: https://github.com/vhrabar/kx-plot/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/vhrabar/kx-plot/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/vhrabar/kx-plot/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/vhrabar/kx-plot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/vhrabar/kx-plot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vhrabar/kx-plot/compare/v0.3.0...v0.4.0
