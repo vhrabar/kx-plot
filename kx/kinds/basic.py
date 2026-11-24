@@ -324,7 +324,7 @@ def lollipop(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: s
     if z is None:
         ax.hlines(idx, 0, ends[0][1], color="C0", lw=1.5, zorder=2)
     else:
-        ax.hlines(idx, ends[0][1], ends[1][1], color=plt.rcParams["grid.color"], lw=3, zorder=2)
+        ax.hlines(idx, ends[0][1], ends[1][1], color=plt.rcParams["text.color"], alpha=0.3, lw=3, zorder=2)
     for i, (name, v) in enumerate(ends):
         ax.plot(v, idx, **{"ls": "none", "marker": "o", "ms": 8, "color": f"C{i}", "zorder": 3,
                            **({"label": name} if z is not None else {}), **kw})

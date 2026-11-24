@@ -47,16 +47,16 @@ kx.plot(df.value, spec='box', by=df.group)         # one box per group (also rid
 
 | Token | Values                                                                                        |
 |-------|-----------------------------------------------------------------------------------------------|
-| kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `hist` `kde` `ridge` `ecdf` `box` `violin` |
-|       | `strip` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap` `pie` `donut` `radar`     |
-|       | `parallel` `pair` `cluster` `mosaic` `treemap` `sunburst`                                     |
+| kind  | `line` `step` `area` `band` `scatter` `bar` `barh` `lollipop` `hist` `kde` `ridge` `ecdf`     |
+|       | `box` `violin` `strip` `errbar` `qq` `count` `crosstab` `hexbin` `heat` `missing` `nullmap`   |
+|       | `pie` `donut` `radar` `parallel` `pair` `cluster` `mosaic` `treemap` `sunburst`               |
 |       | ML: `cm` `roc` `pr` `calib` `proba` `thresh` `gain` `lift` `pva` `resid` `imp` `loss`         |
 |       | `lcurve` `vcurve` `elbow` `embed`                                                             |
 |       | Images: `imgrid` `meanimg` `colorhist` `imhist` `segmask` `saliency` `miscls`                 |
-| theme | `dark` `light` `paper` `science` `talk` `poster` `thesis`                                     |
+| theme | `dark` `light` `minimal` `colorblind` `paper` `science` `talk` `poster` `thesis`              |
 | flags | `grid` `leg` `legout` `tight` `rot` `wrap` `logx` `logy` `logxy` `symlogy` `zero` `eq` `pct`  |
-|       | `si` `facet`; per kind: `stack` `norm` `cum` `date` `mk` `sort` `ann` `mean` `median` `nocb`  |
-|       | `sym` `logc` `corr` `all` `diag` `fit` `best` `raw` `sig`                                     |
+|       | `si` `facet`; per kind: `stack` `norm` `cum` `date` `mk` `endlab` `ci` `sort` `ann` `mean`    |
+|       | `median` `sd` `nocb` `sym` `logc` `corr` `all` `diag` `fit` `best` `raw` `sig`                |
 
 `stack` works with `area`, `bar`, `barh` and `hist`. `norm` is a 100% stack for `area` and a
 density (area 1) for `hist`. `cum` makes `hist` cumulative; `hist-norm-cum` is the CDF.
@@ -66,6 +66,20 @@ its slope and R² in the legend (one line per group with a categorical `z`).
 
 `sig` on `box` and `violin` writes the Kruskal-Wallis p and brackets the pairs that differ, with stars (`ann`: the
 p-values), Holm-corrected.
+
+### Uncertainty and labels
+
+`ci` draws the mean of the rows at each x with a bootstrap 95% interval: a band on `line` and `step`, error bars
+on `bar` and `barh` (`n_boot=` resamples, 1000; `seed=`, 0). `errbar` is the mean and interval per series or
+`by=` group, `sd` for mean ± one standard deviation instead, `sig` for the tests as on `box`.
+`endlab` writes each line's name at its right end instead of a legend, on `line`, `step`, `band` and `area`.
+`lollipop` is a dot per category on a stem from 0, or with `z` a dumbbell from `y` to `z` (`sort` by the change).
+
+```python
+kx.plot(df, 'month', 'temp', 'line-ci-endlab')        # each month's mean, a 95% band, the name at the end
+kx.plot(df, 'fare', spec='errbar-sig', by='pclass')   # mean and interval per class, with the tests
+kx.plot(df, 'city', 'before', 'after', 'lollipop-sort')
+```
 
 `facet` draws a plot once per value of a column, `kx.plot(df, 'pclass', 'port', 'crosstab-facet', facet='sex')`,
 with every category in every panel, shared axes, and one colour scale and colorbar for the colour kinds.
@@ -187,6 +201,7 @@ other cycled properties (such as `paper`'s linestyles) stay.
 | `ibm`                                    | IBM Design Colors  |
 
 `kx.palette('okabe')` returns the hex codes. A list of colours works too: `palette=['#264653', '#e9c46a']`.
+`kx.register('brand', colors)` adds a named palette for the session, `cmap=True` a colourmap through the colours.
 
 ## Colourmaps
 
