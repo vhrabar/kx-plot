@@ -221,10 +221,9 @@ def _bars(ax: Axes, cats: np.ndarray, series: list[tuple[str, np.ndarray]], flag
     error bar's end with errs). errs: per series, a (2, n) array of the distances below and above each bar's end."""
     w = kw.pop("height" if horizontal else "width", 0.8)
     stack = "stack" in flags and len(series) > 1
-    if "sort" in flags:
-        order = np.argsort(-(sum(v for _, v in series) if stack else series[0][1]), kind="stable")
-        cats, series = cats[order], [(n, v[order]) for n, v in series]
-        errs = None if errs is None else [e[:, order] for e in errs]
+    order = _order(ax, cats, sum(v for _, v in series) if stack else series[0][1], flags, horizontal)
+    series = [(n, v[order]) for n, v in series]
+    errs = None if errs is None else [e[:, order] for e in errs]
     idx = np.arange(len(cats))
     draw = ax.barh if horizontal else ax.bar
     bottom = None
@@ -239,11 +238,18 @@ def _bars(ax: Axes, cats: np.ndarray, series: list[tuple[str, np.ndarray]], flag
             draw(idx + (i + 0.5 - len(series) / 2) * w / len(series), v, w / len(series), **{"label": name, **kw})
         if errs is not None:
             kw = {k: a for k, a in kw.items() if k not in ("xerr", "yerr")}
-    (ax.set_yticks if horizontal else ax.set_xticks)(idx, [str(c) for c in cats])
     if "ann" in flags:                          # stacked segments: value inside; otherwise past the end
         for c in ax.containers:
             if isinstance(c, BarContainer):
                 ax.bar_label(c, fmt=fmt, label_type="center" if stack else "edge", padding=0 if stack else 2)
+
+
+def _order(ax: Axes, cats: np.ndarray, key: np.ndarray, flags: set[str], horizontal: bool) -> np.ndarray:
+    """The order to draw the categories in, as given or largest key first with sort (NaN last), and their
+    labels as ticks at 0, 1, ... in that order: one rule for bar, barh and lollipop."""
+    order = np.argsort(-np.asarray(key, dtype=float), kind="stable") if "sort" in flags else np.arange(len(cats))
+    (ax.set_yticks if horizontal else ax.set_xticks)(np.arange(len(cats)), [str(c) for c in cats[order]])
+    return order
 
 
 def _levels(v: ArrayLike) -> tuple[list[str], list[np.ndarray]]:
@@ -294,6 +300,46 @@ def barh(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[s
     """Like bar, lying down: categories (x) top to bottom, bar lengths along the x axis; ci as for bar."""
     bar(ax, x, y, z, flags, horizontal=True, **kw)
     ax.invert_yaxis()                           # first category on top, read like a table
+
+
+def _check_lollipop(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if np.size(y) and np.ndim(y) != 1:
+        raise ValueError("kind 'lollipop' takes one value per category: y (and z for a dumbbell) 1-D")
+
+
+@kind("lollipop", flags=("sort", "ann"), value_axis="x", check=_check_lollipop)
+def lollipop(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str],
+             fmt: str = "{:.3g}", **kw: Any) -> None:
+    """A dot per category (x) at its value (y) on a thin stem from 0, lying down like barh, first category on top.
+    With z, a dumbbell: a line from y to z and a dot at each end, no stems. sort = largest first (by z - y with z),
+    ann = the value beside each dot (fmt=, '{:.3g}'). kw: ax.plot for the dots."""
+    cats = np.asarray(x, dtype=object).ravel()
+    ends = [(label(a, n), np.asarray(a, dtype=float).ravel()) for a, n in ((y, "y"), (z, "z")) if a is not None]
+    if any(len(v) != len(cats) for _, v in ends):
+        raise ValueError(f"kind 'lollipop' takes one value per category: {len(cats)} categories, "
+                         f"{' and '.join(str(len(v)) for _, v in ends)} values")
+    order = _order(ax, cats, ends[1][1] - ends[0][1] if z is not None else ends[0][1], flags, True)
+    ends = [(n, v[order]) for n, v in ends]
+    idx = np.arange(len(cats))
+    if z is None:
+        ax.hlines(idx, 0, ends[0][1], color="C0", lw=1.5, zorder=2)
+    else:
+        ax.hlines(idx, ends[0][1], ends[1][1], color=plt.rcParams["grid.color"], lw=3, zorder=2)
+    for i, (name, v) in enumerate(ends):
+        ax.plot(v, idx, **{"ls": "none", "marker": "o", "ms": 8, "color": f"C{i}", "zorder": 3,
+                           **({"label": name} if z is not None else {}), **kw})
+    if "ann" in flags:
+        for j, (_, v) in enumerate(ends):
+            other = ends[1 - j][1] if z is not None else np.zeros(len(cats))
+            for i, a in enumerate(v):
+                if np.isfinite(a):
+                    left = a < other[i] or (a == other[i] and j == 0 and z is not None)
+                    ax.annotate(fmt.format(a), (a, i), xytext=(-8 if left else 8, 0), textcoords="offset points",
+                                ha="right" if left else "left", va="center")
+        ax.margins(x=0.12)
+    ax.set_ylim(len(cats) - 0.5, -0.5)
+    if z is not None:
+        ax.legend()
 
 
 def _legend_right(ax: Axes, title: str | None, gap: float = 0.02) -> None:
