@@ -1,11 +1,11 @@
 """Themes, palettes and colormaps: discovery, kx.use and kx.context."""
 import contextlib
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
+from matplotlib.colors import Colormap, LinearSegmentedColormap, ListedColormap, to_hex
 
 from . import _files
 
@@ -16,6 +16,11 @@ BREWER_CMAPS = {"blues": "Blues", "greys": "Greys", "rdbu": "RdBu"}
 # styles/cmaps/<name>.txt: cmocean, then Crameri's Scientific colour maps 8
 VENDORED_CMAPS = ("thermal", "haline", "deep", "balance",
                   "batlow", "lipari", "hawaii", "oslo", "davos", "vik", "roma", "bam", "cork", "romaO")
+
+# kx.register: name -> '#rrggbb' colours, for this session
+_RUNTIME_PALETTES: dict[str, list[str]] = {}
+# kx.register(cmap=True): names added to mpl.colormaps
+_RUNTIME_CMAPS: set[str] = set()
 
 
 def styles() -> list[str]:
@@ -31,8 +36,8 @@ def style_path(name: str) -> str:
 
 
 def palettes() -> list[str]:
-    """List available palette names."""
-    return _files.names("styles/palettes", ".txt")
+    """List available palette names: the files in styles/palettes/ and those added with kx.register."""
+    return sorted({*_files.names("styles/palettes", ".txt"), *_RUNTIME_PALETTES})
 
 
 def palette(name: str) -> list[str]:
@@ -42,6 +47,8 @@ def palette(name: str) -> list[str]:
 
 def _read_palette(name: str) -> list[str]:
     """palette() under a name that kx.use's `palette` argument does not shadow."""
+    if name in _RUNTIME_PALETTES:
+        return list(_RUNTIME_PALETTES[name])
     if name not in palettes():
         raise ValueError(f"unknown palette {name!r}. Available: {palettes()}")
     return _read_hex(_files.path("styles", "palettes", f"{name}.txt"))
@@ -73,8 +80,55 @@ _register_cmaps()
 
 
 def cmaps() -> list[str]:
-    """List supported colormap names that this matplotlib version has, plus the vendored ones."""
-    return sorted(n for n in (*BUILTIN_CMAPS, *BREWER_CMAPS, *VENDORED_CMAPS) if n in mpl.colormaps)
+    """List supported colormap names that this matplotlib version has, plus the vendored ones and those added
+    with kx.register."""
+    names = (*BUILTIN_CMAPS, *BREWER_CMAPS, *VENDORED_CMAPS, *_RUNTIME_CMAPS)
+    return sorted({n for n in names if n in mpl.colormaps})
+
+
+def register(name: str, colors: Sequence[Any] | Colormap, cmap: bool = False) -> None:
+    """Add a palette, or with cmap=True a colormap, for this session:  kx.register('brand', ['#0b3d91', 'tab:red'])
+    colors: anything matplotlib reads as a colour ('#hex', names, RGB tuples); a Colormap is registered as a
+    colormap. A palette then works as kx.use(palette='brand'), a colormap as kx.use(cmap='brand') and 'brand_r'.
+    A name a shipped palette or a matplotlib colormap already has raises; registering the same name again
+    replaces it, so a notebook cell can run twice. To keep one, add a file to styles/palettes/ or styles/cmaps/."""
+    if not isinstance(name, str) or not name.strip() or name.endswith("_r"):
+        raise ValueError(f"register needs a name that does not end in '_r' (kept for reversed maps), got {name!r}")
+    if isinstance(colors, Colormap) or cmap:
+        _register_cmap(name, colors)
+        return
+    if name in _files.names("styles/palettes", ".txt"):
+        raise ValueError(f"palette {name!r} ships with kx; pick another name")
+    _RUNTIME_PALETTES[name] = _hexes(colors, least=1)
+
+
+def _register_cmap(name: str, colors: Sequence[Any] | Colormap) -> None:
+    """kx.register with cmap=True: a copy of a Colormap, or a smooth map through the colours, in mpl.colormaps."""
+    if name in mpl.colormaps and name not in _RUNTIME_CMAPS:
+        raise ValueError(f"colormap {name!r} exists in matplotlib or kx; pick another name")
+    if isinstance(colors, Colormap):
+        new = colors.copy()
+        new.name = name
+    else:
+        new = LinearSegmentedColormap.from_list(name, _hexes(colors, least=2))
+    for old in (name, f"{name}_r"):             # the old map, and a reversed copy kx.use made of it
+        if old in mpl.colormaps:
+            mpl.colormaps.unregister(old)
+    mpl.colormaps.register(new, name=name)
+    _RUNTIME_CMAPS.add(name)
+
+
+def _hexes(colors: Sequence[Any], least: int) -> list[str]:
+    """colors as '#rrggbb', at least `least` of them; a bad colour raises naming it."""
+    if isinstance(colors, str) or len(colors) < least:
+        raise ValueError(f"register needs a list of at least {least} colours, got {colors!r}")
+    out = []
+    for c in colors:
+        try:
+            out.append(to_hex(c))
+        except (ValueError, TypeError):
+            raise ValueError(f"register: {c!r} is not a colour") from None
+    return out
 
 
 def show(name: str) -> None:

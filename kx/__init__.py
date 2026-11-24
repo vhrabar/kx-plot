@@ -31,6 +31,7 @@ table  : heat, cluster, missing, nullmap, loss, radar, parallel, pair take a who
 
 Palettes (kx.use(theme, palette="okabe")): any file name in styles/palettes/
 Colormaps (kx.use(theme, cmap="magma")):  kx.cmaps()
+kx.register("brand", colors): a palette (cmap=True: a colormap) of your own for this session, then as above.
 with kx.context(theme, ...): the same as kx.use, for one block only.
 kx.save("fig.png"): saves to /kaggle/working on Kaggle, the current folder elsewhere.
 kx.load("passengers"): a demo table; kx.load("shapes"): a dict of image arrays. kx.datasets() lists them.
@@ -61,11 +62,23 @@ from ._metrics import pr_ap, roc_auc
 from ._plot import plot
 from ._save import save
 from ._spec import COMMON_FLAGS, KINDS, Spec, all_flags, parse
-from ._theme import BREWER_CMAPS, BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
+from ._theme import (
+    BREWER_CMAPS,
+    BUILTIN_CMAPS,
+    VENDORED_CMAPS,
+    cmaps,
+    context,
+    palette,
+    palettes,
+    register,
+    show,
+    styles,
+    use,
+)
 
 __all__ = ["BREWER_CMAPS", "BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "cramers",
            "datasets", "embed", "evaluate", "grammar", "grid", "load", "missing", "palette", "palettes", "parse",
-           "plot", "pr_ap", "roc_auc", "save", "show", "source", "styles", "use"]
+           "plot", "pr_ap", "register", "roc_auc", "save", "show", "source", "styles", "use"]
 
 
 def _version() -> str:

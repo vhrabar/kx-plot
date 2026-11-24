@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Plot kind** `errbar`: the mean per series or `by=` group with a bootstrap 95% interval; `sd`, `ann`, `sig`.
 - **Flag** `endlab` (`line`, `step`, `band`, `area`): each line's name at its right end instead of a legend.
 - **Plot kind** `lollipop`: a dot per category on a stem from 0, or a dumbbell from `y` to `z`; `sort`, `ann`.
+- `kx.register(name, colors, cmap=False)`: a palette or colormap of your own for the session.
 
 ## [0.6.0] - 2026-11-04
 
