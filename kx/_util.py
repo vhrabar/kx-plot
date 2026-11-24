@@ -100,8 +100,8 @@ def spread(labels: list[mpl.text.Annotation]) -> None:
         return
     ax = labels[0].axes
     to_pt = 72 / ax.figure.dpi
-    ends = np.array([ax.transData.transform((ax.convert_xunits(a.xy[0]), ax.convert_yunits(a.xy[1])))[1] * to_pt
-                     for a in labels])          # in points, where each line ends
+    ends = np.array([ax.transData.transform((ax.viewLim.x0, float(a.xy[1])))[1] * to_pt
+                     for a in labels])          # in points, where each line ends; y alone, x may be a category
     gap = ENDLAB_GAP * max(a.get_fontsize() for a in labels)
     blocks = [[i] for i in np.argsort(ends, kind="stable")]     # bottom to top
 
