@@ -1,7 +1,22 @@
 # Vendored colour palettes
 
-```
-tol* colour palettes
+The palette files in this folder copy colour values from the sources below. Each source's notice and licence is
+kept here as its terms ask. The `colorblind` theme (`kx/styles/colorblind.mplstyle`) uses the Okabe-Ito colours.
+
+| Files | Source | Licence |
+|---|---|---|
+| `tolbright`, `tolvibrant`, `tollight`, `tolhc`, `tolmc` | Paul Tol | BSD-3-Clause style, below |
+| `petroff6`, `petroff8`, `petroff10` | Matthew A. Petroff | CC0 1.0 |
+| `set1`, `set2`, `dark2`, `paired` | ColorBrewer, Cynthia Brewer | Apache-2.0 |
+| `ibm` | IBM Design Library | CC BY 4.0 |
+| `okabe`, theme `colorblind` | Okabe & Ito (2008) | none stated; credited |
+| `tab10`, `tab20`, `tableaucb` | Tableau, as shipped with matplotlib | Matplotlib licence |
+
+## Paul Tol: tolbright, tolvibrant, tollight, tolhc, tolmc
+
+https://sronpersonalpages.nl/~pault/
+
+```text
 Copyright (c) 2022, Paul Tol
 
 Redistribution and use in source and binary forms, with or without
@@ -32,11 +47,12 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-```
-petroff* colour palettes
-Petroff, M. A. (2021), "Accessible Color Sequences for Data Visualization", arXiv:2107.02270
+## Petroff: petroff6, petroff8, petroff10
+
+Petroff, M. A. (2021), "Accessible Color Sequences for Data Visualization", arXiv:2107.02270.
 https://github.com/mpetroff/accessible-color-cycles
 
+```text
 Creative Commons Legal Code
 
 CC0 1.0 Universal
@@ -158,12 +174,13 @@ express Statement of Purpose.
  d. Affirmer understands and acknowledges that Creative Commons is not a
     party to this document and has no duty or obligation with respect to
     this CC0 or use of the Work.
-
 ```
 
-```
-set1, set2, dark2 and paired colour palettes
+## ColorBrewer: set1, set2, dark2, paired
 
+https://colorbrewer2.org/, as shipped with matplotlib.
+
+```text
 Copyright (c) 2002 Cynthia Brewer, Mark Harrower, and The Pennsylvania State University.
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -177,13 +194,13 @@ Copyright (c) 2002 Cynthia Brewer, Mark Harrower, and The Pennsylvania State Uni
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-
 ```
 
-```
-IBM colour palette
-IBM Design Colors by International Business Machines Corporation,
+## IBM: ibm
 
+IBM Design Colors by International Business Machines Corporation, IBM Design Library.
+
+```text
 Attribution 4.0 International
 
 =======================================================================
@@ -579,5 +596,66 @@ the avoidance of doubt, this paragraph does not form part of the
 public licenses.
 
 Creative Commons may be contacted at creativecommons.org.
+```
 
+## Okabe-Ito: okabe, theme colorblind
+
+Okabe, M. and Ito, K. (2008), "Color Universal Design (CUD): How to make figures and presentations that are
+friendly to colorblind people", https://jfly.uni-koeln.de/color/. Published as a recommendation for anyone to use;
+no licence is stated. `colorblind` uses seven of the eight colours (without the yellow) in its own order.
+
+## Tableau via matplotlib: tab10, tab20, tableaucb
+
+The Tableau 10 and Tableau 20 colours and the `tableau-colorblind10` style, as shipped with matplotlib.
+
+```text
+License agreement for matplotlib versions 1.3.0 and later
+=========================================================
+
+1. This LICENSE AGREEMENT is between the Matplotlib Development Team
+("MDT"), and the Individual or Organization ("Licensee") accessing and
+otherwise using matplotlib software in source or binary form and its
+associated documentation.
+
+2. Subject to the terms and conditions of this License Agreement, MDT
+hereby grants Licensee a nonexclusive, royalty-free, world-wide license
+to reproduce, analyze, test, perform and/or display publicly, prepare
+derivative works, distribute, and otherwise use matplotlib
+alone or in any derivative version, provided, however, that MDT's
+License Agreement and MDT's notice of copyright, i.e., "Copyright (c)
+2012- Matplotlib Development Team; All Rights Reserved" are retained in
+matplotlib  alone or in any derivative version prepared by
+Licensee.
+
+3. In the event Licensee prepares a derivative work that is based on or
+incorporates matplotlib or any part thereof, and wants to
+make the derivative work available to others as provided herein, then
+Licensee hereby agrees to include in any such work a brief summary of
+the changes made to matplotlib .
+
+4. MDT is making matplotlib available to Licensee on an "AS
+IS" basis.  MDT MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, MDT MAKES NO AND
+DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
+FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF MATPLOTLIB
+WILL NOT INFRINGE ANY THIRD PARTY RIGHTS.
+
+5. MDT SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF MATPLOTLIB
+ FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR
+LOSS AS A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING
+MATPLOTLIB , OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF
+THE POSSIBILITY THEREOF.
+
+6. This License Agreement will automatically terminate upon a material
+breach of its terms and conditions.
+
+7. Nothing in this License Agreement shall be deemed to create any
+relationship of agency, partnership, or joint venture between MDT and
+Licensee.  This License Agreement does not grant permission to use MDT
+trademarks or trade name in a trademark sense to endorse or promote
+products or services of Licensee, or any third party.
+
+8. By copying, installing or otherwise using matplotlib ,
+Licensee agrees to be bound by the terms and conditions of this License
+Agreement.
 ```

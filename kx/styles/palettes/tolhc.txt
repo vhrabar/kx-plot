@@ -1,6 +1,6 @@
 # Paul Tol High Contrast: 3 colours that also work in greyscale
 # (Tol's white and black are background/text, so not in the cycle)
-# https://sronpersonalpages.nl/~pault/
+# https://sronpersonalpages.nl/~pault/ (BSD-3-Clause style; see LICENCES.md)
 004488
 DDAA33
 BB5566

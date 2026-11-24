@@ -1,5 +1,5 @@
 # Tableau Color Blind 10: blues, oranges and greys that survive red-green colour blindness
-# Tableau, as shipped with matplotlib
+# Tableau, as shipped with matplotlib (Matplotlib licence; see LICENCES.md)
 006BA4
 FF800E
 ABABAB

@@ -1,8 +1,10 @@
 """Themes, palettes and colormaps."""
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 import matplotlib as mpl
+import pandas as pd
 import pytest
 from helpers import X, Y, Z
 from matplotlib.colors import to_hex
@@ -183,6 +185,60 @@ def test_paper_cycles_linestyles_for_greyscale_print() -> None:
     assert ax.lines[0].get_linestyle() != ax.lines[1].get_linestyle()
 
 
+def _grid(axis: mpl.axis.Axis) -> bool:
+    return any(line.get_visible() for line in axis.get_gridlines())
+
+
+def test_minimal_has_no_box_and_a_grid_along_the_values() -> None:
+    kx.use("minimal")
+    assert not any(mpl.rcParams[f"axes.spines.{s}"] for s in ("left", "right", "top", "bottom"))
+    assert (mpl.rcParams["xtick.major.size"], mpl.rcParams["ytick.major.size"]) == (0, 0)
+    assert not mpl.rcParams["legend.frameon"]
+    for spec, values, other in [("bar", "yaxis", "xaxis"), ("barh", "xaxis", "yaxis"),
+                                ("lollipop", "xaxis", "yaxis")]:
+        ax = kx.plot(["a", "b", "c"], [1, 2, 3], spec)
+        ax.figure.canvas.draw()
+        assert _grid(getattr(ax, values))
+        assert not _grid(getattr(ax, other))
+
+
+@pytest.mark.parametrize("spec", ["heat-minimal", "heat-minimal-grid"])
+def test_minimal_grid_stays_off_cells(spec: str) -> None:
+    ax = kx.plot(pd.DataFrame({"a": X, "b": Y, "c": Z}), spec)
+    ax.figure.canvas.draw()
+    assert _grid(ax.xaxis) == _grid(ax.yaxis) == spec.endswith("-grid")
+
+
+def test_minimal_in_a_spec_is_local() -> None:
+    ax = kx.plot(["a", "b"], [1, 2], "barh-minimal")
+    ax.figure.canvas.draw()
+    assert _grid(ax.xaxis)
+    assert not mpl.rcParams["axes.grid"]
+    assert not _grid(kx.plot(["a", "b"], [1, 2], "barh").xaxis)
+
+
+COLORBLIND = ["#0072b2", "#e69f00", "#009e73", "#d55e00", "#56b4e9", "#cc79a7", "#000000"]
+
+
+def test_colorblind_is_okabe_without_yellow_and_with_linestyles() -> None:
+    kx.use("colorblind")
+    cycle = mpl.rcParams["axes.prop_cycle"].by_key()
+    assert [to_hex(c) for c in cycle["color"]] == COLORBLIND
+    assert set(COLORBLIND) <= {to_hex(c) for c in OKABE}
+    assert to_hex("#F0E442") not in COLORBLIND
+    assert cycle["linestyle"][:4] == ["-", "--", ":", "-."]
+    assert mpl.rcParams["image.cmap"] == "cividis"
+    ax = kx.plot(X, Y, Z, "line")
+    assert ax.lines[0].get_linestyle() != ax.lines[1].get_linestyle()
+
+
+def test_colorblind_palette_swap_keeps_linestyles() -> None:
+    kx.use("colorblind", palette="tab10")
+    cycle = mpl.rcParams["axes.prop_cycle"].by_key()
+    assert len(cycle["linestyle"]) == len(cycle["color"]) == 10
+    assert cycle["linestyle"][:4] == ["-", "--", ":", "-."]
+
+
 def test_scatter_size_follows_theme_markersize() -> None:
     small = kx.plot(X, Y, "scatter-science").collections[0].get_sizes()[0]
     large = kx.plot(X, Y, "scatter-poster").collections[0].get_sizes()[0]
@@ -193,3 +249,69 @@ def test_scatter_size_follows_theme_markersize() -> None:
 def test_every_shipped_style_loads() -> None:
     for name in kx.styles():
         kx.use(name)
+
+
+# ---------- kx.register ----------
+@pytest.fixture(autouse=True)
+def runtime_registry() -> Iterator[None]:
+    """Each test starts and ends with nothing registered at runtime, so the theme tests stay independent."""
+    yield
+    kx._theme._RUNTIME_PALETTES.clear()
+    for name in kx._theme._RUNTIME_CMAPS:
+        for old in (name, f"{name}_r"):
+            if old in mpl.colormaps:
+                mpl.colormaps.unregister(old)
+    kx._theme._RUNTIME_CMAPS.clear()
+
+
+def test_register_palette() -> None:
+    kx.register("brand", ["#0B3D91", "tab:red", (0, 0.5, 0)])
+    assert "brand" in kx.palettes()
+    assert kx.palette("brand") == ["#0b3d91", "#d62728", "#008000"]
+    kx.use("light", palette="brand")
+    assert [to_hex(c) for c in mpl.rcParams["axes.prop_cycle"].by_key()["color"]] == kx.palette("brand")
+    with kx.context("dark", palette="brand"):
+        assert to_hex(kx.plot(X, Y, "line").lines[0].get_color()) == "#0b3d91"
+
+
+def test_register_palette_twice_replaces_it() -> None:
+    kx.register("brand", ["red"])
+    kx.register("brand", ["blue", "green"])
+    assert kx.palette("brand") == ["#0000ff", "#008000"]
+    assert kx.palettes().count("brand") == 1
+
+
+@pytest.mark.parametrize("cmap", [True, False])
+def test_register_cmap(cmap: bool) -> None:
+    kx.register("ramp", ["white", "black"] if cmap else mpl.colormaps["viridis"], cmap=cmap)
+    assert "ramp" in kx.cmaps()
+    assert "ramp" not in kx.palettes()
+    kx.use("light", cmap="ramp_r")
+    rev = kx.plot(X, Y, Z, "scatter").collections[0].get_cmap()
+    want = ("#000000", "#ffffff") if cmap else (to_hex(mpl.colormaps["viridis"](1.0)), "#440154")
+    assert (to_hex(rev(0.0)), to_hex(rev(1.0))) == want
+
+
+def test_register_cmap_twice_replaces_it_and_its_reverse() -> None:
+    kx.register("ramp", ["white", "black"], cmap=True)
+    kx.use("light", cmap="ramp_r")
+    kx.register("ramp", ["red", "blue"], cmap=True)
+    kx.use("light", cmap="ramp_r")
+    assert to_hex(mpl.colormaps["ramp_r"](0.0)) == "#0000ff"
+
+
+@pytest.mark.parametrize(("name", "colors", "cmap", "match"), [
+    ("okabe", ["red"], False, "ships with kx"),
+    ("viridis", ["red", "blue"], True, "exists in matplotlib"),
+    ("batlow", ["red", "blue"], True, "exists in matplotlib"),
+    ("brand", ["red", "notacolour"], False, "'notacolour' is not a colour"),
+    ("brand", "red", False, "a list of at least 1"),
+    ("brand", [], False, "a list of at least 1"),
+    ("ramp", ["red"], True, "a list of at least 2"),
+    ("brand_r", ["red"], False, "does not end in '_r'"),
+    ("", ["red"], False, "needs a name"),
+])
+def test_register_errors(name: str, colors: list | str, cmap: bool, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.register(name, colors, cmap=cmap)
+    assert name not in kx.palettes() or name == "okabe"

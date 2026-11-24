@@ -9,7 +9,8 @@ from ._theme import styles
 COMMON_FLAGS = {"grid", "leg", "legout", "tight", "rot", "wrap",           # handled by kx.plot for every kind
                 "logx", "logy", "logxy", "symlogy", "zero", "eq", "pct", "si", "facet"}
 EXCLUSIVE = ({"logy", "logxy", "symlogy"}, {"logx", "logxy"}, {"zero", "logy"}, {"zero", "logxy"},
-             {"pct", "si"}, {"sym", "logc"}, {"corr", "logc"})          # pairs that ask for opposite things
+             {"pct", "si"}, {"sym", "logc"}, {"corr", "logc"},
+             {"ci", "stack"}, {"endlab", "leg"}, {"endlab", "legout"})     # pairs that ask for opposite things
 
 
 @dataclass(frozen=True)

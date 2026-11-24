@@ -61,7 +61,9 @@ def test_ml_datasets_shapes_and_story() -> None:
     assert set(m.y) == set(m.pred) == {"cat", "dog", "bird"}
     assert np.allclose(m[["cat", "dog", "bird"]].sum(axis=1), 1)
     assert (m.pred == m[["cat", "dog", "bird"]].idxmax(axis=1)).all()
-    err = (r.actual - r.predicted).abs()
+    resid = r.actual - r.predicted
+    assert abs(np.corrcoef(resid, r.predicted)[0, 1]) < 0.1
+    err = resid.abs()
     assert err[r.x > 7].mean() > 2 * err[r.x < 3].mean()
     assert 0 < h.val_loss.idxmin() < len(h) - 1             # overfits: the minimum is inside, not at the end
     assert h.loss.idxmin() > h.val_loss.idxmin()

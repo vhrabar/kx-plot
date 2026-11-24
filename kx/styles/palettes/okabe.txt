@@ -1,5 +1,5 @@
 # Okabe-Ito: 8 colours distinguishable with every common colour-vision deficiency
-# Okabe & Ito (2008), https://jfly.uni-koeln.de/color/
+# Okabe & Ito (2008), https://jfly.uni-koeln.de/color/ (no licence stated, credited; see LICENCES.md)
 E69F00
 56B4E9
 009E73

@@ -1,4 +1,5 @@
 """Basic kinds: y and z against x."""
+import warnings
 from typing import Any
 
 import matplotlib as mpl
@@ -7,13 +8,15 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
+from matplotlib.container import BarContainer
 from matplotlib.patheffects import withStroke
 from numpy.typing import ArrayLike
 
 from .._spec import kind
-from .._util import COLOUR, categories, colorbar, diagonal, ink, label, norm
+from .._stats import bootstrap
+from .._util import COLOUR, categories, colorbar, diagonal, endlabels, ink, label, norm
 
-LINES = ("date", "mk")                          # flags of the kinds that draw lines against x
+LINES = ("date", "mk", "endlab")                # flags of the kinds that draw lines against x
 
 
 def _mk(flags: set[str]) -> dict[str, str]:
@@ -21,20 +24,67 @@ def _mk(flags: set[str]) -> dict[str, str]:
     return {"marker": "o"} if "mk" in flags else {}
 
 
-@kind("line", flags=LINES)
-def line(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
-    """y and z against x. date = x as dates, mk = a marker on every point. kw: ax.plot."""
-    ax.plot(x, y, **{"label": label(y, "y"), **_mk(flags), **kw})
-    if z is not None:
-        ax.plot(x, z, **{"label": label(z, "z"), **_mk(flags), **kw})
+def _boot(flags: set[str], n_boot: int | None, seed: int | None) -> tuple[int, int]:
+    """n_boot= and seed= for the flag ci, which they only go with."""
+    if "ci" not in flags and (n_boot is not None or seed is not None):
+        raise ValueError("n_boot= and seed= set the bootstrap of the flag ci; add it: line-ci")
+    return (1000 if n_boot is None else n_boot), (0 if seed is None else seed)
 
 
-@kind("step", flags=LINES)
-def step(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
-    """Like line, drawn as steps centred on each x. kw: ax.step."""
-    ax.step(x, y, **{"where": "mid", "label": label(y, "y"), **_mk(flags), **kw})
-    if z is not None:
-        ax.step(x, z, **{"where": "mid", "label": label(z, "z"), **_mk(flags), **kw})
+def _mean_ci(x: ArrayLike, v: ArrayLike, n_boot: int, seed: int) -> tuple[Any, np.ndarray, np.ndarray, np.ndarray]:
+    """ci: x's distinct values (sorted for numbers, dates and categoricals, in order of appearance for text), the
+    mean of v at each, and the bootstrap interval of that mean."""
+    xs = pd.Series(np.asarray(x)) if not isinstance(x, pd.Series) else x.reset_index(drop=True)
+    ordered = (pd.api.types.is_numeric_dtype(xs) or pd.api.types.is_datetime64_any_dtype(xs)
+               or isinstance(xs.dtype, pd.CategoricalDtype))
+    codes, keys = pd.factorize(xs, sort=ordered)
+    vs = np.asarray(v, dtype=float).ravel()
+    if len(keys) == np.count_nonzero(codes >= 0):
+        raise ValueError("ci bootstraps the y values at each x, and each x has one here. "
+                         "For a spread you know, use band: kx.plot(x, y, err, 'band')")
+    groups = [vs[codes == i] for i in range(len(keys))]
+    with np.errstate(invalid="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        mean = np.array([np.nanmean(g) for g in groups])
+    lo, hi = np.array([bootstrap(g, n_boot, seed) for g in groups]).T
+    return np.asarray(keys), mean, lo, hi
+
+
+def _lines(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], drawn: bool,
+           n_boot: int | None, seed: int | None, **kw: Any) -> None:
+    """line and step: y and z against x, as given or (ci) as the mean at each x with its interval as a band."""
+    n_boot, seed = _boot(flags, n_boot, seed)
+    draw = ax.step if drawn else ax.plot
+    where = {"where": "mid"} if drawn else {}
+    for v, name in ((y, "y"), (z, "z")):
+        if v is None:
+            continue
+        if "ci" not in flags:
+            draw(x, v, **{**where, "label": label(v, name), **_mk(flags), **kw})
+            continue
+        keys, mean, lo, hi = _mean_ci(x, v, n_boot, seed)
+        ln, = draw(keys, mean, **{**where, "label": label(v, name), **_mk(flags), **kw})
+        ax.fill_between(keys, lo, hi, color=ln.get_color(), alpha=0.25, linewidth=0,
+                        **({"step": "mid"} if drawn else {}))
+    if "endlab" in flags:
+        endlabels(ax)
+
+
+@kind("line", flags=(*LINES, "ci"))
+def line(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], n_boot: int | None = None,
+         seed: int | None = None, **kw: Any) -> None:
+    """y and z against x. date = x as dates, mk = a marker on every point, endlab = each line's name at its
+    right end instead of a legend.
+    ci = the mean of y at each x with a bootstrap 95% interval as a band (n_boot= resamples, 1000; seed=, 0).
+    kw: ax.plot."""
+    _lines(ax, x, y, z, flags, False, n_boot, seed, **kw)
+
+
+@kind("step", flags=(*LINES, "ci"))
+def step(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], n_boot: int | None = None,
+         seed: int | None = None, **kw: Any) -> None:
+    """Like line, drawn as steps centred on each x; ci as for line, the band in steps too. kw: ax.step."""
+    _lines(ax, x, y, z, flags, True, n_boot, seed, **kw)
 
 
 def _check_area(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
@@ -42,6 +92,8 @@ def _check_area(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("flag 'norm' needs two series (y and z) to split 100% between")
     if "mk" in flags and flags & {"stack", "norm"}:
         raise ValueError("flag 'mk' marks the lines of an overlapping area; a stack has no lines")
+    if "endlab" in flags and flags & {"stack", "norm"}:
+        raise ValueError("flag 'endlab' labels the lines of an overlapping area; a stack ends in bands, not points")
 
 
 @kind("area", flags=("stack", "norm", *LINES), check=_check_area)
@@ -60,6 +112,8 @@ def area(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[s
         for v, n in series:
             ln, = ax.plot(x, v, label=n, **_mk(flags))
             ax.fill_between(x, v, **{"color": ln.get_color(), "alpha": 0.3, "linewidth": 0, **kw})
+        if "endlab" in flags:
+            endlabels(ax)
 
 
 def _check_band(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
@@ -74,6 +128,8 @@ def band(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike, flags: set[str], **
     ln, = ax.plot(x, mid, **{"label": label(y, "y"), **_mk(flags), **kw})
     ax.fill_between(x, mid - half, mid + half, color=ln.get_color(), alpha=0.25,
                     linewidth=0, label=f"± {label(z, 'z')}")
+    if "endlab" in flags:
+        endlabels(ax)
 
 
 def _check_scatter(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
@@ -131,38 +187,69 @@ def scatter(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: se
         diagonal(ax, x, y, flags)
 
 
-@kind("bar", flags=("stack", "sort", "ann"))
+@kind("bar", flags=("stack", "sort", "ann", "ci"))
 def bar(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str],
-        horizontal: bool = False, **kw: Any) -> None:
+        horizontal: bool = False, n_boot: int | None = None, seed: int | None = None, **kw: Any) -> None:
     """y and z grouped per category, x = category labels; stack = z on top of y.
     sort = largest first (by y, or by the total with stack), ann = the value on each bar.
+    ci = one bar per category at the mean of its rows, with a bootstrap 95% interval as an error bar
+    (n_boot= resamples, 1000; seed=, 0); missing x values are a 'NaN' category, as in count.
     kw: ax.bar (ax.barh); width= (height= for barh) is the space a category's bars fill, 0.8 by default."""
-    series = [(label(a, n), np.asarray(a, dtype=float)) for a, n in ((y, "y"), (z, "z")) if a is not None]
-    _bars(ax, np.asarray(x, dtype=object), series, flags, horizontal, **kw)
+    n_boot, seed = _boot(flags, n_boot, seed)
+    named = [(label(a, n), a) for a, n in ((y, "y"), (z, "z")) if a is not None]
+    if "ci" not in flags:
+        series = [(n, np.asarray(a, dtype=float)) for n, a in named]
+        _bars(ax, np.asarray(x, dtype=object), series, flags, horizontal, **kw)
+        return
+    cats, masks = _levels(x)
+    series, errs = [], []
+    for n, a in named:
+        v = np.asarray(a, dtype=float).ravel()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)  # a category whose values are all NaN: no bar
+            mean = np.array([np.nanmean(v[m]) for m in masks])
+        lo, hi = np.array([bootstrap(v[m], n_boot, seed) for m in masks]).T
+        series.append((n, mean))
+        errs.append(np.array([mean - lo, hi - mean]))
+    _bars(ax, np.array(cats, dtype=object), series, flags, horizontal, errs=errs, **kw)
 
 
 def _bars(ax: Axes, cats: np.ndarray, series: list[tuple[str, np.ndarray]], flags: set[str], horizontal: bool,
-          fmt: str = "{:.3g}", **kw: Any) -> None:
+          fmt: str = "{:.3g}", errs: list[np.ndarray] | None = None, **kw: Any) -> None:
     """One bar per category for each series, side by side (or stacked), with the category labels as ticks.
-    sort = largest first (by the first series, or by the total with stack), ann = fmt on each bar."""
+    sort = largest first (by the first series, or by the total with stack), ann = fmt on each bar (past the
+    error bar's end with errs). errs: per series, a (2, n) array of the distances below and above each bar's end."""
     w = kw.pop("height" if horizontal else "width", 0.8)
     stack = "stack" in flags and len(series) > 1
-    if "sort" in flags:
-        order = np.argsort(-(sum(v for _, v in series) if stack else series[0][1]), kind="stable")
-        cats, series = cats[order], [(n, v[order]) for n, v in series]
+    order = _order(ax, cats, sum(v for _, v in series) if stack else series[0][1], flags, horizontal)
+    series = [(n, v[order]) for n, v in series]
+    errs = None if errs is None else [e[:, order] for e in errs]
     idx = np.arange(len(cats))
     draw = ax.barh if horizontal else ax.bar
     bottom = None
     for i, (name, v) in enumerate(series):
+        if errs is not None:
+            kw = {"xerr" if horizontal else "yerr": errs[i], "capsize": 3,
+                  "error_kw": {"ecolor": plt.rcParams["text.color"], "elinewidth": 1}, **kw}
         if stack:                               # each series starts where the last ended: the end is the total
             draw(idx, v, w, bottom, **{"label": name, **kw})
             bottom = v if bottom is None else bottom + v
         else:                                   # side by side, together filling w
             draw(idx + (i + 0.5 - len(series) / 2) * w / len(series), v, w / len(series), **{"label": name, **kw})
-    (ax.set_yticks if horizontal else ax.set_xticks)(idx, [str(c) for c in cats])
+        if errs is not None:
+            kw = {k: a for k, a in kw.items() if k not in ("xerr", "yerr")}
     if "ann" in flags:                          # stacked segments: value inside; otherwise past the end
         for c in ax.containers:
-            ax.bar_label(c, fmt=fmt, label_type="center" if stack else "edge", padding=0 if stack else 2)
+            if isinstance(c, BarContainer):
+                ax.bar_label(c, fmt=fmt, label_type="center" if stack else "edge", padding=0 if stack else 2)
+
+
+def _order(ax: Axes, cats: np.ndarray, key: np.ndarray, flags: set[str], horizontal: bool) -> np.ndarray:
+    """The order to draw the categories in, as given or largest key first with sort (NaN last), and their
+    labels as ticks at 0, 1, ... in that order: one rule for bar, barh and lollipop."""
+    order = np.argsort(-np.asarray(key, dtype=float), kind="stable") if "sort" in flags else np.arange(len(cats))
+    (ax.set_yticks if horizontal else ax.set_xticks)(np.arange(len(cats)), [str(c) for c in cats[order]])
+    return order
 
 
 def _levels(v: ArrayLike) -> tuple[list[str], list[np.ndarray]]:
@@ -208,11 +295,51 @@ def count(ax: Axes, x: ArrayLike, y: None, z: None, flags: set[str], by: ArrayLi
         ax.legend(title=label(by, "by"), **({"loc": "center left", "bbox_to_anchor": (1, 0.5)} if full else {}))
 
 
-@kind("barh", flags=("stack", "sort", "ann"), value_axis="x")
+@kind("barh", flags=("stack", "sort", "ann", "ci"), value_axis="x")
 def barh(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
-    """Like bar, lying down: categories (x) top to bottom, bar lengths along the x axis."""
+    """Like bar, lying down: categories (x) top to bottom, bar lengths along the x axis; ci as for bar."""
     bar(ax, x, y, z, flags, horizontal=True, **kw)
     ax.invert_yaxis()                           # first category on top, read like a table
+
+
+def _check_lollipop(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
+    if np.size(y) and np.ndim(y) != 1:
+        raise ValueError("kind 'lollipop' takes one value per category: y (and z for a dumbbell) 1-D")
+
+
+@kind("lollipop", flags=("sort", "ann"), value_axis="x", check=_check_lollipop)
+def lollipop(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str],
+             fmt: str = "{:.3g}", **kw: Any) -> None:
+    """A dot per category (x) at its value (y) on a thin stem from 0, lying down like barh, first category on top.
+    With z, a dumbbell: a line from y to z and a dot at each end, no stems. sort = largest first (by z - y with z),
+    ann = the value beside each dot (fmt=, '{:.3g}'). kw: ax.plot for the dots."""
+    cats = np.asarray(x, dtype=object).ravel()
+    ends = [(label(a, n), np.asarray(a, dtype=float).ravel()) for a, n in ((y, "y"), (z, "z")) if a is not None]
+    if any(len(v) != len(cats) for _, v in ends):
+        raise ValueError(f"kind 'lollipop' takes one value per category: {len(cats)} categories, "
+                         f"{' and '.join(str(len(v)) for _, v in ends)} values")
+    order = _order(ax, cats, ends[1][1] - ends[0][1] if z is not None else ends[0][1], flags, True)
+    ends = [(n, v[order]) for n, v in ends]
+    idx = np.arange(len(cats))
+    if z is None:
+        ax.hlines(idx, 0, ends[0][1], color="C0", lw=1.5, zorder=2)
+    else:
+        ax.hlines(idx, ends[0][1], ends[1][1], color=plt.rcParams["text.color"], alpha=0.3, lw=3, zorder=2)
+    for i, (name, v) in enumerate(ends):
+        ax.plot(v, idx, **{"ls": "none", "marker": "o", "ms": 8, "color": f"C{i}", "zorder": 3,
+                           **({"label": name} if z is not None else {}), **kw})
+    if "ann" in flags:
+        for j, (_, v) in enumerate(ends):
+            other = ends[1 - j][1] if z is not None else np.zeros(len(cats))
+            for i, a in enumerate(v):
+                if np.isfinite(a):
+                    left = a < other[i] or (a == other[i] and j == 0 and z is not None)
+                    ax.annotate(fmt.format(a), (a, i), xytext=(-8 if left else 8, 0), textcoords="offset points",
+                                ha="right" if left else "left", va="center")
+        ax.margins(x=0.12)
+    ax.set_ylim(len(cats) - 0.5, -0.5)
+    if z is not None:
+        ax.legend()
 
 
 def _legend_right(ax: Axes, title: str | None, gap: float = 0.02) -> None:

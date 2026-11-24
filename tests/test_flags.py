@@ -9,6 +9,7 @@ import pytest
 from helpers import DF, PASSENGERS, X, Y, Z, _dashed
 from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
+from matplotlib.container import BarContainer
 
 import kx
 import kx._stats
@@ -326,7 +327,7 @@ def _brackets(ax: Axes) -> list[tuple[float, float, float]]:
     return [(ln.get_xdata()[0], ln.get_xdata()[2], ln.get_ydata()[1]) for ln in ax.lines if len(ln.get_xdata()) == 4]
 
 
-@pytest.mark.parametrize("kind", ["box", "violin"])
+@pytest.mark.parametrize("kind", ["box", "violin", "errbar"])
 def test_sig_brackets_only_the_pairs_that_differ(kind: str) -> None:
     ax = kx.plot(LOW, SAME, HIGH, f"{kind}-sig")
     assert sorted((a, b) for a, b, _ in _brackets(ax)) == [(1, 3), (2, 3)]
@@ -336,7 +337,8 @@ def test_sig_brackets_only_the_pairs_that_differ(kind: str) -> None:
     assert [t.get_text() for t in ax.texts].count(marks) == 2
     _, p = kx._stats.kruskal(LOW, SAME, HIGH)
     assert f"Kruskal-Wallis {kx.kinds.dist._p(p)}" in [t.get_text() for t in ax.texts]
-    assert all(h > HIGH.max() for _, _, h in _brackets(ax))         # above the data
+    top = HIGH.max() if kind != "errbar" else kx._stats.bootstrap(HIGH)[1]
+    assert all(h > top for _, _, h in _brackets(ax))                # above what is drawn
     assert ax.get_ylim()[1] > max(h for _, _, h in _brackets(ax))   # and inside the axes
 
 
@@ -375,3 +377,191 @@ def test_sig_works_with_facet_and_by_columns() -> None:
 def test_sig_errors(call: Callable[[], Axes], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         call()
+
+
+# ---------- ci ----------
+CI_X = np.repeat([3, 1, 2], 20)
+CI_Y = np.random.default_rng(0).normal(0, 1, 60) + CI_X
+
+
+def _band(ax: Axes, i: int = 0) -> tuple[np.ndarray, np.ndarray]:
+    """The lower and upper edges of the i-th fill_between, one value per x."""
+    verts = ax.collections[i].get_paths()[0].vertices
+    xs = np.unique(verts[:, 0])
+    return (np.array([verts[verts[:, 0] == x, 1].min() for x in xs]),
+            np.array([verts[verts[:, 0] == x, 1].max() for x in xs]))
+
+
+@pytest.mark.parametrize("kind", ["line", "step"])
+def test_ci_draws_the_mean_per_x_and_a_band(kind: str) -> None:
+    ax = kx.plot(CI_X, CI_Y, f"{kind}-ci")
+    ln, = ax.lines
+    assert list(ln.get_xdata()) == [1, 2, 3]
+    means = pd.Series(CI_Y).groupby(CI_X).mean()
+    assert ln.get_ydata() == pytest.approx(means.to_numpy())
+    assert len(ax.collections) == 1
+    assert to_hex(ax.collections[0].get_facecolor()[0]) == to_hex(ln.get_color())
+
+
+def test_ci_band_is_the_bootstrap() -> None:
+    lo, hi = _band(kx.plot(CI_X, CI_Y, "line-ci"))
+    want = [kx._stats.bootstrap(g) for _, g in pd.Series(CI_Y).groupby(CI_X)]
+    assert lo == pytest.approx([w[0] for w in want])
+    assert hi == pytest.approx([w[1] for w in want])
+
+
+def test_ci_seed_and_n_boot_reach_the_bootstrap() -> None:
+    same = [_band(kx.plot(CI_X, CI_Y, "line-ci", seed=7))[0] for _ in range(2)]
+    assert np.array_equal(*same)
+    assert not np.array_equal(same[0], _band(kx.plot(CI_X, CI_Y, "line-ci", seed=8))[0])
+    lo, _ = _band(kx.plot(CI_X, CI_Y, "line-ci", n_boot=50))
+    assert lo[0] == pytest.approx(kx._stats.bootstrap(CI_Y[CI_X == 1], n_boot=50)[0])
+
+
+def test_ci_with_z_text_x_and_dates() -> None:
+    ax = kx.plot(CI_X, CI_Y, CI_Y * 2, "line-ci-mk")
+    assert len(ax.lines) == len(ax.collections) == 2
+    assert ax.lines[0].get_marker() == "o"
+    days = np.tile(["Mon", "Tue"], 10)
+    assert list(kx.plot(days, np.arange(20), "line-ci").lines[0].get_xdata()) == ["Mon", "Tue"]
+    cats = pd.Series(pd.Categorical(days, categories=["Tue", "Mon"]))
+    assert list(kx.plot(cats, np.arange(20), "line-ci").lines[0].get_xdata()) == ["Tue", "Mon"]
+    dates = np.repeat(["2026-01-02", "2026-01-01"], 5)
+    ax = kx.plot(dates, np.arange(10), "line-ci-date")
+    assert ax.lines[0].get_ydata() == pytest.approx([7, 2])
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(X, Y, "line-ci"), "each x has one"),
+    (lambda: kx.plot(CI_X, CI_Y, "line", n_boot=10), "add it"),
+    (lambda: kx.plot(CI_X, CI_Y, "step", seed=1), "add it"),
+    (lambda: kx.plot(CI_X, CI_Y, "area-ci"), "only works with kind"),
+])
+def test_ci_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
+def _bar_series(ax: Axes) -> list[BarContainer]:
+    return [c for c in ax.containers if isinstance(c, BarContainer)]
+
+
+def _errbar_ends(ax: Axes, i: int = 0) -> np.ndarray:
+    """The (lo, hi) ends of the i-th bar series' error bars, one row per bar."""
+    segs = _bar_series(ax)[i].errorbar.lines[2][0].get_segments()
+    horizontal = segs[0][0][1] == segs[0][1][1]
+    return np.array([sorted(s[:, 0 if horizontal else 1]) for s in segs])
+
+
+def test_bar_ci_is_the_mean_with_bootstrap_error_bars() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "fare", "bar-ci")
+    groups = PASSENGERS.groupby("pclass").fare
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["1", "2", "3"]
+    assert [r.get_height() for r in ax.patches] == pytest.approx(groups.mean().to_list())
+    want = [kx._stats.bootstrap(g) for _, g in groups]
+    assert _errbar_ends(ax) == pytest.approx(np.array(want))
+    assert to_hex(_bar_series(ax)[0].errorbar.lines[2][0].get_color()[0]) == to_hex(mpl.rcParams["text.color"])
+
+
+def test_bar_ci_with_z_sort_ann_and_nan_category() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "fare", "age", "bar-ci")
+    assert len(_bar_series(ax)) == 2
+    assert _errbar_ends(ax, 1) == pytest.approx(np.array([kx._stats.bootstrap(g) for _, g in
+                                                         PASSENGERS.groupby("pclass").age]))
+    ax = kx.plot(PASSENGERS, "port", "fare", "bar-ci-sort-ann")
+    heights = [r.get_height() for r in ax.patches]
+    assert heights == sorted(heights, reverse=True)
+    assert "NaN" in [t.get_text() for t in ax.get_xticklabels()]  # missing ports, as in count
+    tops = _errbar_ends(ax)[:, 1]
+    assert [t.xy[1] for t in ax.texts] == pytest.approx(tops)   # past the error bar, not the bar
+    assert [t.get_text() for t in ax.texts] == [f"{h:.3g}" for h in heights]
+
+
+def test_barh_ci_first_category_on_top() -> None:
+    ax = kx.plot(PASSENGERS, "pclass", "fare", "barh-ci")
+    assert [r.get_width() for r in ax.patches] == pytest.approx(PASSENGERS.groupby("pclass").fare.mean().to_list())
+    assert ax.yaxis_inverted()
+    assert _errbar_ends(ax)[0] == pytest.approx(kx._stats.bootstrap(PASSENGERS.fare[PASSENGERS.pclass == 1]))
+
+
+def test_bar_without_ci_is_unchanged() -> None:
+    ax = kx.plot(["a", "b"], [1, 2], "bar-ann")
+    assert [r.get_height() for r in ax.patches] == [1, 2]
+    assert ax.containers[0].errorbar is None
+
+
+@pytest.mark.parametrize(("call", "match"), [
+    (lambda: kx.plot(PASSENGERS, "pclass", "fare", "age", "bar-ci-stack"), "do not go together"),
+    (lambda: kx.plot(PASSENGERS, "pclass", "fare", "bar", n_boot=10), "add it"),
+])
+def test_bar_ci_errors(call: Callable[[], Axes], match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        call()
+
+
+# ---------- endlab ----------
+def _endlabels(ax: Axes) -> list:
+    return [t for t in ax.texts if isinstance(t, mpl.text.Annotation)]
+
+
+@pytest.mark.parametrize("kind", ["line", "step", "band", "area"])
+def test_endlab_names_each_line_at_its_end(kind: str) -> None:
+    ax = kx.plot(DF, "t", "speed", "accel", f"{kind}-endlab")
+    labels = _endlabels(ax)
+    lines = [ln for ln in ax.lines if not ln.get_label().startswith("_")]
+    assert [t.get_text() for t in labels] == [ln.get_label() for ln in lines]
+    for t, ln in zip(labels, lines, strict=True):
+        assert to_hex(t.get_color()) == to_hex(ln.get_color())
+        assert t.xy == (ln.get_xdata()[-1], ln.get_ydata()[-1])
+    assert ax.get_legend() is None
+
+
+def test_endlab_skips_nans_at_the_end() -> None:
+    y = np.r_[Y[:-3], [np.nan] * 3]
+    t, = _endlabels(kx.plot(X, y, "line-endlab"))
+    assert t.xy == (X[-4], Y[-4])
+
+
+def test_endlab_labels_never_overlap() -> None:
+    same = np.ones_like(X)
+    ax = kx.plot(X, same, same, "line-endlab")
+    ax.figure.canvas.draw()
+    boxes = [t.get_window_extent() for t in _endlabels(ax)]
+    assert not boxes[0].overlaps(boxes[1])
+    ends = [t.xy[1] for t in _endlabels(ax)]
+    offsets = sorted(t.xyann[1] for t in _endlabels(ax))
+    assert ends[0] == ends[1]
+    assert offsets[0] == -offsets[1]
+
+def test_endlab_respaces_after_a_scale_change() -> None:
+    ax = kx.plot(X, Y, Y + 0.01, "line-endlab")
+    ax.figure.canvas.draw()
+    before = [t.xyann[1] for t in _endlabels(ax)]
+    ax.set_ylim(-100, 100)
+    ax.figure.canvas.draw()
+    assert [t.xyann[1] for t in _endlabels(ax)] != before
+    boxes = [t.get_window_extent() for t in _endlabels(ax)]
+    assert not boxes[0].overlaps(boxes[1])
+
+
+def test_endlab_with_dates_text_x_and_ci() -> None:
+    dates = pd.date_range("2026-01-01", periods=len(X))
+    t, = _endlabels(kx.plot(dates, Y, "line-date-endlab"))
+    assert t.get_text() == "y"
+    ax = kx.plot(["a", "b", "c"], [1, 2, 3], [3, 2, 1], "step-endlab")
+    ax.figure.canvas.draw()
+    assert [t.xy for t in _endlabels(ax)] == [("c", 3), ("c", 1)]
+    ax = kx.plot(CI_X, CI_Y, "line-ci-endlab")
+    t, = _endlabels(ax)
+    assert t.xy[1] == pytest.approx(ax.lines[0].get_ydata()[-1])
+
+
+@pytest.mark.parametrize(("spec", "match"), [
+    ("line-endlab-leg", "do not go together"),
+    ("line-endlab-legout", "do not go together"),
+    ("area-endlab-stack", "a stack ends in bands"),
+    ("scatter-endlab", "only works with kind"),
+])
+def test_endlab_errors(spec: str, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        kx.plot(X, Y, Z, spec)

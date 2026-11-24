@@ -1,6 +1,6 @@
 # Paul Tol Medium Contrast: 3 light/dark pairs (blue, yellow, red), also work in greyscale
 # (Tol's white and black are background/text, so not in the cycle)
-# https://sronpersonalpages.nl/~pault/
+# https://sronpersonalpages.nl/~pault/ (BSD-3-Clause style; see LICENCES.md)
 6699CC
 004488
 EECC66

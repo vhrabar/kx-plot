@@ -1,5 +1,5 @@
 """
-Statistics for the significance, association and clustering kinds, in numpy with no scipy needed
+Statistics for the interval, significance, association and clustering kinds, in numpy with no scipy needed
 """
 import math
 
@@ -8,6 +8,7 @@ import pandas as pd
 from numpy.typing import ArrayLike
 
 MAX_LEAVES = 1000
+BOOT_CELLS = 10_000_000
 METHODS = ("single", "complete", "average", "ward")
 
 
@@ -60,6 +61,24 @@ def _gamma_q(a: float, x: float) -> float:
         if abs(d * c - 1) < 1e-15:
             break
     return math.exp(log_front) * h
+
+
+def bootstrap(values: ArrayLike, n_boot: int = 1000, seed: int = 0) -> tuple[float, float]:
+    """The percentile 95% interval of the mean: the 2.5th and 97.5th percentiles of n_boot means of resamples
+    drawn with replacement. NaNs are dropped; one value gives (v, v), none (nan, nan). The same seed gives the
+    same interval."""
+    if n_boot < 1:
+        raise ValueError(f"n_boot= must be at least 1, got {n_boot}")
+    v = np.asarray(values, dtype=float).ravel()
+    v = v[~np.isnan(v)]
+    if len(v) < 2:
+        return (float(v[0]), float(v[0])) if len(v) else (math.nan, math.nan)
+    rng = np.random.default_rng(seed)
+    rows = max(1, BOOT_CELLS // len(v))         # resamples per chunk, so a long series does not fill memory
+    means = np.concatenate([v[rng.integers(0, len(v), (min(rows, n_boot - i), len(v)))].mean(axis=1)
+                            for i in range(0, n_boot, rows)])
+    lo, hi = np.percentile(means, [2.5, 97.5])
+    return float(lo), float(hi)
 
 
 def chi2_sf(x: float, df: int) -> float:

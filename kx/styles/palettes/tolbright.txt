@@ -1,5 +1,5 @@
 # Paul Tol Bright: 7 colours, colour-blind safe
-# https://sronpersonalpages.nl/~pault/
+# https://sronpersonalpages.nl/~pault/ (BSD-3-Clause style; see LICENCES.md)
 4477AA
 66CCEE
 228833

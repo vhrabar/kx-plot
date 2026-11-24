@@ -1,5 +1,5 @@
 # Petroff 8: colour-blind safe, ordered for aesthetics and accessibility (as in matplotlib)
-# Petroff (2021), arXiv:2107.02270, https://github.com/mpetroff/accessible-color-cycles
+# Petroff (2021), arXiv:2107.02270, https://github.com/mpetroff/accessible-color-cycles (CC0; see LICENCES.md)
 1845FB
 FF5E02
 C91F16

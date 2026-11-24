@@ -7,6 +7,7 @@ import sys
 
 import matplotlib
 import numpy as np
+import pandas as pd
 
 matplotlib.use("Agg")
 
@@ -20,25 +21,32 @@ import kx  # noqa: E402
 
 def render(theme: str, out_dir: str) -> str:
     """Draw one panel per kind in `theme`, 7 per row, and save it as PNG."""
-    waves, cloud, monthly, dists, passengers = (kx.load(n) for n in ("waves", "cloud", "monthly", "dists",
-                                                                     "passengers"))
+    waves, cloud, monthly, dists, passengers, daily = (kx.load(n) for n in ("waves", "cloud", "monthly", "dists",
+                                                                            "passengers", "daily"))
     spread = (0.1 + waves.x / 40).rename("std")
     samples = (dists.normal, dists.skewed, dists.bimodal)
+    date = pd.to_datetime(daily.date)
+    month = date.dt.strftime("%b")              # each month's days of a year: a line with a 95% band
+    years = [daily.temp.where(date.dt.year == y).rename(str(y)) for y in (2025, 2026)]
     kx.use(theme)
-    a = iter(axs := kx.grid(29, cols=7))
+    a = iter(axs := kx.grid(33, cols=7))
     fig = axs[0].figure
     kx.plot(waves.x, waves.y, waves.z, "line-leg", title="line", ax=next(a))
     kx.plot(monthly.month, monthly.y2025, monthly.y2026, "step-leg", title="step", ax=next(a))
     kx.plot(monthly.month, monthly.y2025, monthly.y2026, "area-stack-leg", title="area-stack", ax=next(a))
     kx.plot(waves.x, waves.y, spread, "band-leg", title="band", ax=next(a))
+    kx.plot(month, *years, spec="line-ci-endlab", title="line-ci-endlab", ax=next(a))
     kx.plot(cloud.x, cloud.y, cloud.z, "scatter", title="scatter", ax=next(a))
     kx.plot(monthly.month, monthly.y2025, monthly.y2026, "bar-leg", title="bar", ax=next(a))
+    kx.plot(passengers, "pclass", "fare", "bar-ci", title="bar-ci", ax=next(a))
     kx.plot(monthly.month, monthly.y2025, monthly.y2026, "barh-stack-leg", title="barh-stack", ax=next(a))
+    kx.plot(monthly.month, monthly.y2025, monthly.y2026, "lollipop-sort", title="lollipop", ax=next(a))
     kx.plot(*samples, spec="hist-leg", title="hist", ax=next(a))
     kx.plot(*samples, spec="kde-leg", title="kde", ax=next(a))
     kx.plot(*samples, spec="ridge", title="ridge", ax=next(a))
     kx.plot(*samples, spec="ecdf-leg", title="ecdf", ax=next(a))
     kx.plot(*samples, spec="box-sig", title="box-sig", ax=next(a))
+    kx.plot(passengers, "fare", spec="errbar-sig", by="pclass", title="errbar-sig", ax=next(a))
     kx.plot(*samples, spec="violin", title="violin", ax=next(a))
     kx.plot(*samples, spec="strip", title="strip", ax=next(a))
     kx.plot(*samples, spec="qq", title="qq", ax=next(a))
@@ -149,8 +157,9 @@ def render_img(theme: str, out_dir: str) -> str:
     return path
 
 
-def main() -> None:
-    out_dir = os.path.join(_root, "previews")
+def main(out_dir: str | None = None) -> None:
+    """Render every sheet into out_dir, previews/ by default (a check renders into a temporary folder)."""
+    out_dir = out_dir or os.path.join(_root, "previews")
     os.makedirs(out_dir, exist_ok=True)
     for theme in kx.styles():
         print(render(theme, out_dir))
@@ -160,4 +169,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1] if len(sys.argv) > 1 else None)

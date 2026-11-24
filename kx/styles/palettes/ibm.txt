@@ -1,5 +1,5 @@
 # IBM colour-blind safe: 5 colours
-# IBM Design Library
+# IBM Design Library (CC BY 4.0; see LICENCES.md)
 648FFF
 785EF0
 DC267F

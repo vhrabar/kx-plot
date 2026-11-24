@@ -2,24 +2,25 @@
 kx: tiny matplotlib helper.
 
 Token grammar for kx.plot(spec):   kind-theme-flag-flag-...
-  kind  : line | step | area | band | scatter | bar | barh | hist | kde | ridge | ecdf | box | violin | strip
-          | qq | heat | crosstab | count | missing | nullmap | hexbin | pie | donut | radar | parallel | pair
-          | cluster | mosaic | treemap | sunburst
+  kind  : line | step | area | band | scatter | bar | barh | lollipop | hist | kde | ridge | ecdf | box | violin
+          | strip | errbar | qq | heat | crosstab | count | missing | nullmap | hexbin | pie | donut | radar | parallel
+          | pair | cluster | mosaic | treemap | sunburst
           | cm | roc | pr | calib | proba | thresh | gain | lift | pva | resid | imp | loss
           | lcurve | vcurve | elbow | embed
           | imgrid | meanimg | colorhist | imhist | segmask | saliency | miscls
   theme : any file name in styles/
   flags : grid | leg | legout | tight | rot | wrap | logx | logy | logxy | symlogy | zero | eq | pct | si | facet
-          and per kind: stack norm cum (bars, area, hist), date mk (lines), sort ann (bars, count),
+          and per kind: stack norm cum (bars, area, hist), date mk endlab (lines), sort ann (bars, count, lollipop),
+          ci (line, step, bar, barh),
           stack norm (count),
-          mean median ann (distributions), sig (box, violin),
+          mean median ann (distributions), sig (box, violin, errbar), ann sd (errbar),
           nocb sym logc (scatter, heat, hexbin, cluster), corr ann (heat, cluster),
           norm ann nocb logc (crosstab), ann all (missing), sort (nullmap), diag (scatter, hexbin),
           fit (scatter), norm ann nocb (cm), norm (proba), best (thresh, loss, elbow),
           nocb sym logc (resid), ann sort (pie, donut), ann (mosaic, treemap, sunburst), raw (radar), mean (parallel),
           std (meanimg), hsv map (colorhist), hsv (imhist), ann nocb sym logc (embed).
           kx.grammar(kind) lists them.
-by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, qq, count);
+by=    : group labels for x, one series per group (kde, ridge, ecdf, box, violin, strip, errbar, qq, count);
          for radar, parallel and pair a column of the table: kx.plot(df, 'radar', by='class')
 images : image kinds take an (N, H, W[, C]) array or a list of arrays or file paths, labels as y:
          kx.plot(images, labels, 'imgrid')
@@ -30,6 +31,7 @@ table  : heat, cluster, missing, nullmap, loss, radar, parallel, pair take a who
 
 Palettes (kx.use(theme, palette="okabe")): any file name in styles/palettes/
 Colormaps (kx.use(theme, cmap="magma")):  kx.cmaps()
+kx.register("brand", colors): a palette (cmap=True: a colormap) of your own for this session, then as above.
 with kx.context(theme, ...): the same as kx.use, for one block only.
 kx.save("fig.png"): saves to /kaggle/working on Kaggle, the current folder elsewhere.
 kx.load("passengers"): a demo table; kx.load("shapes"): a dict of image arrays. kx.datasets() lists them.
@@ -60,11 +62,23 @@ from ._metrics import pr_ap, roc_auc
 from ._plot import plot
 from ._save import save
 from ._spec import COMMON_FLAGS, KINDS, Spec, all_flags, parse
-from ._theme import BREWER_CMAPS, BUILTIN_CMAPS, VENDORED_CMAPS, cmaps, context, palette, palettes, show, styles, use
+from ._theme import (
+    BREWER_CMAPS,
+    BUILTIN_CMAPS,
+    VENDORED_CMAPS,
+    cmaps,
+    context,
+    palette,
+    palettes,
+    register,
+    show,
+    styles,
+    use,
+)
 
 __all__ = ["BREWER_CMAPS", "BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "cramers",
            "datasets", "embed", "evaluate", "grammar", "grid", "load", "missing", "palette", "palettes", "parse",
-           "plot", "pr_ap", "roc_auc", "save", "show", "source", "styles", "use"]
+           "plot", "pr_ap", "register", "roc_auc", "save", "show", "source", "styles", "use"]
 
 
 def _version() -> str:

@@ -1,4 +1,4 @@
-"""Distribution kinds: hist, kde, ridge, ecdf, box, violin, strip, qq."""
+"""Distribution kinds: hist, kde, ridge, ecdf, box, violin, strip, errbar, qq."""
 from statistics import NormalDist
 
 import matplotlib as mpl
@@ -189,3 +189,60 @@ def test_qq_normal_sample_lies_on_its_line_and_by_groups() -> None:
 def test_violin_marks_median() -> None:
     ax = kx.plot(X, spec="violin")
     assert ax.collections[-1].get_offsets()[0][1] == pytest.approx(np.median(X))
+
+
+# ---------- errbar ----------
+def _errbars(ax: mpl.axes.Axes) -> list[tuple[float, float, float]]:
+    """(mean, low, high) of each errbar dot, left to right."""
+    out = []
+    for c in ax.containers:
+        lo, hi = sorted(c.lines[2][0].get_segments()[0][:, 1])
+        out.append((c.lines[0].get_ydata()[0], lo, hi))
+    return out
+
+
+def test_errbar_is_the_mean_with_a_bootstrap_interval() -> None:
+    passengers = kx.load("passengers")
+    ax = kx.plot(passengers, "fare", spec="errbar", by="pclass")
+    groups = [g.dropna().to_numpy() for _, g in passengers.groupby("pclass").fare]
+    want = [(g.mean(), *kx._stats.bootstrap(g)) for g in groups]
+    assert np.array(_errbars(ax)) == pytest.approx(np.array(want))
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["1", "2", "3"]
+    assert ax.get_xlabel() == "pclass"
+    assert ax.get_ylabel() == "fare, mean ± 95% CI"
+    assert [to_hex(c.lines[0].get_color()) for c in ax.containers] == [to_hex(f"C{i}") for i in range(3)]
+
+
+def test_errbar_arrays_seed_and_n_boot() -> None:
+    ax = kx.plot(X, Y, Z, spec="errbar", seed=3, n_boot=200)
+    want = [(v.mean(), *kx._stats.bootstrap(v, 200, 3)) for v in (X, Y, Z)]
+    assert np.array(_errbars(ax)) == pytest.approx(np.array(want))
+    assert ax.get_ylabel() == "mean ± 95% CI"
+
+
+def test_errbar_sd_ann_and_one_value() -> None:
+    ax = kx.plot(X, Y, spec="errbar-sd-ann")
+    (m, lo, hi), _ = _errbars(ax)
+    assert (lo, hi) == pytest.approx((m - X.std(ddof=1), m + X.std(ddof=1)))
+    assert [t.get_text() for t in ax.texts] == [f"{X.mean():.3g}", f"{Y.mean():.3g}"]
+    assert ax.get_ylabel() == "mean ± sd"
+    for spec in ("errbar", "errbar-sd"):
+        (m, lo, hi), = _errbars(kx.plot([4.0], spec=spec))
+        assert m == lo == hi == 4
+
+
+def test_errbar_sig_brackets_sit_above_the_intervals() -> None:
+    low, high = np.arange(20.0), np.arange(20.0) + 30
+    ax = kx.plot(low, high, spec="errbar-sig")
+    top = max(hi for _, _, hi in _errbars(ax))
+    bracket = next(ln for ln in ax.lines if len(ln.get_xdata()) == 4)
+    assert top < bracket.get_ydata()[1] < high.max()
+
+
+def test_errbar_errors() -> None:
+    with pytest.raises(ValueError, match="sd does not use"):
+        kx.plot(X, spec="errbar-sd", n_boot=10)
+    with pytest.raises(ValueError, match="finite value"):
+        kx.plot([np.nan], spec="errbar")
+    with pytest.raises(ValueError, match="compares 2 or more"):
+        kx.plot(X, spec="errbar-sig")

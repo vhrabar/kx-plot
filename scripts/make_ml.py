@@ -41,10 +41,11 @@ def multiclass(rng: np.random.Generator, n: int = 600) -> pd.DataFrame:
 
 
 def regression(rng: np.random.Generator, n: int = 500) -> pd.DataFrame:
-    """Actual against predicted values, with the error growing with x."""
+    """Actual against predicted values, with the error growing with x. The noise is in actual, so the residuals
+    are uncorrelated with predicted (an unbiased model) and fan out as x grows."""
     x = rng.uniform(0, 10, n)
-    actual = 5 + 3 * x + rng.normal(0, 2, n)
-    predicted = actual + rng.normal(0, 0.5 + 0.6 * x)
+    predicted = 5 + 3 * x + rng.normal(0, 1, n)
+    actual = predicted + rng.normal(0, 0.5 + 0.6 * x)
     return pd.DataFrame({"actual": actual.round(3), "predicted": predicted.round(3), "x": x.round(3)})
 
 

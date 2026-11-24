@@ -1,5 +1,5 @@
 # ColorBrewer Set1: 9 strong, saturated colours for points and lines
-# Cynthia Brewer, https://colorbrewer2.org/ (as shipped with matplotlib)
+# Cynthia Brewer, https://colorbrewer2.org/, as shipped with matplotlib (Apache-2.0; see LICENCES.md)
 E41A1C
 377EB8
 4DAF4A

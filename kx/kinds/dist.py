@@ -209,14 +209,16 @@ def _p(p: float) -> str:
     return "p < 0.001" if p < 0.001 else f"p = {p:.2g}"
 
 
-def _significance(ax: Axes, series: list[tuple[np.ndarray, str]], flags: set[str]) -> None:
+def _significance(ax: Axes, series: list[tuple[np.ndarray, str]], flags: set[str],
+                  span: tuple[float, float] | None = None) -> None:
     """sig: the Kruskal-Wallis p over all groups in the corner, and with up to SIG_PAIRS groups a bracket over
-    each pair that differs (Mann-Whitney, Holm-adjusted p < 0.05), stars for the p (ann: the p itself)."""
+    each pair that differs (Mann-Whitney, Holm-adjusted p < 0.05), stars for the p (ann: the p itself).
+    The brackets go above span (low, high), the range drawn; by default the values' range."""
     values = [v for v, _ in series]
     if len(values) < 2:
         raise ValueError("flag 'sig' compares 2 or more groups; pass y and z, or by=")
     _, p_all = _stats.kruskal(*values)
-    low, high = min(v.min() for v in values), max(v.max() for v in values)
+    low, high = span or (min(v.min() for v in values), max(v.max() for v in values))
     step = 0.08 * ((high - low) or 1)
     rows: list[list[tuple[int, int]]] = []      # brackets already placed on each level
     if len(values) <= SIG_PAIRS:
@@ -298,6 +300,38 @@ def strip(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flag
         ax.scatter(i + 1 + rng.uniform(-jitter, jitter, len(v)), v,
                    **{"s": size, "color": f"C{i}", "alpha": 0.6, "linewidth": 0, "label": n, **kw})
     _per_group(ax, series, flags, by)
+
+
+@kind("errbar", flags=("ann", "sig", "sd"), needs_y=False, takes_by=True, check=_check_sig)
+def errbar(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
+           by: ArrayLike | None = None, n_boot: int | None = None, seed: int | None = None, **kw: Any) -> None:
+    """The mean of x, y, z (or of each by= group) as a dot, with its bootstrap 95% interval as a line with caps
+    (n_boot= resamples, 1000; seed=, 0). sd = mean ± one standard deviation instead, no bootstrap.
+    ann = the mean beside each dot, sig = Kruskal-Wallis p and pairwise stars as for box. kw: ax.errorbar."""
+    if "sd" in flags and (n_boot is not None or seed is not None):
+        raise ValueError("n_boot= and seed= set the bootstrap, which sd does not use")
+    series = _split(x, y, z, by)
+    _need(series, "errbar", 1)
+    means = np.array([v.mean() for v, _ in series])
+    if "sd" in flags:                           # one value has no spread: a dot without a line
+        sd = np.array([v.std(ddof=1) if len(v) > 1 else 0.0 for v, _ in series])
+        lo, hi = means - sd, means + sd
+    else:
+        lo, hi = np.array([_stats.bootstrap(v, 1000 if n_boot is None else n_boot, seed or 0)
+                           for v, _ in series]).T
+    pos = np.arange(1, len(series) + 1)
+    for i, (p, m, (_, n)) in enumerate(zip(pos, means, series, strict=True)):
+        ax.errorbar(p, m, yerr=[[m - lo[i]], [hi[i] - m]],
+                    **{"fmt": "o", "color": f"C{i}", "capsize": 4, "elinewidth": 1.5, "label": n, **kw})
+        if "ann" in flags:
+            ax.annotate(f"{m:.3g}", (p, m), xytext=(6, 0), textcoords="offset points", va="center",
+                        color=plt.rcParams["text.color"], fontsize="small")
+    _per_group(ax, series, set(), by)
+    ax.set_xlim(0.5, len(series) + 0.5)
+    what = "mean ± sd" if "sd" in flags else "mean ± 95% CI"
+    ax.set_ylabel(f"{label(x, 'x')}, {what}" if by is not None else what)
+    if "sig" in flags:
+        _significance(ax, series, flags, (float(lo.min()), float(hi.max())))
 
 
 @kind("qq", needs_y=False, takes_by=True)

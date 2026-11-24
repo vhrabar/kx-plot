@@ -1,4 +1,4 @@
-"""Basic kinds: line, scatter, step, area, band, bar, barh, count, pie, donut, radar, parallel."""
+"""Basic kinds: line, scatter, step, area, band, bar, barh, lollipop, count, pie, donut, radar, parallel."""
 from collections.abc import Callable
 
 import matplotlib as mpl
@@ -149,6 +149,74 @@ def test_hist_overlays_each_array(arrays: int) -> None:
 
 def _heights(ax: Axes) -> list[list[float]]:
     return [[p.get_height() for p in c] for c in ax.containers]
+
+
+CATS = ["a", "b", "c"]
+
+
+def _dots(ax: Axes) -> list[list[float]]:
+    """Each lollipop dot series as (value, row) pairs, top row first."""
+    return [list(zip(line.get_xdata(), line.get_ydata(), strict=True)) for line in ax.lines]
+
+
+def _segments(ax: Axes) -> list[tuple[float, float, float]]:
+    """The stems (or dumbbell bars) as (start, end, row)."""
+    (lines,) = ax.collections
+    return [(a[0], b[0], a[1]) for a, b in lines.get_segments()]
+
+
+def test_lollipop_dots_on_stems_from_zero() -> None:
+    ax = kx.plot(CATS, [3, -1, 2], "lollipop")
+    assert _dots(ax) == [[(3, 0), (-1, 1), (2, 2)]]
+    assert _segments(ax) == [(0, 3, 0), (0, -1, 1), (0, 2, 2)]
+    assert [t.get_text() for t in ax.get_yticklabels()] == CATS
+    assert ax.yaxis_inverted()
+    assert to_hex(ax.lines[0].get_color()) == to_hex("C0")
+    assert ax.get_legend() is None
+    assert ax.get_xlim()[0] < -1
+
+
+def test_lollipop_dumbbell_joins_y_and_z() -> None:
+    y, z = pd.Series([1, 4, 2], name="y2025"), pd.Series([3, 5, 1], name="y2026")
+    ax = kx.plot(CATS, y, z, "lollipop")
+    assert _dots(ax) == [[(1, 0), (4, 1), (2, 2)], [(3, 0), (5, 1), (1, 2)]]
+    assert _segments(ax) == [(1, 3, 0), (4, 5, 1), (2, 1, 2)]
+    assert [to_hex(line.get_color()) for line in ax.lines] == [to_hex("C0"), to_hex("C1")]
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["y2025", "y2026"]
+
+
+@pytest.mark.parametrize(("z", "cats"), [(None, ["b", "c", "a"]), ([3, 5, 1], ["a", "b", "c"])])
+def test_lollipop_sort_by_value_or_difference(z: list | None, cats: list) -> None:
+    ax = kx.plot(CATS, [1, 4, 2], z, "lollipop-sort")
+    assert [t.get_text() for t in ax.get_yticklabels()] == cats
+    values = dict(zip(CATS, [1, 4, 2], strict=True))
+    assert [v for v, _ in _dots(ax)[0]] == [values[c] for c in cats]
+
+
+def test_lollipop_ann_beside_each_dot() -> None:
+    ax = kx.plot(CATS, [3, -1, 2], "lollipop-ann")
+    texts = {t.get_text(): (t.xy, t.get_ha()) for t in ax.texts}
+    assert texts == {"3": ((3, 0), "left"), "-1": ((-1, 1), "right"), "2": ((2, 2), "left")}
+
+
+def test_lollipop_ann_on_the_outside_of_a_dumbbell() -> None:
+    ax = kx.plot(CATS, [1, 4, 2], [3, 5, 1], "lollipop-ann")
+    sides = {(t.xy[1], t.xy[0]): t.get_ha() for t in ax.texts}
+    assert sides == {(0, 1): "right", (0, 3): "left", (1, 4): "right", (1, 5): "left",
+                     (2, 2): "left", (2, 1): "right"}
+
+
+def test_lollipop_value_axis_is_x() -> None:
+    ax = kx.plot(CATS, [0.1, 0.5, 0.25], "lollipop-pct")
+    assert isinstance(ax.xaxis.get_major_formatter(), mpl.ticker.PercentFormatter)
+    assert kx.plot(CATS, [2, 3, 4], [5, 6, 7], "lollipop-zero").get_xlim()[0] == 0
+
+
+def test_lollipop_errors() -> None:
+    with pytest.raises(ValueError, match="one value per category"):
+        kx.plot(CATS, [1, 2], "lollipop")
+    with pytest.raises(ValueError, match="1-D"):
+        kx.plot(CATS, np.ones((3, 2)), "lollipop")
 
 
 def test_count_matches_value_counts_with_nan_as_a_bar() -> None:
