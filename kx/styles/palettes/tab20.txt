@@ -1,5 +1,5 @@
 # Tableau 20 (T20): tab10 with a lighter partner after each colour, for up to 20 categories
-# Tableau, as shipped with matplotlib
+# Tableau, as shipped with matplotlib (Matplotlib licence; see LICENCES.md)
 1F77B4
 AEC7E8
 FF7F0E

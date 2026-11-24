@@ -1,5 +1,5 @@
 # ColorBrewer Dark2: 8 darker colours for lines and points, colour-blind safe for the first 3
-# Cynthia Brewer, https://colorbrewer2.org/ (as shipped with matplotlib)
+# Cynthia Brewer, https://colorbrewer2.org/, as shipped with matplotlib (Apache-2.0; see LICENCES.md)
 1B9E77
 D95F02
 7570B3

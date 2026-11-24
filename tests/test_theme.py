@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import matplotlib as mpl
+import pandas as pd
 import pytest
 from helpers import X, Y, Z
 from matplotlib.colors import to_hex
@@ -182,6 +183,60 @@ def test_styles_discovers_new_files(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 def test_paper_cycles_linestyles_for_greyscale_print() -> None:
     ax = kx.plot(X, Y, Z, "line-paper")
     assert ax.lines[0].get_linestyle() != ax.lines[1].get_linestyle()
+
+
+def _grid(axis: mpl.axis.Axis) -> bool:
+    return any(line.get_visible() for line in axis.get_gridlines())
+
+
+def test_minimal_has_no_box_and_a_grid_along_the_values() -> None:
+    kx.use("minimal")
+    assert not any(mpl.rcParams[f"axes.spines.{s}"] for s in ("left", "right", "top", "bottom"))
+    assert (mpl.rcParams["xtick.major.size"], mpl.rcParams["ytick.major.size"]) == (0, 0)
+    assert not mpl.rcParams["legend.frameon"]
+    for spec, values, other in [("bar", "yaxis", "xaxis"), ("barh", "xaxis", "yaxis"),
+                                ("lollipop", "xaxis", "yaxis")]:
+        ax = kx.plot(["a", "b", "c"], [1, 2, 3], spec)
+        ax.figure.canvas.draw()
+        assert _grid(getattr(ax, values))
+        assert not _grid(getattr(ax, other))
+
+
+@pytest.mark.parametrize("spec", ["heat-minimal", "heat-minimal-grid"])
+def test_minimal_grid_stays_off_cells(spec: str) -> None:
+    ax = kx.plot(pd.DataFrame({"a": X, "b": Y, "c": Z}), spec)
+    ax.figure.canvas.draw()
+    assert _grid(ax.xaxis) == _grid(ax.yaxis) == spec.endswith("-grid")
+
+
+def test_minimal_in_a_spec_is_local() -> None:
+    ax = kx.plot(["a", "b"], [1, 2], "barh-minimal")
+    ax.figure.canvas.draw()
+    assert _grid(ax.xaxis)
+    assert not mpl.rcParams["axes.grid"]
+    assert not _grid(kx.plot(["a", "b"], [1, 2], "barh").xaxis)
+
+
+COLORBLIND = ["#0072b2", "#e69f00", "#009e73", "#d55e00", "#56b4e9", "#cc79a7", "#000000"]
+
+
+def test_colorblind_is_okabe_without_yellow_and_with_linestyles() -> None:
+    kx.use("colorblind")
+    cycle = mpl.rcParams["axes.prop_cycle"].by_key()
+    assert [to_hex(c) for c in cycle["color"]] == COLORBLIND
+    assert set(COLORBLIND) <= {to_hex(c) for c in OKABE}
+    assert to_hex("#F0E442") not in COLORBLIND
+    assert cycle["linestyle"][:4] == ["-", "--", ":", "-."]
+    assert mpl.rcParams["image.cmap"] == "cividis"
+    ax = kx.plot(X, Y, Z, "line")
+    assert ax.lines[0].get_linestyle() != ax.lines[1].get_linestyle()
+
+
+def test_colorblind_palette_swap_keeps_linestyles() -> None:
+    kx.use("colorblind", palette="tab10")
+    cycle = mpl.rcParams["axes.prop_cycle"].by_key()
+    assert len(cycle["linestyle"]) == len(cycle["color"]) == 10
+    assert cycle["linestyle"][:4] == ["-", "--", ":", "-."]
 
 
 def test_scatter_size_follows_theme_markersize() -> None:

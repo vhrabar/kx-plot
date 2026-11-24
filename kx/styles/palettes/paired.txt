@@ -1,5 +1,5 @@
 # ColorBrewer Paired: 6 light/dark pairs (12 colours), for grouped categories such as before/after
-# Cynthia Brewer, https://colorbrewer2.org/ (as shipped with matplotlib)
+# Cynthia Brewer, https://colorbrewer2.org/, as shipped with matplotlib (Apache-2.0; see LICENCES.md)
 A6CEE3
 1F78B4
 B2DF8A

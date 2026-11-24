@@ -192,7 +192,14 @@ def _column(df: pd.DataFrame, name: object) -> pd.Series:
 def _common(ax: Axes, name: str, value_axis: str, flags: set[str]) -> None:
     """Flags every kind takes: legend, scales, value-axis format, ticks."""
     values = ax.xaxis if value_axis == "x" else ax.yaxis
-    if "grid" in flags:  ax.grid(True)
+    if "grid" in flags:
+        ax.grid(True)
+    elif plt.rcParams["axes.grid"]:
+        if ax.images:
+            ax.grid(False)
+        elif value_axis == "x" and plt.rcParams["axes.grid.axis"] == "y":
+            ax.grid(False, axis="y")
+            ax.grid(True, axis="x")
     if flags & {"leg", "legout"} and ax.get_legend_handles_labels()[0]:   # nothing labelled (scatter z): none
         old = ax.get_legend()
         outside = "legout" in flags or (name == "area" and "norm" in flags)  # a 100% stack has no free corner

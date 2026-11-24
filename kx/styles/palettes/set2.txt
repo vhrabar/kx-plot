@@ -1,5 +1,5 @@
 # ColorBrewer Set2: 8 soft colours for areas and bars, colour-blind safe for the first 3
-# Cynthia Brewer, https://colorbrewer2.org/ (as shipped with matplotlib)
+# Cynthia Brewer, https://colorbrewer2.org/, as shipped with matplotlib (Apache-2.0; see LICENCES.md)
 66C2A5
 FC8D62
 8DA0CB

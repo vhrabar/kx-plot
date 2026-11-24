@@ -1,5 +1,5 @@
 # Tableau 10 (T10): matplotlib's default colour cycle, handy to get it back under a themed cycle
-# Tableau, as shipped with matplotlib
+# Tableau, as shipped with matplotlib (Matplotlib licence; see LICENCES.md)
 1F77B4
 FF7F0E
 2CA02C

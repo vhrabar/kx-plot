@@ -1,9 +1,18 @@
 # Vendored colourmaps
 
-```
-cmocean colourmaps: thermal, haline, deep, balance
+The colourmap files in this folder copy colour tables from the sources below, each under the MIT licence, kept
+here as it asks.
+
+| Files | Source | Licence |
+|---|---|---|
+| `thermal`, `haline`, `deep`, `balance` | cmocean, Kristen M. Thyng | MIT |
+| `batlow`, `lipari`, `hawaii`, `oslo`, `davos`, `vik`, `roma`, `bam`, `cork`, `romaO` | Scientific colour maps 8.0, Fabio Crameri | MIT |
+
+## cmocean: thermal, haline, deep, balance
+
 https://github.com/matplotlib/cmocean
 
+```text
 The MIT License (MIT)
 
 Copyright (c) 2015 Kristen M. Thyng
@@ -24,18 +33,19 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.```
-
+SOFTWARE.
 ```
-Crameri colourmaps: batlow, lipari, hawaii, oslo, davos, vik, roma, bam, cork, romaO
-Scientific colour maps 8.0, https://doi.org/10.5281/zenodo.8035877
-Tables taken from cmcrameri 1.10, https://github.com/callumrollo/cmcrameri
 
+## Crameri: batlow, lipari, hawaii, oslo, davos, vik, roma, bam, cork, romaO
+
+Scientific colour maps 8.0, https://doi.org/10.5281/zenodo.8035877.
+Tables taken from cmcrameri 1.10, https://github.com/callumrollo/cmcrameri.
+
+```text
 MIT License
 
 Colormaps in cmcrameri/cm/cmaps:
 Copyright (c) 2020 Fabio Crameri
-
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
