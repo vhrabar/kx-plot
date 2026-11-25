@@ -42,6 +42,7 @@ embed = [
 
 [project.urls]
 Homepage = "https://github.com/vhrabar/kx-plot"
+Documentation = "https://vhrabar.github.io/kx-plot"
 Issues = "https://github.com/vhrabar/kx-plot/issues"
 Changelog = "https://github.com/vhrabar/kx-plot/blob/main/CHANGELOG.md"
 Kaggle = "https://www.kaggle.com/datasets/vhrabar/kx-plot"

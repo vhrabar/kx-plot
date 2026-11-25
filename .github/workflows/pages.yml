@@ -1,0 +1,61 @@
+name: Publish example notebook to Pages
+on:
+  push:
+    branches: [main]
+    paths: ["kx/**", "Example Usage.ipynb", "site/**", "uv.lock", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - run: uv sync --locked
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: 1.11.9
+
+      - name: Execute notebook and render with Quarto
+        run: |
+          cp "Example Usage.ipynb" site/index.ipynb
+          uv run --locked --with jupyter quarto render site/index.ipynb
+
+      - name: Write sitemap.xml
+        run: |
+          LASTMOD="$(date -u +%F)"
+          cat > site/_site/sitemap.xml <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <url><loc>https://vhrabar.github.io/kx-plot/</loc><lastmod>${LASTMOD}</lastmod></url>
+          </urlset>
+          EOF
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/_site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,18 @@
+/*-- scss:defaults --*/
+// same background as kx's dark mplstyle, so plots sit flush on the page
+$body-bg: #111418;
+$body-color: #E6E6E6;
+$primary: #4C9BE8;
+$link-color: #4C9BE8;
+$code-block-bg: #181C21;
+$code-color: #F2A541;
+$border-color: #2A2F36;
+$toc-active-border: #4C9BE8;
+$font-family-sans-serif: "Inter", system-ui, sans-serif;
+$font-family-monospace: "JetBrains Mono", ui-monospace, monospace;
+
+/*-- scss:rules --*/
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+.cell-output-display img { border-radius: 8px; }
+div.sourceCode { border: 1px solid #2A2F36; }
+h2 { border-bottom-color: #2A2F36 !important; }

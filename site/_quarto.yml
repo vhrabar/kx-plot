@@ -1,0 +1,50 @@
+project:
+  type: default
+  output-dir: _site
+
+execute:
+  enabled: true
+
+format:
+  html:
+    pagetitle: "kx-plot: one-line matplotlib plots and themes"
+    description: "Every kx-plot chart kind, theme and flag, run and rendered: one-line matplotlib plots for notebooks, scripts and offline Kaggle notebooks."
+    lang: en
+    include-in-header: head.html
+    filters: [strip-contents.lua, lazy-images.lua]
+    # dark listed first = dark by default;
+    # the toggle (top right) switches and remembers
+    theme:
+      dark: [darkly, kx-dark.scss]
+      light: [flatly, kx-light.scss]
+    highlight-style:
+      dark: github-dark
+      light: github
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    toc-title: "kx-plot"
+    smooth-scroll: true
+    anchor-sections: true
+    lightbox: true
+    code-tools: true
+    code-copy: true
+    code-overflow: wrap
+    other-links:
+      - text: GitHub
+        icon: github
+        href: https://github.com/vhrabar/kx-plot
+      - text: PyPI
+        icon: box-seam
+        href: https://pypi.org/project/kx-plot/
+      - text: Kaggle
+        icon: journal-code
+        href: https://www.kaggle.com/code/vhrabar/kx-one-line-matplotlib-plots-and-themes
+      - text: vhrabar.github.io
+        icon: person
+        href: https://vhrabar.github.io/
+      - text: Changelog
+        icon: clock-history
+        href: https://github.com/vhrabar/kx-plot/blob/main/CHANGELOG.md
+    fig-format: png
+    embed-resources: false
