@@ -12,3 +12,5 @@ previews/*.png linguist-generated
 *.csv text eol=lf linguist-detectable=false
 
 uv.lock linguist-generated
+
+site/** linguist-documentation

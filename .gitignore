@@ -12,3 +12,10 @@ __pycache__/
 # Build
 dist/
 build/
+
+# Quarto site
+site/index.ipynb
+site/_site/
+site/.quarto/
+site/*_files/
+site/figure_*

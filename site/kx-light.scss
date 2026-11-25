@@ -1,0 +1,14 @@
+/*-- scss:defaults --*/
+$body-bg: #FFFFFF;
+$body-color: #222222;
+$primary: #1F6FC2;
+$link-color: #1F6FC2;
+$code-block-bg: #F6F8FA;
+$code-color: #B4560B;
+$font-family-sans-serif: "Inter", system-ui, sans-serif;
+$font-family-monospace: "JetBrains Mono", ui-monospace, monospace;
+
+/*-- scss:rules --*/
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+.cell-output-display img { border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+div.sourceCode { border: 1px solid #E1E4E8; }
