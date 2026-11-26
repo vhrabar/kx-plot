@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: release
@@ -111,6 +112,12 @@ jobs:
             --title "$TAG" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             --target "${{ steps.commit.outputs.sha }}"
+
+      - name: Deploy the docs site and previews to Pages
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main
           {
             echo "### Published \`${TAG}\`"
             echo ""
@@ -155,7 +162,7 @@ jobs:
           gh label create "release changelog" --description "Pull requests with a release changelog update" --force || true
           gh pr create \
             --title "Sync ${TAG} back to dev" \
-            --body "Merges the \`${TAG}\` changelog promotion (and any preview commits) from \`main\` back into \`dev\`, so \`dev\` picks up a fresh \`[Unreleased]\` section." \
+            --body "Merges the \`${TAG}\` changelog promotion from \`main\` back into \`dev\`, so \`dev\` picks up a fresh \`[Unreleased]\` section." \
             --label "release changelog" \
             --base dev \
             --head "$BRANCH"

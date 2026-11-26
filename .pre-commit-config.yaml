@@ -24,6 +24,12 @@ repos:
         files: ^CHANGELOG\.md$
         pass_filenames: false
 
+      - id: nbstripout
+        name: strip notebook outputs
+        entry: uvx nbstripout==0.8.1
+        language: system
+        types: [jupyter]
+
       - id: pytest
         name: pytest -W error (tests.yml)
         entry: env MPLBACKEND=Agg uv run --locked pytest -W error -q -p no:cacheprovider

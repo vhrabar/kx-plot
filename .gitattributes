@@ -1,13 +1,11 @@
 * text=auto eol=lf
 
 *.ipynb linguist-detectable=false
-previews/demo.ipynb linguist-generated
 
 *.png binary
 *.jpg binary
 *.pdf binary
 *.npz binary
-previews/*.png linguist-generated
 
 *.csv text eol=lf linguist-detectable=false
 

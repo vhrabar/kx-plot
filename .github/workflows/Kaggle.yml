@@ -2,7 +2,7 @@ name: Publish to Kaggle
 on:
   push:
     branches: [main]
-    paths: ["kx/**", "previews/**", "scripts/make_previews.py",
+    paths: ["kx/**", "scripts/make_previews.py",
             "README.md", "LICENSE", "dataset-metadata.json", "pyproject.toml"]
   workflow_dispatch:
 
