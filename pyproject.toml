@@ -30,6 +30,7 @@ classifiers = [
 ]
 dependencies = [
     "matplotlib>=3.7",
+    "narwhals>=2",
     "numpy>=1.23",
     "pandas>=1.5",
 ]
@@ -61,6 +62,7 @@ include = ["kx", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [dependency-groups]
 dev = [
+    "polars>=2.0.0",
     "pytest",
     "ruff>=0.16.10",
 ]

@@ -1,4 +1,6 @@
 """kx.embed: project a table or images to 2-D (PCA, t-SNE or UMAP) and plot it with the embed kind."""
+from __future__ import annotations
+
 from typing import Any
 
 import numpy as np
@@ -6,18 +8,20 @@ import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
+from ._frame import to_pandas
 from ._image import images
 from ._plot import plot
+from .typing import Column, DataFrame
 
 METHODS = ("pca", "tsne", "umap")
 NEEDS = {"tsne": ("sklearn.manifold", "TSNE", "scikit-learn"), "umap": ("umap", "UMAP", "umap-learn")}
 
 
-def embed(data: Any, method: str = "pca", by: ArrayLike | str | None = None, spec: str = "", seed: int = 0,
-          ax: Axes | None = None, title: str | None = None, **kw: Any) -> Axes:
+def embed(data: DataFrame | ArrayLike, method: str = "pca", by: Column | str | None = None, spec: str = "",
+          seed: int = 0, ax: Axes | None = None, title: str | None = None, **kw: Any) -> Axes:
     """kx.embed(df, by='label') or kx.embed(images, labels): the rows in 2-D, coloured by label.
-    data: a DataFrame (its numeric columns, standardised; by= may name a column, left out of them), a 2-D
-    array of features, or images (an (N, H, W[, C]) array or a list, flattened; all one size).
+    data: a dataframe, pandas, polars, ... (its numeric columns, standardised; by= may name a column, left out of
+    them), a 2-D array of features, or images (an (N, H, W[, C]) array or a list, flattened; all one size).
     method: 'pca' (numpy, the explained variance in the axis labels), 'tsne' (scikit-learn) or 'umap'
     (umap-learn): pip install 'kx-plot[embed]'. seed= fixes t-SNE and UMAP; other keywords go to them.
     spec= adds a theme and flags (kx.embed(df, by='label', spec='dark-ann')). Returns the axes; the coordinates
@@ -26,7 +30,7 @@ def embed(data: Any, method: str = "pca", by: ArrayLike | str | None = None, spe
         raise ValueError(f"unknown method {method!r}; use one of {list(METHODS)}")
     if kw and method == "pca":
         raise TypeError(f"method='pca' takes no options, got {sorted(kw)}")
-    features, by = _features(data, by)
+    features, by = _features(to_pandas(data), to_pandas(by))
     coords, names = _project(features, method, seed, kw)
     axes = plot(pd.Series(coords[:, 0], name=names[0]), pd.Series(coords[:, 1], name=names[1]),
                 spec="-".join(["embed", *([spec] if spec else [])]), by=by, ax=ax, title=title)

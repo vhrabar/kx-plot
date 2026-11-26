@@ -1,6 +1,8 @@
 API reference
 =============
 
+The data types in the signatures (``DataFrame``, ``Series``, ``Column``) are described in :doc:`data`.
+
 Plotting
 --------
 

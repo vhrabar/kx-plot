@@ -1,11 +1,16 @@
 """Transparency (show, grammar, source), kx.grid and kx.save."""
+import datetime as dt
+import subprocess
+import sys
+import typing
 from collections.abc import Callable
 from pathlib import Path
 
 import matplotlib as mpl
 import numpy as np
+import pandas as pd
 import pytest
-from helpers import X, Y, Z
+from helpers import DF, X, Y, Z
 
 import kx
 import kx._stats
@@ -211,3 +216,138 @@ def test_cramers_errors() -> None:
         kx.cramers(PASSENGERS, cols=["sex", "nope"])
     with pytest.raises(ValueError, match="compares pairs"):
         kx.cramers(PASSENGERS[["age", "fare", "sex"]])
+
+
+# ---------- dataframe libraries (narwhals) ----------
+def _drawn(axs: object) -> list:
+    """What a plot draws, comparable across runs: line and patch geometry, points, images and tick labels."""
+    out = []
+    for ax in np.atleast_1d(axs):
+        out.append([ln.get_xydata().tolist() for ln in ax.lines])
+        out.append([p.get_path().vertices.tolist() for p in ax.patches])
+        out.append([np.asarray(c.get_offsets()).tolist() for c in ax.collections])
+        out.append([np.asarray(im.get_array()).tolist() for im in ax.images])
+        out.append([t.get_text() for t in [*ax.get_xticklabels(), *ax.get_yticklabels()]])
+        out.append([ax.get_xlabel(), ax.get_ylabel(), ax.get_title()])
+    return out
+
+
+def _to_polars(obj: object) -> object:
+    """A pandas frame or Series as polars, the gaps as nulls."""
+    pl = pytest.importorskip("polars")
+    if isinstance(obj, pd.Series):
+        return pl.Series(obj.name, obj.astype(object).where(obj.notna(), None).tolist())
+    return pl.DataFrame({c: obj[c].astype(object).where(obj[c].notna(), None).tolist() for c in obj.columns})
+
+
+def _same(f: Callable[[object], object]) -> object:
+    return f
+
+
+BINARY = kx.load("binary")
+SHAPES = kx.load("shapes")
+PLOTS = {
+    "line": lambda f: kx.plot(f(DF), "t", "speed", "accel", "line-leg"),
+    "box by=": lambda f: kx.plot(f(DF), "speed", spec="box", by="group"),
+    "heat-corr": lambda f: kx.plot(f(DF.drop(columns="group")), "heat-corr-ann"),
+    "roc": lambda f: kx.plot(f(BINARY), "y", "gbm", "logreg", "roc"),
+    "imgrid": lambda f: kx.plot(SHAPES["images"][:30], f(pd.Series(SHAPES["labels"][:30], name="label")), "imgrid",
+                                n=2),
+    "count": lambda f: kx.plot(f(kx.load("passengers")), "port", spec="count"),
+}
+
+
+@pytest.mark.parametrize("name", PLOTS)
+def test_polars_input_draws_the_same_as_pandas(name: str) -> None:
+    pytest.importorskip("polars")
+    assert _drawn(PLOTS[name](_to_polars)) == _drawn(PLOTS[name](_same))
+
+
+def test_polars_dtypes_become_their_pandas_counterparts() -> None:
+    pl = pytest.importorskip("polars")
+    from kx._frame import to_pandas
+
+    when = pl.Series("t", [dt.datetime(2025, 1, 1, 12), None]).dt.replace_time_zone("Europe/Zagreb")
+    frame = pl.DataFrame({
+        "i": [1, None], "s": ["a", None], "b": [True, None], "d": [dt.date(2025, 1, 1), None], "t": when,
+        "dur": [dt.timedelta(days=1), None],
+        "e": pl.Series(["hi", None], dtype=pl.Enum(["lo", "mid", "hi"])),
+        "c": pl.Series(["z", "y"], dtype=pl.Categorical),
+    })
+    got = to_pandas(frame)
+    assert list(got.columns) == frame.columns
+    assert got["i"].dtype == float
+    assert np.isnan(got["i"][1])
+    assert got["s"][0] == "a"
+    assert pd.isna(got["s"][1])
+    assert got["b"][0] is True
+    assert pd.isna(got["b"][1])
+    assert got["d"].dtype == "datetime64[ns]"
+    assert pd.isna(got["d"][1])
+    assert str(got["t"].dt.tz) == "Europe/Zagreb"
+    assert got["t"][0].hour == 12
+    assert got["dur"][0] == pd.Timedelta(days=1)
+    assert list(got["e"].cat.categories) == ["lo", "mid", "hi"]
+    assert pd.isna(got["e"][1])
+    assert list(got["c"].cat.categories) == ["z", "y"]
+    assert to_pandas(pl.Series([1, 2])).name is None
+    assert to_pandas(pl.Series("v", [1, 2])).name == "v"
+
+
+def test_pandas_input_passes_through_untouched() -> None:
+    from kx._frame import to_pandas, wrap
+
+    column = DF["t"]
+    assert to_pandas(DF) is DF
+    assert to_pandas(column) is column
+    assert wrap(X) is X
+    assert wrap("line") == "line"
+
+
+def test_lazy_frames_are_refused() -> None:
+    pl = pytest.importorskip("polars")
+    with pytest.raises(TypeError, match=r"\.collect\(\)"):
+        kx.plot(pl.DataFrame({"x": [1, 2], "y": [3, 4]}).lazy(), "x", "y")
+
+
+def test_polars_columns_by_name_with_typo_hint() -> None:
+    pytest.importorskip("polars")
+    with pytest.raises(ValueError, match="Did you mean"):
+        kx.plot(_to_polars(DF), "t", "sped", "line")
+
+
+def test_polars_reaches_evaluate_embed_and_cramers() -> None:
+    pytest.importorskip("polars")
+    pb = _to_polars(BINARY)
+    assert _drawn(kx.evaluate(pb["y"], pb["gbm"])) == _drawn(kx.evaluate(BINARY["y"], BINARY["gbm"]))
+    e = kx.load("embedding")
+    assert np.allclose(kx.embed(_to_polars(e), by="label").embedding, kx.embed(e, by="label").embedding)
+    p = kx.load("passengers")
+    assert kx.cramers(_to_polars(p), plot=False).equals(kx.cramers(p, plot=False))
+
+
+def test_load_into_polars() -> None:
+    pl = pytest.importorskip("polars")
+    p, pandas = kx.load("passengers", backend="polars"), kx.load("passengers")
+    assert isinstance(p, pl.DataFrame)
+    assert p.columns == list(pandas.columns)
+    assert p.null_count().row(0) == tuple(pandas.isna().sum())
+    assert isinstance(kx.load("shapes", backend="polars"), dict)
+    with pytest.raises(ValueError, match="bogus"):
+        kx.load("daily", backend="bogus")
+
+
+def test_import_kx_does_not_import_polars() -> None:
+    code = "import sys, kx; print('polars' in sys.modules, 'pyarrow' in sys.modules)"
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert out.stdout.split() == ["False", "False"]
+
+
+def test_typing_names_the_input_types() -> None:
+    assert {"DataFrame", "Series", "Column"} <= set(kx.typing.__all__)
+    hints = typing.get_type_hints(kx.plot)
+    assert hints["by"] == kx.typing.Column | str | None
+    assert typing.get_type_hints(kx.cramers)["df"] is kx.typing.DataFrame
+    assert typing.get_type_hints(kx.evaluate)["y"] == kx.typing.Column
+    for f in (kx.missing, kx.embed, kx.load):
+        typing.get_type_hints(f)                # every public annotation resolves

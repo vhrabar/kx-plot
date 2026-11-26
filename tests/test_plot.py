@@ -156,7 +156,7 @@ def test_frame_without_columns_hints_table_kinds(table_kind: list) -> None:
 
 def test_grammar_says_a_table_kind_takes_a_frame(table_kind: list, capsys: pytest.CaptureFixture[str]) -> None:
     kx.grammar("tbl")
-    assert "takes a DataFrame or 2-D array" in capsys.readouterr().out
+    assert "takes a dataframe (pandas, polars, ...) or 2-D array" in capsys.readouterr().out
     kx.grammar("line")
     assert "DataFrame" not in capsys.readouterr().out
 

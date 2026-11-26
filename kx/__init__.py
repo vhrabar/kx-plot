@@ -26,6 +26,8 @@ images : image kinds take an (N, H, W[, C]) array or a list of arrays or file pa
          kx.plot(images, labels, 'imgrid')
 facet= : with the flag facet, one panel per value of a column, on shared axes and one colour scale:
          kx.plot(df, 'pclass', 'port', 'crosstab-facet', facet='sex')
+data   : a dataframe of any library narwhals reads (pandas, polars, pyarrow, ...) and column names, or arrays;
+         kx.typing names the types: DataFrame, Series, Column.
 table  : heat, cluster, missing, nullmap, loss, radar, parallel, pair take a whole DataFrame or 2-D array:
          kx.plot(df, 'heat-corr'); a dict or a Keras History works too: kx.plot(model.fit(...), 'loss')
 
@@ -34,7 +36,8 @@ Colormaps (kx.use(theme, cmap="magma")):  kx.cmaps()
 kx.register("brand", colors): a palette (cmap=True: a colormap) of your own for this session, then as above.
 with kx.context(theme, ...): the same as kx.use, for one block only.
 kx.save("fig.png"): saves to /kaggle/working on Kaggle, the current folder elsewhere.
-kx.load("passengers"): a demo table; kx.load("shapes"): a dict of image arrays. kx.datasets() lists them.
+kx.load("passengers"): a demo table (backend="polars" for polars); kx.load("shapes"): a dict of image arrays.
+kx.datasets() lists them.
 kx.missing(df): the share of missing values per column, the same as kx.plot(df, 'missing-ann').
 kx.grid(5): a figure of 5 panels as a flat array of axes, for kx.plot(..., ax=).
 kx.roc_auc(y_true, score) and kx.pr_ap(y_true, score): area under the ROC curve and average precision, in numpy.
@@ -43,6 +46,8 @@ kx.embed(df, by='label'): the rows in 2-D (PCA; method='tsne' or 'umap' with pip
 kx.cramers(df): how strongly each pair of categorical columns goes together (Cramér's V), as a heat map.
 kx.grammar("area") and kx.source("area") explain one kind; kx.parse(spec) shows how a spec is read.
 """
+from __future__ import annotations
+
 import glob
 import importlib.metadata
 import inspect
@@ -50,9 +55,9 @@ import os
 import re
 from typing import Any
 
-import pandas as pd
 from matplotlib.axes import Axes
 
+from . import typing
 from ._cramers import cramers
 from ._data import datasets, load
 from ._embed import embed
@@ -75,10 +80,11 @@ from ._theme import (
     styles,
     use,
 )
+from .typing import DataFrame
 
 __all__ = ["BREWER_CMAPS", "BUILTIN_CMAPS", "VENDORED_CMAPS", "Spec", "__version__", "cmaps", "context", "cramers",
            "datasets", "embed", "evaluate", "grammar", "grid", "load", "missing", "palette", "palettes", "parse",
-           "plot", "pr_ap", "register", "roc_auc", "save", "show", "source", "styles", "use"]
+           "plot", "pr_ap", "register", "roc_auc", "save", "show", "source", "styles", "typing", "use"]
 
 
 def _version() -> str:
@@ -113,7 +119,7 @@ def grammar(kind: str | None = None) -> None:
         print(f"{k.name}: {inspect.getdoc(k.draw)}")
         print("flags:", sorted(COMMON_FLAGS), "+", sorted(k.flags) or "none of its own")
         if k.takes_table:
-            print("data : takes a DataFrame or 2-D array")
+            print("data : takes a dataframe (pandas, polars, ...) or 2-D array")
         if k.takes_by:
             print("by=  : group labels for x, one per group")
         if k.panels:
@@ -139,7 +145,7 @@ def source(kind: str | None = None) -> None:
             print(f"# ---------- kx/{os.path.relpath(p, here)} ----------\n{f.read()}")
 
 
-def missing(df: pd.DataFrame, spec: str = "", **kw: Any) -> Axes:
+def missing(df: DataFrame, spec: str = "", **kw: Any) -> Axes:
     """The share of missing values in each column, labelled: kx.plot(df, 'missing-ann-' + spec).
     kx.missing(df, 'dark-wrap') adds a theme and flags; other keywords (title=, ax=, ...) go to kx.plot."""
     return plot(df, "-".join(["missing", "ann", *([spec] if spec else [])]), **kw)

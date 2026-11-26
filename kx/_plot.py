@@ -1,4 +1,6 @@
 """kx.plot: the one-liner. Kinds live in kx/kinds/; this file checks input and applies common flags."""
+from __future__ import annotations
+
 import contextlib
 import difflib
 import textwrap
@@ -7,6 +9,7 @@ from typing import Any
 import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
@@ -16,21 +19,23 @@ from matplotlib.layout_engine import ConstrainedLayoutEngine
 from numpy.typing import ArrayLike
 
 from . import kinds  # noqa: F401  (registers every kind)
+from ._frame import to_pandas, wrap
 from ._spec import KINDS, Spec, parse
 from ._theme import style_path
 from ._util import categories, label, split
 from .kinds.basic import _levels
+from .typing import Column, DataFrame
 
 OUTSIDE = {"loc": "center left", "bbox_to_anchor": (1, 0.5)}       # legend right of the axes
 WRAP = 12                                                           # wrap: characters per tick label line
 
 
-def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, title: str | None = None,
-         ax: Axes | None = None, by: ArrayLike | str | None = None, facet: ArrayLike | str | None = None,
+def plot(*data: DataFrame | Column | str, spec: str | Spec | None = None, title: str | None = None,
+         ax: Axes | None = None, by: Column | str | None = None, facet: Column | str | None = None,
          **kwargs: Any) -> Axes | np.ndarray:
     """kx.plot(x, y, z, 'scatter-dark-grid-leg')   or   kx.plot(x, y, 'bar-light')
-    kx.plot(df, 'month', 'y2025', 'y2026', 'bar')   names columns of a DataFrame.
-    kx.plot(df, 'heat')   a table kind takes the whole DataFrame (or a 2-D array) instead.
+    kx.plot(df, 'month', 'y2025', 'y2026', 'bar')   names columns of a dataframe (pandas, polars, ...).
+    kx.plot(df, 'heat')   a table kind takes the whole dataframe (or a 2-D array) instead.
 
     Up to three arrays x, y, z, then the spec (or spec=). by= gives a group label per x value,
     one curve, box or violin per group: kx.plot(df, 'value', spec='kde', by='group').
@@ -45,6 +50,7 @@ def plot(*data: ArrayLike | pd.DataFrame | str, spec: str | Spec | None = None, 
     is given.
     """
     x, y, z, spec, by, facet = _arrays(data, spec, by, facet)
+    x, y, z, by, facet = (to_pandas(v) for v in (x, y, z, by, facet))  # the kinds still speak pandas
     name, theme, flags = parse(spec or "line")
     kind = KINDS[name]
     if kind.takes_table and not (isinstance(x, pd.DataFrame) and y is None and (by is None or kind.takes_by)):
@@ -117,9 +123,11 @@ def _panels(name: str, out: object) -> np.ndarray:
 def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None,
             facet: ArrayLike | str | None = None) -> tuple:
     """(x, y, z, spec, by, facet) from kx.plot's positional arguments: arrays, or a DataFrame and column names.
-    by= and facet= may name columns; a table kind's table then leaves them out."""
-    data = list(data)
-    df = data.pop(0) if data and isinstance(data[0], pd.DataFrame) else None
+    by= and facet= may name columns; a table kind's table then leaves them out. Any dataframe narwhals reads
+    (pandas, polars, pyarrow, ...) works; frames and series come back as narwhals objects."""
+    data = [wrap(d) for d in data]
+    by, facet = wrap(by), wrap(facet)
+    df = data.pop(0) if data and isinstance(data[0], nw.DataFrame) else None
     last = data[-1] if data else None
     if isinstance(last, Spec) or (isinstance(last, str) and (df is None or last not in df.columns
                                                              or (spec is None and _table_spec(last)))):
@@ -135,15 +143,15 @@ def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None,
         spec = data.pop()
     table = KINDS[parse(spec or "line").kind].takes_table
     if table and df is None and len(data) == 1 and _history(data[0]) is not None:
-        df, data = pd.DataFrame(_history(data[0])), []    # a dict, or a Keras History: kx.plot(model.fit(...), 'loss')
-    elif table and df is None and len(data) == 1 and np.ndim(data[0]) == 2:
-        df, data = pd.DataFrame(data[0]), []    # a 2-D array is a table with 0..n labels
+        df, data = wrap(pd.DataFrame(_history(data[0]))), []   # a dict or a Keras History: kx.plot(model.fit(), 'loss')
+    elif table and df is None and len(data) == 1 and not isinstance(data[0], nw.Series) and np.ndim(data[0]) == 2:
+        df, data = wrap(pd.DataFrame(data[0])), []    # a 2-D array is a table with 0..n labels
     if df is not None:
         if not data and table:                  # by= and facet= name columns: taken out of the table
             named = [c for c in (by, facet) if isinstance(c, str)]
             by = _column(df, by) if isinstance(by, str) else by
             facet = _column(df, facet) if isinstance(facet, str) else facet
-            return (df.drop(columns=named) if named else df), None, None, spec, by, facet
+            return (df.drop(named) if named else df), None, None, spec, by, facet
         if not data:
             tables = ", ".join(sorted(k.name for k in KINDS.values() if k.takes_table))
             raise TypeError("kx.plot(df, ...) needs the column names to plot: kx.plot(df, 'x', 'y')"
@@ -178,15 +186,15 @@ def _history(obj: object) -> dict | None:
     return history if isinstance(history, dict) else None
 
 
-def _column(df: pd.DataFrame, name: object) -> pd.Series:
-    """df[name], or an error naming the columns that are close."""
+def _column(df: nw.DataFrame, name: object) -> nw.Series:
+    """The column called name, or an error naming the columns that are close."""
     if not isinstance(name, str):
         raise TypeError(f"after a DataFrame, give column names, not {type(name).__name__}")
     if name not in df.columns:
         close = difflib.get_close_matches(name, [str(c) for c in df.columns], n=3)
         hint = f" Did you mean {close}?" if close else f" Columns: {list(df.columns)}"
         raise ValueError(f"no column {name!r} in the DataFrame.{hint}")
-    return df[name]
+    return df.get_column(name)
 
 
 def _common(ax: Axes, name: str, value_axis: str, flags: set[str]) -> None:
