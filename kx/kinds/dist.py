@@ -11,7 +11,8 @@ from numpy.typing import ArrayLike
 
 from .. import _stats
 from .._spec import kind
-from .._util import categories, label
+from .._util import label
+from .basic import _levels
 
 
 def _finite(arr: ArrayLike) -> np.ndarray:
@@ -26,7 +27,8 @@ def _series(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None) -> list[tupl
 
 def _split(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None,
            by: ArrayLike | None) -> list[tuple[np.ndarray, str]]:
-    """x, y, z as separate series, or with by= x split into one series per group (categories in order)."""
+    """x, y, z as separate series, or with by= x split into one series per group, in the order count shows them
+    (a categorical's or Enum's, else sorted). Rows with no group are left out; a group with no rows is too."""
     if by is None:
         return _series(x, y, z)
     if y is not None or z is not None:
@@ -34,10 +36,10 @@ def _split(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None,
     xs, groups = np.asarray(x, dtype=float).ravel(), np.asarray(by, dtype=object).ravel()
     if len(xs) != len(groups):
         raise ValueError(f"by= has {len(groups)} values but x has {len(xs)}")
-    cats = categories(by)
-    if cats is None:
-        cats = sorted(pd.unique(groups[pd.notna(groups)]))
-    return [(_finite(xs[groups == c]), str(c)) for c in cats if (groups == c).any()]   # unseen: none
+    names, masks = _levels(by)
+    if pd.isna(groups).any():
+        names, masks = names[:-1], masks[:-1]
+    return [(_finite(xs[m]), n) for n, m in zip(names, masks, strict=True) if m.any()]
 
 
 def _need(series: list[tuple[np.ndarray, str]], kind: str, distinct: int) -> None:
@@ -69,7 +71,7 @@ def _vlines(ax: Axes, series: list[tuple[np.ndarray, str]], flags: set[str]) -> 
                             color=f"C{i}", fontsize="small")
 
 
-@kind("hist", flags=("stack", "norm", "cum", *STATS), needs_y=False, check=_check_stats)
+@kind("hist", flags=("stack", "norm", "cum", *STATS), needs_y=False, check=_check_stats, frames=True)
 def hist(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Up to three distributions x, y, z on the same 30 bins, overlaid.
     stack = on top of each other, norm = density (area 1), cum = cumulative outlines (with norm: the CDF).
@@ -117,7 +119,7 @@ def _densities(series: list[tuple[np.ndarray, str]]) -> tuple[np.ndarray, list[n
     return grid, [density(v, grid, bw) for (v, _), bw in zip(series, bws, strict=True)]
 
 
-@kind("kde", flags=STATS, needs_y=False, takes_by=True, check=_check_stats)
+@kind("kde", flags=STATS, needs_y=False, takes_by=True, check=_check_stats, frames=True)
 def kde(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
         by: ArrayLike | None = None, **kw: Any) -> None:
     """Smooth density curves of x, y, z (Gaussian KDE, Silverman bandwidth).
@@ -134,7 +136,7 @@ def kde(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags:
         ax.legend(title=label(by, "by"))
 
 
-@kind("ridge", flags=("mean", "median"), needs_y=False, takes_by=True)
+@kind("ridge", flags=("mean", "median"), needs_y=False, takes_by=True, frames=True)
 def ridge(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
           by: ArrayLike | None = None, **kw: Any) -> None:
     """Density curves of x, y, z stacked top to bottom, each on its own baseline (a ridgeline).
@@ -163,7 +165,7 @@ def ridge(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flag
         ax.set_ylabel(label(by, "by"))
 
 
-@kind("ecdf", flags=STATS, needs_y=False, takes_by=True, check=_check_stats)
+@kind("ecdf", flags=STATS, needs_y=False, takes_by=True, check=_check_stats, frames=True)
 def ecdf(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
          by: ArrayLike | None = None, **kw: Any) -> None:
     """Empirical CDF of x, y, z: the share of values <= each x, a step up of 1/n at every value.
@@ -241,7 +243,7 @@ def _significance(ax: Axes, series: list[tuple[np.ndarray, str]], flags: set[str
             fontsize="small", color=plt.rcParams["text.color"])
 
 
-@kind("box", flags=("mean", "ann", "sig"), needs_y=False, takes_by=True, check=_check_sig)
+@kind("box", flags=("mean", "ann", "sig"), needs_y=False, takes_by=True, check=_check_sig, frames=True)
 def box(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
         by: ArrayLike | None = None, **kw: Any) -> None:
     """Box plots of x, y, z side by side: median, quartile box, whiskers to 1.5 IQR, outliers as points.
@@ -262,7 +264,7 @@ def box(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags:
         _significance(ax, series, flags)
 
 
-@kind("violin", flags=("mean", "ann", "sig"), needs_y=False, takes_by=True, check=_check_sig)
+@kind("violin", flags=("mean", "ann", "sig"), needs_y=False, takes_by=True, check=_check_sig, frames=True)
 def violin(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
            by: ArrayLike | None = None, **kw: Any) -> None:
     """Violin plots of x, y, z side by side: a mirrored KDE with the median and quartiles marked.
@@ -285,7 +287,7 @@ def violin(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, fla
         _significance(ax, series, flags)
 
 
-@kind("strip", flags=("mean", "ann"), needs_y=False, takes_by=True)
+@kind("strip", flags=("mean", "ann"), needs_y=False, takes_by=True, frames=True)
 def strip(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
           by: ArrayLike | None = None, **kw: Any) -> None:
     """Every value as a point, one column per x, y, z, jittered sideways so ties stay visible.
@@ -302,7 +304,7 @@ def strip(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flag
     _per_group(ax, series, flags, by)
 
 
-@kind("errbar", flags=("ann", "sig", "sd"), needs_y=False, takes_by=True, check=_check_sig)
+@kind("errbar", flags=("ann", "sig", "sd"), needs_y=False, takes_by=True, check=_check_sig, frames=True)
 def errbar(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
            by: ArrayLike | None = None, n_boot: int | None = None, seed: int | None = None, **kw: Any) -> None:
     """The mean of x, y, z (or of each by= group) as a dot, with its bootstrap 95% interval as a line with caps
@@ -334,7 +336,7 @@ def errbar(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, fla
         _significance(ax, series, flags, (float(lo.min()), float(hi.max())))
 
 
-@kind("qq", needs_y=False, takes_by=True)
+@kind("qq", needs_y=False, takes_by=True, frames=True)
 def qq(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
        by: ArrayLike | None = None, **kw: Any) -> None:
     """Quantile-quantile plot of x, y, z against a normal distribution: sorted values against the normal
