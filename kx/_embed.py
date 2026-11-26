@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from typing import Any
 
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
-from ._frame import to_pandas
+from ._frame import wrap
 from ._image import images
 from ._plot import plot
 from .typing import Column, DataFrame
@@ -30,7 +31,7 @@ def embed(data: DataFrame | ArrayLike, method: str = "pca", by: Column | str | N
         raise ValueError(f"unknown method {method!r}; use one of {list(METHODS)}")
     if kw and method == "pca":
         raise TypeError(f"method='pca' takes no options, got {sorted(kw)}")
-    features, by = _features(to_pandas(data), to_pandas(by))
+    features, by = _features(wrap(data), wrap(by))
     coords, names = _project(features, method, seed, kw)
     axes = plot(pd.Series(coords[:, 0], name=names[0]), pd.Series(coords[:, 1], name=names[1]),
                 spec="-".join(["embed", *([spec] if spec else [])]), by=by, ax=ax, title=title)
@@ -40,16 +41,15 @@ def embed(data: DataFrame | ArrayLike, method: str = "pca", by: Column | str | N
 
 def _features(data: Any, by: ArrayLike | str | None) -> tuple[np.ndarray, ArrayLike | None]:
     """The rows as a float matrix to project, and by= as labels (a column name taken out of a table)."""
-    if isinstance(data, pd.DataFrame):
+    if isinstance(data, nw.DataFrame):
         if isinstance(by, str):
             if by not in data.columns:
                 raise ValueError(f"no column {by!r} in the DataFrame. Columns: {list(data.columns)}")
-            data, by = data.drop(columns=by), data[by]
-        cols = [c for c in data.columns
-                if pd.api.types.is_numeric_dtype(data[c]) and not pd.api.types.is_bool_dtype(data[c])]
+            data, by = data.drop(by), data.get_column(by)
+        cols = [data.get_column(c) for c in data.columns if data.get_column(c).dtype.is_numeric()]
         if not cols:
             raise ValueError("kx.embed needs numeric columns to project; this table has none")
-        values = data[cols].to_numpy(dtype=float)
+        values = np.column_stack([np.asarray(s.cast(nw.Float64).to_numpy(), dtype=float) for s in cols])
         spread = values.std(axis=0)
         values = (values - values.mean(axis=0)) / np.where(spread > 0, spread, 1)   # one unit per column
     elif isinstance(by, str):

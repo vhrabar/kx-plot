@@ -5,12 +5,14 @@ from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.patheffects import withStroke
 from numpy.typing import ArrayLike
 
+from .._frame import wrap
 from .._metrics import (
     binary,
     brier,
@@ -52,7 +54,7 @@ def _check_cm(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
     _flat(y, "y_pred")
 
 
-@kind("cm", flags=("norm", "ann", "nocb"), check=_check_cm)
+@kind("cm", flags=("norm", "ann", "nocb"), check=_check_cm, frames=True)
 def cm(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: Any) -> None:
     """Confusion matrix: kx.plot(y_true, y_pred, 'cm'). True classes down the rows, predicted along the columns,
     as in scikit-learn; every label of either array gets a row and a column.
@@ -86,7 +88,7 @@ def _scored(x: ArrayLike, y: ArrayLike, z: ArrayLike | None) -> list[tuple[np.nd
                 if s is not None]
     truth = np.asarray(x, dtype=object).ravel()
     found, scores = classes(truth), np.asarray(y, dtype=float)
-    cols = list(y.columns) if isinstance(y, pd.DataFrame) else None
+    cols = list(y.columns) if isinstance(y, (pd.DataFrame, nw.DataFrame)) else None
     if cols is not None and set(cols) <= set(found):
         pairs = list(zip(cols, cols, strict=True))
     elif len(found) == scores.shape[1]:
@@ -112,7 +114,7 @@ def _unit(ax: Axes, xlabel: str, ylabel: str, loc: str) -> None:
     ax.legend(loc=loc)
 
 
-@kind("roc", check=_check_scores)
+@kind("roc", check=_check_scores, frames=True)
 def roc(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """ROC curve: kx.plot(y_true, score, 'roc'), the true positive rate against the false positive rate as the
     threshold falls, with the AUC in the legend. z = a second model's score; a 2-D score (one column per class)
@@ -125,7 +127,7 @@ def roc(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[st
     _unit(ax, "false positive rate", "true positive rate", "lower right")
 
 
-@kind("pr", check=_check_scores)
+@kind("pr", check=_check_scores, frames=True)
 def pr(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Precision-recall curve: kx.plot(y_true, score, 'pr'), precision against recall as the threshold falls,
     with the average precision in the legend and a dotted baseline at the positive rate, what a random model gets.
@@ -144,7 +146,7 @@ def pr(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str
     _unit(ax, "recall", "precision", "lower left")
 
 
-@kind("calib", check=_check_scores)
+@kind("calib", check=_check_scores, frames=True)
 def calib(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], bins: int = 10,
           **kw: Any) -> None:
     """Reliability diagram: kx.plot(y_true, score, 'calib'), the observed positive rate against the mean score in
@@ -166,7 +168,7 @@ def _check_proba(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("kind 'proba' shows one model's scores; compare two models with 'roc', 'pr' or 'calib'")
 
 
-@kind("proba", flags=("norm",), check=_check_proba)
+@kind("proba", flags=("norm",), check=_check_proba, frames=True)
 def proba(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], bins: int = 20, **kw: Any) -> None:
     """Score distribution per true class: kx.plot(y_true, score, 'proba'), one histogram per class on the same
     bins= equal-width bins over 0..1 (20). Where they overlap, the model confuses the classes.
@@ -204,7 +206,7 @@ def _best(ax: Axes, at: float, text: str) -> None:
     ax.axvline(at, color=plt.rcParams["text.color"], linestyle="--", linewidth=1, alpha=0.8, label=text)
 
 
-@kind("thresh", flags=("best",), check=_check_thresh)
+@kind("thresh", flags=("best",), check=_check_thresh, frames=True)
 def thresh(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: Any) -> None:
     """Precision, recall and F1 against the decision threshold: kx.plot(y_true, score, 'thresh').
     A row is positive when its score is at or above the threshold. best = a dashed line at the threshold with the
@@ -254,7 +256,7 @@ def _ranked(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, lift: boo
         ax.legend(loc="lower right")
 
 
-@kind("gain", check=_check_scores)
+@kind("gain", check=_check_scores, frames=True)
 def gain(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Cumulative gain: kx.plot(y_true, score, 'gain'), the share of positives found against the share of rows
     taken, highest scores first. The dotted diagonal is a random order, the dashed corner a perfect one.
@@ -262,7 +264,7 @@ def gain(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[s
     _ranked(ax, x, y, z, False, **kw)
 
 
-@kind("lift", check=_check_scores)
+@kind("lift", check=_check_scores, frames=True)
 def lift(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Lift: kx.plot(y_true, score, 'lift'), the gain divided by a random order's, so how many times more positives
     the top rows hold than the same share picked at random; the dotted line at 1 is random.
@@ -276,7 +278,7 @@ def _check_pva(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
                          "To colour by a third column, use 'resid'")
 
 
-@kind("pva", check=_check_pva)
+@kind("pva", check=_check_pva, frames=True)
 def pva(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: Any) -> None:
     """Predicted against actual: kx.plot(actual, predicted, 'pva'), with the dashed y = x line a perfect model lies
     on and R², RMSE and MAE in the corner. Over 5,000 points it draws hexagons (hexbin), so big test sets stay
@@ -289,7 +291,8 @@ def pva(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: An
     ax.text(0.03, 0.97, f"R² {r2:.3f}\nRMSE {rmse:.3g}\nMAE {mae:.3g}", transform=ax.transAxes, ha="left",
             va="top", bbox={"boxstyle": "round", "facecolor": ax.get_facecolor(), "edgecolor": "none",
                             "alpha": 0.85})
-    lo, hi = min(np.min(x), np.min(y)), max(np.max(x), np.max(y))
+    xs, ys = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    lo, hi = min(np.nanmin(xs), np.nanmin(ys)), max(np.nanmax(xs), np.nanmax(ys))   # gaps skipped, as pandas
     pad = 0.03 * (hi - lo) or 1.0
     ax.set_xlim(lo - pad, hi + pad)             # one range on both axes: a square, also in a kx.grid panel
     ax.set_ylim(lo - pad, hi + pad)
@@ -298,7 +301,7 @@ def pva(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: An
     ax.set_ylabel(label(y, "predicted"))
 
 
-@kind("resid", flags=COLOUR, check=_check_scatter)
+@kind("resid", flags=COLOUR, check=_check_scatter, frames=True)
 def resid(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Residuals: kx.plot(actual, predicted, 'resid'), actual - predicted against predicted, with a line at 0.
     Above it the model guessed too low, below too high; a funnel means the error grows with the prediction.
@@ -312,7 +315,7 @@ def resid(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[
     ax.set_ylabel("residual (actual - predicted)")
 
 
-@kind("imp", value_axis="x")
+@kind("imp", value_axis="x", frames=True)
 def imp(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], top: int = 20,
         **kw: Any) -> None:
     """Feature importance: kx.plot(df, 'feature', 'importance', 'std', 'imp'), bars lying down with the largest on
@@ -338,14 +341,15 @@ def imp(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[st
 HIGH = ("acc", "auc", "f1", "precision", "recall")    # metrics that are better high; the rest, like loss, low
 
 
-@kind("loss", flags=("best",), table=True)
-def loss(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any) -> None:
+@kind("loss", flags=("best",), table=True, frames=True)
+def loss(ax: Axes, x: Any, y: None, z: None, flags: set[str], **kw: Any) -> None:
     """Training curves: kx.plot(history, 'loss') with a DataFrame, a dict or a Keras History. The first metric is a
     solid line and its val_ pair a dashed one in the same colour, against an epoch column or the row number from 1.
     Other metrics have other scales: kx.plot(h[['accuracy', 'val_accuracy']], 'loss') draws them.
     best = a marker and a dashed line at the best validation epoch: lowest, or highest for acc, auc, f1,
     precision and recall. kw: the lines (ax.plot)."""
-    epochs = x["epoch"].to_numpy() if "epoch" in x.columns else np.arange(1, len(x) + 1)
+    x = wrap(x)
+    epochs = x.get_column("epoch").to_numpy() if "epoch" in x.columns else np.arange(1, len(x) + 1)
     cols = [str(c) for c in x.columns if c != "epoch"]
     if not cols:
         raise ValueError("kind 'loss' needs at least one metric column besides 'epoch'")
@@ -353,10 +357,11 @@ def loss(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any
     pair = [c for c in (metric, f"val_{metric}") if c in cols]
     for c in pair:
         style = {"linestyle": "--"} if c.startswith("val_") and c != metric else {}
-        ln, = ax.plot(epochs, x[c].to_numpy(dtype=float), **{"label": c, "color": "C0", **style, **kw})
+        values = np.asarray(x.get_column(c).to_numpy(), dtype=float)
+        ln, = ax.plot(epochs, values, **{"label": c, "color": "C0", **style, **kw})
     if "best" in flags:
         watch = pair[-1]                        # the validation curve when there is one
-        values = x[watch].to_numpy(dtype=float)
+        values = np.asarray(x.get_column(watch).to_numpy(), dtype=float)
         high = any(h in watch.lower() for h in HIGH)
         i = int(np.nanargmax(values) if high else np.nanargmin(values))
         ax.plot(epochs[i], values[i], marker="o", color=ln.get_color(), zorder=3)
@@ -394,7 +399,7 @@ def _cv(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, xlabel: str, 
     ax.legend()
 
 
-@kind("lcurve")
+@kind("lcurve", frames=True)
 def lcurve(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Learning curve: kx.plot(sizes, train_scores, val_scores, 'lcurve'), the shapes scikit-learn's learning_curve
     returns: one row per training set size and one column per fold. The mean is a line and ± 1 standard deviation
@@ -402,14 +407,14 @@ def lcurve(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set
     _cv(ax, x, y, z, "training set size", **kw)
 
 
-@kind("vcurve")
+@kind("vcurve", frames=True)
 def vcurve(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Validation curve: kx.plot(param_range, train_scores, val_scores, 'vcurve-logx'), as lcurve with a
     hyperparameter on x, as scikit-learn's validation_curve returns. kw: the lines (ax.plot)."""
     _cv(ax, x, y, z, "parameter", **kw)
 
 
-@kind("elbow", flags=("best",))
+@kind("elbow", flags=("best",), frames=True)
 def elbow(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Choosing k: kx.plot(ks, inertia, 'elbow'), with z (such as the silhouette score) on a second y axis on the
     right. best = a dashed line at the knee, the point farthest from the line between the first and last points.
@@ -441,7 +446,7 @@ def elbow(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[
 GROUPS = 10                                     # embed: a numeric by= with up to this many values is groups
 
 
-@kind("embed", flags=("ann", *COLOUR), needs_y=False, takes_by=True)
+@kind("embed", flags=("ann", *COLOUR), needs_y=False, takes_by=True, frames=True)
 def embed(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
           by: ArrayLike | None = None, **kw: Any) -> None:
     """A 2-D embedding (PCA, t-SNE or UMAP output) as points coloured by label: kx.plot(xy, labels, 'embed') with
@@ -456,7 +461,7 @@ def embed(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flag
         if z is not None:
             raise ValueError("with an (n, 2) array the labels come next (or by=); there is no z")
         xs, ys = points[:, 0], points[:, 1]
-        names = [str(c) for c in x.columns] if isinstance(x, pd.DataFrame) else ["dim 1", "dim 2"]
+        names = [str(c) for c in x.columns] if isinstance(x, (pd.DataFrame, nw.DataFrame)) else ["dim 1", "dim 2"]
         groups = by if by is not None else y
     else:
         if y is None:
