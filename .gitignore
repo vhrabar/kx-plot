@@ -21,3 +21,6 @@ site/_site/
 site/.quarto/
 site/*_files/
 site/figure_*
+docs/_build/
+docs/_static/kinds/
+docs/kinds/

@@ -42,7 +42,8 @@ embed = [
 
 [project.urls]
 Homepage = "https://github.com/vhrabar/kx-plot"
-Documentation = "https://vhrabar.github.io/kx-plot"
+Documentation = "https://kx-plot.readthedocs.io"
+Gallery = "https://vhrabar.github.io/kx-plot"
 Issues = "https://github.com/vhrabar/kx-plot/issues"
 Changelog = "https://github.com/vhrabar/kx-plot/blob/main/CHANGELOG.md"
 Kaggle = "https://www.kaggle.com/datasets/vhrabar/kx-plot"
@@ -62,6 +63,12 @@ include = ["kx", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
 dev = [
     "pytest",
     "ruff>=0.16.10",
+]
+docs = [
+    "myst-parser>=4",
+    "sphinx>=8",
+    "sphinx-copybutton>=0.5",
+    "sphinx-rtd-theme>=3",
 ]
 
 [tool.pytest.ini_options]

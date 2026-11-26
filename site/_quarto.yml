@@ -31,6 +31,9 @@ format:
     code-copy: true
     code-overflow: wrap
     other-links:
+      - text: Documentation
+        icon: book
+        href: https://kx-plot.readthedocs.io
       - text: GitHub
         icon: github
         href: https://github.com/vhrabar/kx-plot
