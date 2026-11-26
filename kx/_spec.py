@@ -26,7 +26,6 @@ class Kind:
     takes_table: bool = False                   # x is a whole DataFrame (or 2-D array), with no y or z
     panels: bool = False                        # draw splits ax into several axes (util.split) and returns them
     projection: str | None = None               # draw needs this projection ("polar"); kx.plot swaps ax for one
-    frames: bool = False                        # draw reads narwhals input itself; False: kx.plot hands it pandas
 
 
 KINDS: dict[str, Kind] = {}
@@ -35,15 +34,14 @@ KINDS: dict[str, Kind] = {}
 def kind(name: str, flags: tuple[str, ...] = (), needs_y: bool = True,
          check: Callable[[Any, Any, set[str]], None] | None = None, takes_by: bool = False,
          value_axis: str = "y", table: bool = False, panels: bool = False,
-         projection: str | None = None, frames: bool = False) -> Callable:
+         projection: str | None = None) -> Callable:
     """Decorator that registers a draw function as kind `name`. table=True: x is the whole DataFrame.
-    panels=True: draw returns the axes it split ax into. projection='polar': draw gets polar axes.
-    frames=True: draw gets Series and DataFrames as narwhals objects (any backend), not pandas."""
+    panels=True: draw returns the axes it split ax into. projection='polar': draw gets polar axes."""
     def register(draw: Callable[..., None]) -> Callable[..., None]:
         if name in KINDS or name in COMMON_FLAGS or "-" in name:
             raise ValueError(f"kind name {name!r} is taken or has a '-'")
         KINDS[name] = Kind(name, draw, frozenset(flags), needs_y and not table, check, takes_by, value_axis, table,
-                           panels, projection, frames)
+                           panels, projection)
         return draw
     return register
 

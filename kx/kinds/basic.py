@@ -82,7 +82,7 @@ def _lines(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set
         endlabels(ax)
 
 
-@kind("line", flags=(*LINES, "ci"), frames=True)
+@kind("line", flags=(*LINES, "ci"))
 def line(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], n_boot: int | None = None,
          seed: int | None = None, **kw: Any) -> None:
     """y and z against x. date = x as dates, mk = a marker on every point, endlab = each line's name at its
@@ -92,7 +92,7 @@ def line(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[s
     _lines(ax, x, y, z, flags, False, n_boot, seed, **kw)
 
 
-@kind("step", flags=(*LINES, "ci"), frames=True)
+@kind("step", flags=(*LINES, "ci"))
 def step(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], n_boot: int | None = None,
          seed: int | None = None, **kw: Any) -> None:
     """Like line, drawn as steps centred on each x; ci as for line, the band in steps too. kw: ax.step."""
@@ -108,7 +108,7 @@ def _check_area(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("flag 'endlab' labels the lines of an overlapping area; a stack ends in bands, not points")
 
 
-@kind("area", flags=("stack", "norm", *LINES), check=_check_area, frames=True)
+@kind("area", flags=("stack", "norm", *LINES), check=_check_area)
 def area(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Filled y and z; stack = on top of each other, norm = 100% stack. kw: the fills (stackplot or fill_between)."""
     series = [(np.asarray(a, dtype=float), label(a, n)) for a, n in ((y, "y"), (z, "z")) if a is not None]
@@ -133,7 +133,7 @@ def _check_band(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("kind 'band' needs z: the half-width of the band (y - z to y + z)")
 
 
-@kind("band", flags=LINES, check=_check_band, frames=True)
+@kind("band", flags=LINES, check=_check_band)
 def band(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike, flags: set[str], **kw: Any) -> None:
     """y line with a y ± z band in the line's colour. kw: the line (ax.plot)."""
     mid, half = np.asarray(y, dtype=float), np.asarray(z, dtype=float)
@@ -169,7 +169,7 @@ def _fit(ax: Axes, x: ArrayLike, y: ArrayLike, **kw: Any) -> str | None:
     return f"slope {slope:.3g}, R² {r2:.2f}"
 
 
-@kind("scatter", flags=("date", "diag", "fit", *COLOUR), check=_check_scatter, frames=True)
+@kind("scatter", flags=("date", "diag", "fit", *COLOUR), check=_check_scatter)
 def scatter(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """y against x; z becomes a colorbar (numbers) or a legend (categories).
     Numeric z: nocb = no colorbar, sym = colours symmetric around 0, logc = log colour scale.
@@ -199,7 +199,7 @@ def scatter(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: se
         diagonal(ax, x, y, flags)
 
 
-@kind("bar", flags=("stack", "sort", "ann", "ci"), frames=True)
+@kind("bar", flags=("stack", "sort", "ann", "ci"))
 def bar(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str],
         horizontal: bool = False, n_boot: int | None = None, seed: int | None = None, **kw: Any) -> None:
     """y and z grouped per category, x = category labels; stack = z on top of y.
@@ -283,7 +283,7 @@ def _check_count(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("kind 'count' counts the categories of x; split them with by=, not y")
 
 
-@kind("count", flags=("stack", "sort", "ann", "norm"), needs_y=False, takes_by=True, check=_check_count, frames=True)
+@kind("count", flags=("stack", "sort", "ann", "norm"), needs_y=False, takes_by=True, check=_check_count)
 def count(ax: Axes, x: ArrayLike, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
           **kw: Any) -> None:
     """How often each category of x occurs, one bar per by= group; missing values count as 'NaN'.
@@ -307,7 +307,7 @@ def count(ax: Axes, x: ArrayLike, y: None, z: None, flags: set[str], by: ArrayLi
         ax.legend(title=label(by, "by"), **({"loc": "center left", "bbox_to_anchor": (1, 0.5)} if full else {}))
 
 
-@kind("barh", flags=("stack", "sort", "ann", "ci"), value_axis="x", frames=True)
+@kind("barh", flags=("stack", "sort", "ann", "ci"), value_axis="x")
 def barh(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Like bar, lying down: categories (x) top to bottom, bar lengths along the x axis; ci as for bar."""
     bar(ax, x, y, z, flags, horizontal=True, **kw)
@@ -319,7 +319,7 @@ def _check_lollipop(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("kind 'lollipop' takes one value per category: y (and z for a dumbbell) 1-D")
 
 
-@kind("lollipop", flags=("sort", "ann"), value_axis="x", check=_check_lollipop, frames=True)
+@kind("lollipop", flags=("sort", "ann"), value_axis="x", check=_check_lollipop)
 def lollipop(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str],
              fmt: str = "{:.3g}", **kw: Any) -> None:
     """A dot per category (x) at its value (y) on a thin stem from 0, lying down like barh, first category on top.
@@ -416,7 +416,7 @@ def _pie(ax: Axes, x: ArrayLike, y: ArrayLike | None, flags: set[str], hole: flo
         _legend_right(ax, label(x, "") or None)
 
 
-@kind("pie", flags=("ann", "sort"), needs_y=False, check=_check_pie, frames=True)
+@kind("pie", flags=("ann", "sort"), needs_y=False, check=_check_pie)
 def pie(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str], top: int = 7, **kw: Any) -> None:
     """Shares of a whole: the counts of x's categories (missing as 'NaN'), or with y their summed values.
     ann = the percent in each slice, sort = largest first. Past top= slices (7) the smallest fold into 'other'.
@@ -424,7 +424,7 @@ def pie(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str], t
     _pie(ax, x, y, flags, 0, top, **kw)
 
 
-@kind("donut", flags=("ann", "sort"), needs_y=False, check=_check_pie, frames=True)
+@kind("donut", flags=("ann", "sort"), needs_y=False, check=_check_pie)
 def donut(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str], top: int = 7,
           hole: float = 0.55, **kw: Any) -> None:
     """A pie with a hole and the total in it. ann = the percent on each segment, sort = largest first.
@@ -472,7 +472,7 @@ def _scaled(values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return scaled, lo, hi
 
 
-@kind("radar", flags=("raw",), table=True, takes_by=True, projection="polar", frames=True)
+@kind("radar", flags=("raw",), table=True, takes_by=True, projection="polar")
 def radar(ax: Axes, x: Any, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
           **kw: Any) -> None:
     """One polygon per row over the numeric columns, or with by= the mean of each group's rows:
@@ -508,7 +508,7 @@ def radar(ax: Axes, x: Any, y: None, z: None, flags: set[str], by: ArrayLike | N
         _legend_right(ax, label(by, "") if by is not None else None, gap=0.3)   # past the right-hand names
 
 
-@kind("parallel", flags=("mean",), table=True, takes_by=True, frames=True)
+@kind("parallel", flags=("mean",), table=True, takes_by=True)
 def parallel(ax: Axes, x: Any, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
              **kw: Any) -> None:
     """Parallel coordinates: one line per row across the numeric columns, each column scaled to 0..1 with its

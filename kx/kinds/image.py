@@ -4,6 +4,7 @@ from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
@@ -339,7 +340,7 @@ def _predicted(y: ArrayLike, z: Any) -> tuple[np.ndarray, np.ndarray | None]:
         return np.asarray(z, dtype=object).ravel(), None
     scores = np.asarray(z, dtype=float)
     found = classes(y)
-    cols = [str(c) for c in z.columns] if isinstance(z, pd.DataFrame) else None
+    cols = [str(c) for c in z.columns] if isinstance(z, (pd.DataFrame, nw.DataFrame)) else None
     if cols is not None:
         names = cols
     elif len(found) == scores.shape[1]:

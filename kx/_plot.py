@@ -19,7 +19,7 @@ from matplotlib.layout_engine import ConstrainedLayoutEngine
 from numpy.typing import ArrayLike
 
 from . import kinds  # noqa: F401  (registers every kind)
-from ._frame import to_pandas, wrap
+from ._frame import wrap
 from ._spec import KINDS, Spec, parse
 from ._theme import style_path
 from ._util import categories, label, split
@@ -52,8 +52,6 @@ def plot(*data: DataFrame | Column | str, spec: str | Spec | None = None, title:
     x, y, z, spec, by, facet = _arrays(data, spec, by, facet)
     name, theme, flags = parse(spec or "line")
     kind = KINDS[name]
-    if not kind.frames:
-        x, y, z, by, facet = (to_pandas(v) for v in (x, y, z, by, facet))
     if kind.takes_table and not (isinstance(x, (pd.DataFrame, nw.DataFrame)) and y is None
                                  and (by is None or kind.takes_by)):
         raise TypeError(f"kind {name!r} takes a whole table and no columns, y, z"

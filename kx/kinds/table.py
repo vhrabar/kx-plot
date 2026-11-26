@@ -44,7 +44,7 @@ def _labels(df: nw.DataFrame) -> tuple[pd.Index, Any]:
     return (pd.Index(index) if index is not None else pd.RangeIndex(len(df))), names
 
 
-@kind("heat", flags=("corr", "ann", *COLOUR), table=True, frames=True)
+@kind("heat", flags=("corr", "ann", *COLOUR), table=True)
 def heat(ax: Axes, x: Any, y: None, z: None, flags: set[str], fmt: str | None = None,
          **kw: Any) -> None:
     """The table's values as coloured cells, columns along x and index labels down y.
@@ -79,7 +79,7 @@ def _check_crosstab(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("kind 'crosstab' counts pairs of x and y; it takes no z")
 
 
-@kind("crosstab", flags=("norm", "ann", "nocb", "logc"), check=_check_crosstab, frames=True)
+@kind("crosstab", flags=("norm", "ann", "nocb", "logc"), check=_check_crosstab)
 def crosstab(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: Any) -> None:
     """How often each pair of categories occurs: x along x, y down y, like pd.crosstab(y, x).
     norm = shares within each x category (each column sums to 100%), ann = the value in each cell,
@@ -129,7 +129,7 @@ def _gaps(df: nw.DataFrame) -> np.ndarray:
     return np.column_stack(out) if out else np.zeros((len(df), 0), dtype=bool)
 
 
-@kind("missing", flags=("ann", "all"), table=True, value_axis="x", frames=True)
+@kind("missing", flags=("ann", "all"), table=True, value_axis="x")
 def missing(ax: Axes, x: Any, y: None, z: None, flags: set[str], **kw: Any) -> None:
     """The share of missing values in each column, as bars lying down, the most missing on top.
     Only columns with missing values, unless all; ann = the share on each bar. kw: ax.barh."""
@@ -151,7 +151,7 @@ def missing(ax: Axes, x: Any, y: None, z: None, flags: set[str], **kw: Any) -> N
     ax.set_xlabel("missing")
 
 
-@kind("nullmap", flags=("sort",), table=True, frames=True)
+@kind("nullmap", flags=("sort",), table=True)
 def nullmap(ax: Axes, x: Any, y: None, z: None, flags: set[str], **kw: Any) -> None:
     """Where the missing values are: one row per row of the table, columns along x, missing cells in the
     palette's first colour on the background. sort = the rows with the most missing on top. kw: ax.imshow."""
@@ -172,7 +172,7 @@ def _check_hexbin(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("flag 'sym' centres the colours of a z on 0; counts are never below 0")
 
 
-@kind("hexbin", flags=("diag", *COLOUR), check=_check_hexbin, frames=True)
+@kind("hexbin", flags=("diag", *COLOUR), check=_check_hexbin)
 def hexbin(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """How many points fall in each hexagon, or the mean of z there. Rows with a NaN are left out.
     nocb = no colorbar, sym = colours symmetric around 0 (z only), logc = log colour scale, diag = a dashed y = x line.
@@ -231,7 +231,7 @@ def _pair_columns(x: Any, cols: list[str] | None) -> tuple[list[Any], np.ndarray
     return names, _floats([df.get_column(c) for c in names], len(df))
 
 
-@kind("pair", table=True, takes_by=True, panels=True, frames=True)
+@kind("pair", table=True, takes_by=True, panels=True)
 def pair(ax: Axes, x: Any, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
          cols: list[str] | None = None, **kw: Any) -> np.ndarray:
     """A scatter matrix: every numeric column against every other, and on the diagonal each column's density
@@ -321,7 +321,7 @@ def _dendrogram(ax: Axes, z: np.ndarray, side: str) -> None:
     ax.set_axis_off()
 
 
-@kind("cluster", flags=("corr", "ann", *COLOUR), table=True, panels=True, frames=True)
+@kind("cluster", flags=("corr", "ann", *COLOUR), table=True, panels=True)
 def cluster(ax: Axes, x: Any, y: None, z: None, flags: set[str], method: str = "average",
             **kw: Any) -> np.ndarray:
     """heat with the rows and the columns reordered so that similar ones sit together, and the dendrograms that
@@ -384,7 +384,7 @@ def _shade(color: str, step: int, steps: int) -> tuple[float, ...]:
     return tuple((1 - t) * np.array(mpl.colors.to_rgb(color)) + t * back)
 
 
-@kind("mosaic", flags=("ann",), check=_check_mosaic, frames=True)
+@kind("mosaic", flags=("ann",), check=_check_mosaic)
 def mosaic(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Two or three categoricals as tiles whose areas are their counts: one column per category of x, as wide as
     its share; in each, one tile per category of y, as tall as its share within that x; z splits each tile again
@@ -508,7 +508,7 @@ def _tree_names(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None) -> str:
     return " > ".join(label(v, n) for v, n in ((x, "x"), (y, "y"), (z, "z")) if v is not None)
 
 
-@kind("treemap", flags=("ann",), needs_y=False, check=_check_tree, frames=True)
+@kind("treemap", flags=("ann",), needs_y=False, check=_check_tree)
 def treemap(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """A hierarchy of up to three categoricals as nested rectangles with areas by count: x's categories tile the
     axes, each split by y, and by z: kx.plot(df, 'pclass', 'sex', 'survived', spec='treemap'). Colours follow x,
@@ -543,7 +543,7 @@ def treemap(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, fl
     _legend_beside(ax, _tree_names(x, y, z))
 
 
-@kind("sunburst", flags=("ann",), needs_y=False, check=_check_tree, projection="polar", frames=True)
+@kind("sunburst", flags=("ann",), needs_y=False, check=_check_tree, projection="polar")
 def sunburst(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
              hole: float = 0.3, **kw: Any) -> None:
     """The treemap's hierarchy as rings: x innermost, each segment's angle its count, y and z split it outward,

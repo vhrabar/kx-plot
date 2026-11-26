@@ -515,19 +515,3 @@ def test_line_date_on_a_polars_date_column() -> None:
     polars = kx.plot(pl.DataFrame({"day": days, "v": np.arange(30.0)}), "day", "v", "line-date")
     pandas = kx.plot(pd.DataFrame({"day": pd.to_datetime(days), "v": np.arange(30.0)}), "day", "v", "line-date")
     assert _drawn(polars) == _drawn(pandas)
-
-
-def test_basic_kinds_read_polars_without_pandas(monkeypatch: pytest.MonkeyPatch) -> None:
-    pytest.importorskip("polars")
-
-    def refuse(obj: object) -> object:
-        raise AssertionError("a basic kind went through the pandas bridge")
-
-    monkeypatch.setattr(kx._plot, "to_pandas", refuse)
-    frame = _to_polars(MIXED)
-    kx.plot(frame, "g", "a", "bar-ci-facet", facet="h", n_boot=20)
-    kx.plot(frame.select("a", "b", "c", "g"), "radar", by="g")
-    kx.plot(frame, "text day", "a", "line-date")
-    kx.plot(frame, "level", spec="count-facet", by="h", facet="flag")
-    with pytest.raises(AssertionError, match="bridge"):
-        kx.plot(np.zeros((2, 4, 4)), frame.get_column("h").head(2), "imgrid")

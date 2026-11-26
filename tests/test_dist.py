@@ -310,15 +310,3 @@ def test_sig_gives_the_same_p_values_from_polars(kind: str) -> None:
              for f in (_to_polars, _same)]
     assert texts[0] == texts[1]
     assert any(t.startswith("Kruskal-Wallis p") for t in texts[0])
-
-
-def test_distribution_kinds_read_polars_without_pandas(monkeypatch: pytest.MonkeyPatch) -> None:
-    pytest.importorskip("polars")
-
-    def refuse(obj: object) -> object:
-        raise AssertionError("a distribution kind went through the pandas bridge")
-
-    monkeypatch.setattr(kx._plot, "to_pandas", refuse)
-    frame = _to_polars(VALUES)
-    for kind in ("hist", "kde", "ridge", "ecdf", "box", "violin", "strip", "errbar", "qq"):
-        kx.plot(frame, "a", spec=kind, by=None if kind == "hist" else "size")

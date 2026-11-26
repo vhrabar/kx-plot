@@ -1,5 +1,4 @@
 """Transparency (show, grammar, source), kx.grid and kx.save."""
-import datetime as dt
 import subprocess
 import sys
 import typing
@@ -221,6 +220,8 @@ def test_cramers_errors() -> None:
 # ---------- dataframe libraries (narwhals) ----------
 BINARY = kx.load("binary")
 SHAPES = kx.load("shapes")
+_CLASSES = sorted(set(SHAPES["labels"][:30].tolist()))
+_SCORES = pd.DataFrame(np.random.default_rng(0).dirichlet(np.ones(len(_CLASSES)), size=30), columns=_CLASSES)
 PLOTS = {
     "line": lambda f: kx.plot(f(DF), "t", "speed", "accel", "line-leg"),
     "box by=": lambda f: kx.plot(f(DF), "speed", spec="box", by="group"),
@@ -229,6 +230,8 @@ PLOTS = {
     "imgrid": lambda f: kx.plot(SHAPES["images"][:30], f(pd.Series(SHAPES["labels"][:30], name="label")), "imgrid",
                                 n=2),
     "count": lambda f: kx.plot(f(kx.load("passengers")), "port", spec="count"),
+    "miscls 2-D score": lambda f: kx.plot(SHAPES["images"][:30], f(pd.Series(SHAPES["labels"][:30], name="y")),
+                                          f(_SCORES), "miscls", n=4),
 }
 
 
@@ -238,43 +241,9 @@ def test_polars_input_draws_the_same_as_pandas(name: str) -> None:
     assert _drawn(PLOTS[name](_to_polars)) == _drawn(PLOTS[name](_same))
 
 
-def test_polars_dtypes_become_their_pandas_counterparts() -> None:
-    pl = pytest.importorskip("polars")
-    from kx._frame import to_pandas
+def test_wrap_passes_arrays_and_specs_through() -> None:
+    from kx._frame import wrap
 
-    when = pl.Series("t", [dt.datetime(2025, 1, 1, 12), None]).dt.replace_time_zone("Europe/Zagreb")
-    frame = pl.DataFrame({
-        "i": [1, None], "s": ["a", None], "b": [True, None], "d": [dt.date(2025, 1, 1), None], "t": when,
-        "dur": [dt.timedelta(days=1), None],
-        "e": pl.Series(["hi", None], dtype=pl.Enum(["lo", "mid", "hi"])),
-        "c": pl.Series(["z", "y"], dtype=pl.Categorical),
-    })
-    got = to_pandas(frame)
-    assert list(got.columns) == frame.columns
-    assert got["i"].dtype == float
-    assert np.isnan(got["i"][1])
-    assert got["s"][0] == "a"
-    assert pd.isna(got["s"][1])
-    assert got["b"][0] is True
-    assert pd.isna(got["b"][1])
-    assert got["d"].dtype == "datetime64[ns]"
-    assert pd.isna(got["d"][1])
-    assert str(got["t"].dt.tz) == "Europe/Zagreb"
-    assert got["t"][0].hour == 12
-    assert got["dur"][0] == pd.Timedelta(days=1)
-    assert list(got["e"].cat.categories) == ["lo", "mid", "hi"]
-    assert pd.isna(got["e"][1])
-    assert list(got["c"].cat.categories) == ["z", "y"]
-    assert to_pandas(pl.Series([1, 2])).name is None
-    assert to_pandas(pl.Series("v", [1, 2])).name == "v"
-
-
-def test_pandas_input_passes_through_untouched() -> None:
-    from kx._frame import to_pandas, wrap
-
-    column = DF["t"]
-    assert to_pandas(DF) is DF
-    assert to_pandas(column) is column
     assert wrap(X) is X
     assert wrap("line") == "line"
 
@@ -316,6 +285,8 @@ def test_import_kx_does_not_import_polars() -> None:
     code = "import sys, kx; print('polars' in sys.modules, 'pyarrow' in sys.modules)"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert out.stdout.split() == ["False", "False"]
+    source = "".join(p.read_text() for p in Path(kx.__file__).parent.rglob("*.py"))
+    assert "to_pandas" not in source
 
 
 def test_typing_names_the_input_types() -> None:
