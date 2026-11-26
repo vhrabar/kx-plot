@@ -8,14 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-- Any dataframe: `kx.plot`, `kx.evaluate`, `kx.embed`, `kx.cramers` and `kx.missing` take a polars `DataFrame` or
-  `Series` (or a pyarrow, modin, cuDF, ... one) as they take pandas ones, read through
-  [narwhals](https://narwhals-dev.github.io/narwhals/), a new dependency with no dependencies of its own. Every kind
-  reads them natively: their data is never copied to pandas. Neither polars nor pyarrow is needed or imported. A
-  lazy frame raises with a hint to `.collect()` it.
-- `kx.load(name, backend='polars')`: a demo table as a polars (or `'pyarrow'`) frame, with the gaps as nulls.
-- `kx.typing`: `DataFrame`, `Series` and `Column`, the input types the signatures and the docs use, and a
-  "Data input" page in the docs.
+- Any dataframe: polars, pyarrow, modin, cuDF, ... frames and Series work wherever pandas ones do (`kx.plot`,
+  `kx.evaluate`, `kx.embed`, `kx.cramers`, `kx.missing`), read natively, never copied to pandas. polars `Enum`
+  and `Categorical` columns keep their order; a lazy frame raises with a hint to `.collect()` it.
+- `kx.load(name, backend='polars')`: a demo table as a polars (or `'pyarrow'`) frame, the gaps as nulls.
+- `kx.typing`: `DataFrame`, `Series` and `Column`, the input types the signatures use; a "Data input" docs page.
+
+### Changed
+
+- New dependency: [narwhals](https://narwhals-dev.github.io/narwhals/) `>=2.9`, pure Python with no dependencies
+  of its own. polars and pyarrow stay optional and are never imported.
 
 ## [0.7.0] - 2026-11-24
 

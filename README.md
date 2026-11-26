@@ -11,7 +11,8 @@
 One-line matplotlib plots and themes for notebooks and scripts.
 
 `kx` is a small, plain-Python package with `.mplstyle` themes, palettes and colourmaps. It needs nothing beyond
-matplotlib, numpy and pandas and works offline, so it also runs in Kaggle competition notebooks.
+matplotlib, narwhals, numpy and pandas and works offline, so it also runs in Kaggle competition notebooks. It takes
+pandas, polars, pyarrow and the other dataframes [narwhals](https://narwhals-dev.github.io/narwhals/) reads.
 
 ![dark theme](https://vhrabar.github.io/kx-plot/previews/dark.png)
 
@@ -74,6 +75,18 @@ its slope and R² in the legend (one line per group with a categorical `z`).
 
 `sig` on `box` and `violin` writes the Kruskal-Wallis p and brackets the pairs that differ, with stars (`ann`: the
 p-values), Holm-corrected.
+
+### Any dataframe
+
+A polars (or pyarrow, modin, cuDF, ...) frame goes wherever a pandas one does, read as it is, never copied to
+pandas; polars `Enum` and `Categorical` columns keep their order.
+
+```python
+import polars as pl
+df = pl.read_csv('titanic.csv')                     # or kx.load('passengers', backend='polars')
+kx.plot(df, 'age', spec='box', by='pclass')
+kx.evaluate(df['survived'], df['score'])
+```
 
 ### Uncertainty and labels
 

@@ -1,6 +1,6 @@
 [project]
 name = "kx-plot"
-version = "0.7.0"
+version = "0.8.0"
 description = "One-line matplotlib plots, themes and model-evaluation charts for notebooks and scripts, Kaggle-friendly"
 readme = "README.md"
 license = "MIT"
