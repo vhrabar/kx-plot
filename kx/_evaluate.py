@@ -19,9 +19,11 @@ LABELS = 10                                     # a numeric y with more distinct
 def evaluate(y: ArrayLike, *scores: ArrayLike, spec: str = "", **kw: Any) -> np.ndarray:
     """A model report in one figure: kx.evaluate(y_true, score) or kx.evaluate(y_true, gbm, logreg).
     The task comes from the data:
-      binary y, 1-D scores    roc, pr, calib, proba (2 x 2), every score in each panel but proba (the first)
-      2-D score (multiclass)  roc per class, cm of the most likely class, proba of the true class
-      numeric y, many values  pva, resid, and a hist of the residuals
+
+    - binary y, 1-D scores: roc, pr, calib, proba (2 x 2), every score in each panel but proba (the first)
+    - 2-D score (multiclass): roc per class, cm of the most likely class, proba of the true class
+    - numeric y, many values: pva, resid, and a hist of the residuals
+
     spec= adds a theme and flags to every panel: kx.evaluate(y, score, spec='dark-grid').
     Other keywords go to kx.grid (figsize=...). Returns the flat array of axes; the figure is axs[0].figure."""
     if not scores:

@@ -1,11 +1,12 @@
 # kx-plot
 
-[![PyPI](https://img.shields.io/pypi/v/kx-plot?style=flat-square)](https://pypi.org/project/kx-plot/)
-[![Python versions](https://img.shields.io/pypi/pyversions/kx-plot?style=flat-square)](https://pypi.org/project/kx-plot/)
-[![Tests](https://img.shields.io/github/actions/workflow/status/vhrabar/kx-plot/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/vhrabar/kx-plot/actions/workflows/tests.yml)
-[![Docs](https://img.shields.io/badge/docs-vhrabar.github.io%2Fkx--plot-blue?style=flat-square)](https://vhrabar.github.io/kx-plot)
-[![Kaggle](https://img.shields.io/badge/Kaggle-dataset-20BEFF?logo=kaggle&logoColor=white&style=flat-square)](https://www.kaggle.com/datasets/vhrabar/kx-plot)
-[![License: MIT](https://img.shields.io/pypi/l/kx-plot?style=flat-square)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/kx-plot?style=for-the-badge)](https://pypi.org/project/kx-plot/)
+[![Python versions](https://img.shields.io/pypi/pyversions/kx-plot?style=for-the-badge)](https://pypi.org/project/kx-plot/)
+[![Tests](https://img.shields.io/github/actions/workflow/status/vhrabar/kx-plot/tests.yml?branch=main&label=tests&style=for-the-badge)](https://github.com/vhrabar/kx-plot/actions/workflows/tests.yml)
+[![Docs](https://img.shields.io/readthedocs/kx-plot?style=for-the-badge)](https://kx-plot.readthedocs.io)
+[![Gallery](https://img.shields.io/badge/gallery-vhrabar.github.io%2Fkx--plot-blue?style=for-the-badge)](https://vhrabar.github.io/kx-plot)
+[![Kaggle](https://img.shields.io/badge/Kaggle-dataset-20BEFF?logo=kaggle&logoColor=white&style=for-the-badge)](https://www.kaggle.com/datasets/vhrabar/kx-plot)
+[![License: MIT](https://img.shields.io/pypi/l/kx-plot?style=for-the-badge)](LICENSE)
 
 One-line matplotlib plots and themes for notebooks and scripts.
 
