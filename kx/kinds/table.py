@@ -5,6 +5,7 @@ from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
@@ -13,6 +14,7 @@ from matplotlib.image import AxesImage
 from numpy.typing import ArrayLike
 
 from .. import _stats
+from .._frame import column, wrap
 from .._spec import kind
 from .._util import COLOUR, colorbar, diagonal, ink, label, norm, split
 from .basic import _bars, _levels
@@ -21,8 +23,29 @@ from .dist import bandwidth, density
 MAX_PAIRS = 8
 
 
-@kind("heat", flags=("corr", "ann", *COLOUR), table=True)
-def heat(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], fmt: str | None = None,
+def _number(s: nw.Series) -> bool:
+    """A column heat can colour: numbers, or bools as 0 and 1."""
+    return s.dtype.is_numeric() or s.dtype == nw.Boolean
+
+
+def _floats(cols: list[nw.Series], n: int) -> np.ndarray:
+    """The columns as one rows x columns float array, NaN for every gap."""
+    if not cols:
+        return np.empty((n, 0))
+    return np.column_stack([np.asarray(s.cast(nw.Float64).to_numpy(), dtype=float) for s in cols])
+
+
+def _labels(df: nw.DataFrame) -> tuple[pd.Index, Any]:
+    """The table's row labels with their name (a pandas index; 0..n-1 for a table that has none) and the name of
+    its columns (a pandas frame's columns.name, else None)."""
+    index = nw.maybe_get_index(df)
+    native = nw.to_native(df)
+    names = getattr(getattr(native, "columns", None), "name", None)
+    return (pd.Index(index) if index is not None else pd.RangeIndex(len(df))), names
+
+
+@kind("heat", flags=("corr", "ann", *COLOUR), table=True, frames=True)
+def heat(ax: Axes, x: Any, y: None, z: None, flags: set[str], fmt: str | None = None,
          **kw: Any) -> None:
     """The table's values as coloured cells, columns along x and index labels down y.
     corr = correlations of the numeric columns (rdbu, ±1), ann = the value in each cell (fmt=, say '{:.0%}'),
@@ -32,15 +55,23 @@ def heat(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], fmt: str 
             **{**style, **kw})
 
 
-def _heat_frame(x: pd.DataFrame, flags: set[str], name: str) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """The numbers heat and cluster colour (corr = the correlations) and their colour scale."""
-    frame = x.corr(numeric_only=True) if "corr" in flags else x
-    text = [str(c) for c in frame.columns if not pd.api.types.is_numeric_dtype(frame[c])]
+def _heat_frame(x: Any, flags: set[str], name: str) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """The numbers heat and cluster colour (corr = the correlations of the numeric columns) and their colour
+    scale, as a frame of kx's own: the row labels a pandas index, or 0..n-1."""
+    df = wrap(x)
+    cols = [df.get_column(c) for c in df.columns]    # get_column: a 2-D array's columns are named 0, 1, ...
+    rows, names = _labels(df)
+    if "corr" in flags:
+        cols = [s for s in cols if _number(s)]
+        keys = pd.Index([s.name for s in cols], name=names)
+        frame = pd.DataFrame(_stats.corr(_floats(cols, len(df))), index=keys, columns=keys)
+        return frame, {"cmap": "rdbu", "norm": mpl.colors.Normalize(-1, 1)}   # r's scale, whatever the data
+    text = [str(s.name) for s in cols if not _number(s)]
     if text:
         raise ValueError(f"kind {name!r} colours numbers; columns {text} are not. "
-                         "Pass df.select_dtypes('number'), or use 'corr'")
-    corr = {"cmap": "rdbu", "norm": mpl.colors.Normalize(-1, 1)}  # the scale of r, whatever this data's range
-    return frame, corr if "corr" in flags else {"norm": norm(frame.to_numpy(dtype=float), flags)}
+                         "Pass the numeric columns only, or use 'corr'")
+    frame = pd.DataFrame(_floats(cols, len(df)), index=rows, columns=pd.Index([s.name for s in cols], name=names))
+    return frame, {"norm": norm(frame.to_numpy(dtype=float), flags)}
 
 
 def _check_crosstab(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
@@ -48,18 +79,22 @@ def _check_crosstab(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("kind 'crosstab' counts pairs of x and y; it takes no z")
 
 
-@kind("crosstab", flags=("norm", "ann", "nocb", "logc"), check=_check_crosstab)
+@kind("crosstab", flags=("norm", "ann", "nocb", "logc"), check=_check_crosstab, frames=True)
 def crosstab(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: Any) -> None:
     """How often each pair of categories occurs: x along x, y down y, like pd.crosstab(y, x).
     norm = shares within each x category (each column sums to 100%), ann = the value in each cell,
     nocb = no colorbar, logc = log colour scale (empty cells stay blank). kw: ax.imshow."""
-    counts = pd.crosstab(pd.Series(np.asarray(y, dtype=object), name=label(y, "y")),
-                         pd.Series(np.asarray(x, dtype=object), name=label(x, "x")))
-    for v, axis in ((y, "index"), (x, "columns")):   # a categorical keeps its unseen categories (facet panels)
-        if isinstance(getattr(v, "dtype", None), pd.CategoricalDtype):
-            counts = counts.reindex(**{axis: list(v.cat.categories)}, fill_value=0)
+    if np.size(x) != np.size(y):
+        raise ValueError(f"x has {np.size(x)} values but y has {np.size(y)}")
+    (xs, xm), (ys, ym) = _present(x), _present(y)
+    table = np.array([[np.sum(a & b) for a in xm] for b in ym], dtype=float).reshape(len(ys), len(xs))
+    keep_x = np.full(len(xs), True) if _all_levels(x) else table.sum(axis=0) > 0
+    keep_y = np.full(len(ys), True) if _all_levels(y) else table.sum(axis=1) > 0
+    counts = pd.DataFrame(table, index=pd.Index(ys, name=label(y, "y")),
+                          columns=pd.Index(xs, name=label(x, "x"))).loc[keep_y, keep_x]
     if "norm" in flags:
-        counts = counts / counts.sum()
+        with np.errstate(invalid="ignore", divide="ignore"):
+            counts = counts / counts.sum()
     if "logc" in flags:                         # log(0) has no colour: leave those cells empty
         counts = counts.where(counts > 0)
     share = "norm" in flags
@@ -67,37 +102,67 @@ def crosstab(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **k
             **{"norm": norm(counts.to_numpy(dtype=float), flags), "aspect": "auto", **kw})
 
 
-@kind("missing", flags=("ann", "all"), table=True, value_axis="x")
-def missing(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any) -> None:
+def _present(v: ArrayLike) -> tuple[list[str], list[np.ndarray]]:
+    """v's levels in order, as _levels gives them, without the 'NaN' level: crosstab counts pairs of values."""
+    names, masks = _levels(v)
+    if pd.isna(np.asarray(v, dtype=object).ravel()).any():
+        names, masks = names[:-1], masks[:-1]
+    return names, masks
+
+
+def _all_levels(v: ArrayLike) -> bool:
+    """v is a categorical (pandas) or Enum / Categorical (polars): its levels show even where no row has them,
+    so facet panels line up. Other levels show only where a pair has them, as in pd.crosstab."""
+    s = column(v)
+    return isinstance(s.dtype, nw.Enum) or s.dtype == nw.Categorical
+
+
+def _gaps(df: nw.DataFrame) -> np.ndarray:
+    """Where the table has no value, rows x columns: a null, or NaN in a float column (as pandas counts it)."""
+    out = []
+    for c in df.columns:
+        s = df.get_column(c)
+        gap = s.is_null()
+        if s.dtype.is_float():
+            gap = gap | s.is_nan().fill_null(True)
+        out.append(np.asarray(gap.to_numpy(), dtype=bool))
+    return np.column_stack(out) if out else np.zeros((len(df), 0), dtype=bool)
+
+
+@kind("missing", flags=("ann", "all"), table=True, value_axis="x", frames=True)
+def missing(ax: Axes, x: Any, y: None, z: None, flags: set[str], **kw: Any) -> None:
     """The share of missing values in each column, as bars lying down, the most missing on top.
     Only columns with missing values, unless all; ann = the share on each bar. kw: ax.barh."""
-    share = x.isna().mean()
+    df = wrap(x)
+    gaps = _gaps(df)
+    share = gaps.mean(axis=0) if len(gaps) else np.zeros(gaps.shape[1])
+    names = np.array([str(c) for c in df.columns], dtype=object)
     if "all" not in flags:
-        share = share[share > 0]
-    if share.empty:                             # nothing to draw is an answer too, not an error
+        names, share = names[share > 0], share[share > 0]
+    if not len(share):                          # nothing to draw is an answer too, not an error
         ax.text(0.5, 0.5, "no missing values", ha="center", va="center", transform=ax.transAxes)
         ax.set_xticks([])
         ax.set_yticks([])
         return
-    _bars(ax, np.array([str(c) for c in share.index], dtype=object), [("missing", share.to_numpy(dtype=float))],
+    _bars(ax, names, [("missing", np.asarray(share, dtype=float))],
           {"sort", *(flags & {"ann"})}, True, fmt="{:.1%}", **kw)
     ax.invert_yaxis()                           # largest on top
     ax.xaxis.set_major_formatter(mpl.ticker.PercentFormatter(1))
     ax.set_xlabel("missing")
 
 
-@kind("nullmap", flags=("sort",), table=True)
-def nullmap(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any) -> None:
+@kind("nullmap", flags=("sort",), table=True, frames=True)
+def nullmap(ax: Axes, x: Any, y: None, z: None, flags: set[str], **kw: Any) -> None:
     """Where the missing values are: one row per row of the table, columns along x, missing cells in the
     palette's first colour on the background. sort = the rows with the most missing on top. kw: ax.imshow."""
-    gaps = x.isna()
+    df = wrap(x)
+    gaps = _gaps(df)
     if "sort" in flags:                         # most missing first; ties by pattern, so the same gaps form a block
-        g = gaps.to_numpy()
-        gaps = gaps.iloc[np.lexsort([*(~g[:, j] for j in reversed(range(g.shape[1]))), -g.sum(axis=1)])]
+        gaps = gaps[np.lexsort([*(~gaps[:, j] for j in reversed(range(gaps.shape[1]))), -gaps.sum(axis=1)])]
     colours = mpl.colors.ListedColormap([ax.get_facecolor(), mpl.colors.to_rgba("C0")])
-    ax.imshow(gaps.to_numpy(dtype=float), **{"cmap": colours, "vmin": 0, "vmax": 1, "interpolation": "nearest",
-                                             "aspect": "auto", **kw})
-    ax.set_xticks(range(gaps.shape[1]), [str(c) for c in gaps.columns])
+    ax.imshow(gaps.astype(float), **{"cmap": colours, "vmin": 0, "vmax": 1, "interpolation": "nearest",
+                                     "aspect": "auto", **kw})
+    ax.set_xticks(range(gaps.shape[1]), [str(c) for c in df.columns])
     ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(10, integer=True))    # row positions, not every row
     ax.set_ylabel("row, most missing first" if "sort" in flags else "row")
 
@@ -107,7 +172,7 @@ def _check_hexbin(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("flag 'sym' centres the colours of a z on 0; counts are never below 0")
 
 
-@kind("hexbin", flags=("diag", *COLOUR), check=_check_hexbin)
+@kind("hexbin", flags=("diag", *COLOUR), check=_check_hexbin, frames=True)
 def hexbin(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """How many points fall in each hexagon, or the mean of z there. Rows with a NaN are left out.
     nocb = no colorbar, sym = colours symmetric around 0 (z only), logc = log colour scale, diag = a dashed y = x line.
@@ -144,35 +209,36 @@ def _matrix(ax: Axes, frame: pd.DataFrame, flags: set[str], cblabel: str, fmt: s
     return im
 
 
-def _pair_columns(x: pd.DataFrame, cols: list[str] | None) -> pd.DataFrame:
-    """The columns of a scatter matrix: cols= in its order, else every numeric (not bool) column; 2 to 8 of them."""
+def _pair_columns(x: Any, cols: list[str] | None) -> tuple[list[Any], np.ndarray]:
+    """The names and values (rows x columns, floats) of a scatter matrix's columns: cols= in its order, else every
+    numeric (not bool) column; 2 to 8 of them."""
+    df = wrap(x)
     if cols is not None:
-        missing = [c for c in cols if c not in x.columns]
+        missing = [c for c in cols if c not in df.columns]
         if missing:
-            raise ValueError(f"cols= names {missing}, which the table does not have. Columns: {list(x.columns)}")
-        text = [str(c) for c in cols if not pd.api.types.is_numeric_dtype(x[c]) or pd.api.types.is_bool_dtype(x[c])]
+            raise ValueError(f"cols= names {missing}, which the table does not have. Columns: {list(df.columns)}")
+        text = [str(c) for c in cols if not df.get_column(c).dtype.is_numeric()]
         if text:
             raise ValueError(f"kind 'pair' plots numbers; cols= {text} are not. Pass a category as by=")
-        frame = x[list(cols)]
+        names = list(cols)
     else:
-        frame = x[[c for c in x.columns
-                   if pd.api.types.is_numeric_dtype(x[c]) and not pd.api.types.is_bool_dtype(x[c])]]
-    if frame.shape[1] < 2:
-        raise ValueError(f"kind 'pair' needs at least 2 numeric columns, got {frame.shape[1]}")
-    if frame.shape[1] > MAX_PAIRS:
-        raise ValueError(f"kind 'pair' with {frame.shape[1]} numeric columns is {frame.shape[1] ** 2} panels; "
+        names = [c for c in df.columns if df.get_column(c).dtype.is_numeric()]
+    if len(names) < 2:
+        raise ValueError(f"kind 'pair' needs at least 2 numeric columns, got {len(names)}")
+    if len(names) > MAX_PAIRS:
+        raise ValueError(f"kind 'pair' with {len(names)} numeric columns is {len(names) ** 2} panels; "
                          f"pick at most {MAX_PAIRS} with cols=[...]")
-    return frame.astype(float)
+    return names, _floats([df.get_column(c) for c in names], len(df))
 
 
-@kind("pair", table=True, takes_by=True, panels=True)
-def pair(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
+@kind("pair", table=True, takes_by=True, panels=True, frames=True)
+def pair(ax: Axes, x: Any, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
          cols: list[str] | None = None, **kw: Any) -> np.ndarray:
     """A scatter matrix: every numeric column against every other, and on the diagonal each column's density
     (a KDE per group), x shared down each column and y along each row: kx.plot(df, 'pair', by='class').
     cols= picks and orders the columns (at most 8). Returns the k x k panels, row by row. kw: ax.scatter."""
-    frame = _pair_columns(x, cols)
-    k, n = frame.shape[1], len(frame)
+    names, values = _pair_columns(x, cols)
+    k, n = values.shape[1], len(values)
     groups, masks = _levels(by) if by is not None else ([None], [np.ones(n, dtype=bool)])
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     fig = ax.figure
@@ -191,10 +257,9 @@ def pair(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: Array
                 a.sharey(axs[r, 1 if r == 0 else 0])
             a.tick_params(labelbottom=r == k - 1, labelleft=c == 0)
             if r == k - 1:
-                a.set_xlabel(str(frame.columns[c]))
+                a.set_xlabel(str(names[c]))
             if c == 0:
-                a.set_ylabel(str(frame.columns[r]))
-    values = frame.to_numpy()
+                a.set_ylabel(str(names[r]))
     size = 0.3 * plt.rcParams["lines.markersize"] ** 2
     alpha = float(np.clip(300 / max(n, 1), 0.2, 0.8))
     for i, (g, m) in enumerate(zip(groups, masks, strict=True)):
@@ -256,8 +321,8 @@ def _dendrogram(ax: Axes, z: np.ndarray, side: str) -> None:
     ax.set_axis_off()
 
 
-@kind("cluster", flags=("corr", "ann", *COLOUR), table=True, panels=True)
-def cluster(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], method: str = "average",
+@kind("cluster", flags=("corr", "ann", *COLOUR), table=True, panels=True, frames=True)
+def cluster(ax: Axes, x: Any, y: None, z: None, flags: set[str], method: str = "average",
             **kw: Any) -> np.ndarray:
     """heat with the rows and the columns reordered so that similar ones sit together, and the dendrograms that
     order comes from above and left: kx.plot(df, 'cluster-corr') groups features that move together.
@@ -319,7 +384,7 @@ def _shade(color: str, step: int, steps: int) -> tuple[float, ...]:
     return tuple((1 - t) * np.array(mpl.colors.to_rgb(color)) + t * back)
 
 
-@kind("mosaic", flags=("ann",), check=_check_mosaic)
+@kind("mosaic", flags=("ann",), check=_check_mosaic, frames=True)
 def mosaic(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Two or three categoricals as tiles whose areas are their counts: one column per category of x, as wide as
     its share; in each, one tile per category of y, as tall as its share within that x; z splits each tile again
@@ -443,7 +508,7 @@ def _tree_names(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None) -> str:
     return " > ".join(label(v, n) for v, n in ((x, "x"), (y, "y"), (z, "z")) if v is not None)
 
 
-@kind("treemap", flags=("ann",), needs_y=False, check=_check_tree)
+@kind("treemap", flags=("ann",), needs_y=False, check=_check_tree, frames=True)
 def treemap(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """A hierarchy of up to three categoricals as nested rectangles with areas by count: x's categories tile the
     axes, each split by y, and by z: kx.plot(df, 'pclass', 'sex', 'survived', spec='treemap'). Colours follow x,
@@ -478,7 +543,7 @@ def treemap(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, fl
     _legend_beside(ax, _tree_names(x, y, z))
 
 
-@kind("sunburst", flags=("ann",), needs_y=False, check=_check_tree, projection="polar")
+@kind("sunburst", flags=("ann",), needs_y=False, check=_check_tree, projection="polar", frames=True)
 def sunburst(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flags: set[str],
              hole: float = 0.3, **kw: Any) -> None:
     """The treemap's hierarchy as rings: x innermost, each segment's angle its count, y and z split it outward,

@@ -128,12 +128,54 @@ def holm(p: ArrayLike) -> np.ndarray:
     return out
 
 
+def _sorted(values: list) -> list:
+    """values in order (numbers by size, text alphabetically); mixed types by their text."""
+    try:
+        return sorted(values)
+    except TypeError:
+        return sorted(values, key=str)
+
+
+def contingency(x: ArrayLike, y: ArrayLike) -> np.ndarray:
+    """How often each pair of values occurs: x's distinct values down the rows, y's along the columns, both
+    sorted, as pd.crosstab(x, y). Rows with a missing value in either are left out."""
+    xs, ys = np.asarray(x, dtype=object).ravel(), np.asarray(y, dtype=object).ravel()
+    if len(xs) != len(ys):
+        raise ValueError(f"x has {len(xs)} values but y has {len(ys)}")
+    keep = ~(np.asarray(pd.isna(xs), dtype=bool) | np.asarray(pd.isna(ys), dtype=bool))
+    xs, ys = xs[keep].tolist(), ys[keep].tolist()
+    rows = {v: i for i, v in enumerate(_sorted(list(set(xs))))}
+    cols = {v: i for i, v in enumerate(_sorted(list(set(ys))))}
+    table = np.zeros((len(rows), len(cols)))
+    np.add.at(table, ([rows[v] for v in xs], [cols[v] for v in ys]), 1)
+    return table
+
+
+def corr(values: ArrayLike) -> np.ndarray:
+    """Pearson's r between the columns of a rows x columns array, each pair over the rows where both have a
+    value, as DataFrame.corr: NaN for a pair with under 2 such rows or a constant column."""
+    v = np.asarray(values, dtype=float)
+    k = v.shape[1]
+    r = np.full((k, k), np.nan)
+    finite = np.isfinite(v)
+    for i in range(k):
+        for j in range(i, k):
+            both = finite[:, i] & finite[:, j]
+            if both.sum() < 2:
+                continue
+            a, b = v[both, i], v[both, j]
+            a, b = a - a.mean(), b - b.mean()
+            scale = math.sqrt(float(a @ a) * float(b @ b))
+            if scale > 0:
+                r[i, j] = r[j, i] = min(1.0, max(-1.0, float(a @ b) / scale))
+    return r
+
+
 def cramers_v(x: ArrayLike, y: ArrayLike, corrected: bool = True) -> float:
     """Cramér's V of two categoricals, 0 (independent) .. 1 (one fixes the other). corrected = the bias correction
     of Bergsma (2013), which keeps V near 0 for independent columns with many categories. Rows with a NaN in
     either are dropped; NaN when either has one category only."""
-    pairs = pd.DataFrame({"x": np.asarray(x, dtype=object).ravel(), "y": np.asarray(y, dtype=object).ravel()})
-    table = pd.crosstab(pairs.x, pairs.y).to_numpy(dtype=float)
+    table = contingency(x, y)
     n = table.sum()
     rows, cols = table.shape
     if rows < 2 or cols < 2:

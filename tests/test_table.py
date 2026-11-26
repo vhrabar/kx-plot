@@ -5,7 +5,7 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import pytest
-from helpers import PASSENGERS
+from helpers import PASSENGERS, _drawn, _same, _to_polars
 from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
 
@@ -565,3 +565,68 @@ def test_sunburst_in_a_grid_cell_is_polar_in_place() -> None:
 def test_tree_errors(call: Callable[[], Axes], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         call()
+
+
+# ---------- pandas and polars draw the same ----------
+_rng = np.random.default_rng(2)
+TABLE = pd.DataFrame({
+    "a": _rng.normal(size=60).round(2),
+    "b": _rng.normal(1, 2, size=60).round(2),
+    "c": _rng.uniform(1, 5, size=60).round(2),
+    "k": _rng.integers(0, 4, size=60),
+    "flag": _rng.choice([True, False], size=60),
+    "g": _rng.choice(["x", "y", "z"], size=60).astype(object),
+    "h": _rng.choice(["p", "q"], size=60),
+    "size": pd.Categorical(_rng.choice(["s", "l"], size=60), categories=["s", "m", "l"]),
+})
+TABLE.loc[[2, 9], "g"] = None
+TABLE.loc[[4, 11, 12], "a"] = np.nan
+TABLE.loc[[1, 4], "b"] = np.nan
+FILLED = TABLE[["a", "b", "c", "k"]].fillna(0)
+
+PARITY = {
+    "heat": lambda f: kx.plot(f(FILLED.head(6)), "heat-ann"),
+    "heat corr with gaps": lambda f: kx.plot(f(TABLE), "heat-corr-ann"),
+    "crosstab enum": lambda f: kx.plot(f(TABLE), "size", "g", "crosstab-ann"),
+    "missing": lambda f: kx.plot(f(TABLE), "missing-ann"),
+    "nullmap sort": lambda f: kx.plot(f(TABLE), "nullmap-sort"),
+    "hexbin z": lambda f: kx.plot(f(TABLE), "a", "b", "c", "hexbin", gridsize=5),
+    "pair by": lambda f: kx.plot(f(TABLE[["a", "b", "c", "g"]]), "pair", by="g"),
+    "cluster corr": lambda f: kx.plot(f(FILLED), "cluster-corr-ann"),
+    "mosaic": lambda f: kx.plot(f(PASSENGERS), "sex", "pclass", "survived", "mosaic-ann"),
+    "treemap enum": lambda f: kx.plot(f(TABLE), "size", "g", "treemap"),
+    "sunburst": lambda f: kx.plot(f(PASSENGERS), "pclass", "sex", "sunburst"),
+    "cramers": lambda f: kx.cramers(f(PASSENGERS)),
+}
+
+
+@pytest.mark.parametrize("name", PARITY)
+def test_table_kinds_draw_the_same_from_polars(name: str) -> None:
+    pytest.importorskip("polars")
+    assert _drawn(PARITY[name](_to_polars)) == _drawn(PARITY[name](_same))
+
+
+def test_heat_corr_is_pandas_corr_with_gaps_dropped_pairwise() -> None:
+    got = kx.plot(TABLE, "heat-corr").images[0].get_array()
+    want = TABLE[["a", "b", "c", "k", "flag"]].corr().to_numpy()
+    assert np.allclose(np.ma.filled(got, np.nan), want, equal_nan=True, rtol=0, atol=1e-12)
+
+
+def test_heat_keeps_a_pandas_index_and_polars_rows_are_numbered() -> None:
+    pl = pytest.importorskip("polars")
+    named = HEAT.rename_axis("row")
+    ax = kx.plot(named, "heat")
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["r1", "r2", "r3"]
+    assert ax.get_ylabel() == "row"
+    ax = kx.plot(pl.from_dict(HEAT.to_dict("list")), "heat")
+    assert [t.get_text() for t in ax.get_yticklabels()] == ["0", "1", "2"]
+    assert ax.get_ylabel() == ""
+
+
+def test_missing_counts_pandas_nan_and_polars_null_and_nan_alike() -> None:
+    pl = pytest.importorskip("polars")
+    pandas = pd.DataFrame({"f": [1.0, np.nan, 3, 4], "s": ["a", None, None, "d"]})
+    nulls = pl.DataFrame({"f": [1.0, None, 3, 4], "s": ["a", None, None, "d"]})
+    nans = pl.DataFrame({"f": [1.0, float("nan"), 3, 4], "s": ["a", None, None, "d"]})
+    shares = [[p.get_width() for p in kx.plot(f, "missing-all").patches] for f in (pandas, nulls, nans)]
+    assert shares == [[0.5, 0.25]] * 3

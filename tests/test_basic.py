@@ -530,4 +530,4 @@ def test_basic_kinds_read_polars_without_pandas(monkeypatch: pytest.MonkeyPatch)
     kx.plot(frame, "text day", "a", "line-date")
     kx.plot(frame, "level", spec="count-facet", by="h", facet="flag")
     with pytest.raises(AssertionError, match="bridge"):
-        kx.plot(frame.select("a", "b"), "heat")
+        kx.plot(frame, "a", "b", "pva")
