@@ -10,7 +10,7 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import pytest
-from helpers import DF, X, Y, Z
+from helpers import DF, X, Y, Z, _drawn, _same, _to_polars
 
 import kx
 import kx._stats
@@ -219,31 +219,6 @@ def test_cramers_errors() -> None:
 
 
 # ---------- dataframe libraries (narwhals) ----------
-def _drawn(axs: object) -> list:
-    """What a plot draws, comparable across runs: line and patch geometry, points, images and tick labels."""
-    out = []
-    for ax in np.atleast_1d(axs):
-        out.append([ln.get_xydata().tolist() for ln in ax.lines])
-        out.append([p.get_path().vertices.tolist() for p in ax.patches])
-        out.append([np.asarray(c.get_offsets()).tolist() for c in ax.collections])
-        out.append([np.asarray(im.get_array()).tolist() for im in ax.images])
-        out.append([t.get_text() for t in [*ax.get_xticklabels(), *ax.get_yticklabels()]])
-        out.append([ax.get_xlabel(), ax.get_ylabel(), ax.get_title()])
-    return out
-
-
-def _to_polars(obj: object) -> object:
-    """A pandas frame or Series as polars, the gaps as nulls."""
-    pl = pytest.importorskip("polars")
-    if isinstance(obj, pd.Series):
-        return pl.Series(obj.name, obj.astype(object).where(obj.notna(), None).tolist())
-    return pl.DataFrame({c: obj[c].astype(object).where(obj[c].notna(), None).tolist() for c in obj.columns})
-
-
-def _same(f: Callable[[object], object]) -> object:
-    return f
-
-
 BINARY = kx.load("binary")
 SHAPES = kx.load("shapes")
 PLOTS = {

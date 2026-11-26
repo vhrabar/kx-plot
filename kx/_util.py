@@ -2,30 +2,35 @@
 from typing import Any
 
 import matplotlib as mpl
+import narwhals.stable.v2 as nw
 import numpy as np
-import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
 from matplotlib.colorbar import Colorbar
 from numpy.typing import ArrayLike
 
+from ._frame import column, name
+
 COLOUR = ("nocb", "sym", "logc")               # flags for numeric values on a colour scale
 
 
 def label(arr: ArrayLike, default: str) -> str:
-    """Use a pandas Series name as legend label when there is one."""
-    name = getattr(arr, "name", None)
-    return str(name) if name is not None else default
+    """A Series' name (any backend) as the label when it has one, else default."""
+    found = name(arr)
+    return str(found) if found is not None else default
 
 
 def categories(z: ArrayLike) -> list[Any] | None:
-    """Category values of z if it is text, bool or categorical; None if z is numeric."""
-    s = z if isinstance(z, pd.Series) else pd.Series(np.asarray(z))
-    if isinstance(s.dtype, pd.CategoricalDtype):
-        return list(s.cat.categories)
-    if pd.api.types.is_numeric_dtype(s) and not pd.api.types.is_bool_dtype(s):
+    """Category values of z if it is text, bool, dates or categorical (a pandas categorical's, a polars Enum's or
+    Categorical's order); None if z holds numbers or durations."""
+    s = column(z)
+    if isinstance(s.dtype, nw.Enum):
+        return list(s.dtype.categories)
+    if s.dtype == nw.Categorical:
+        return s.cat.get_categories().to_list()
+    if s.dtype.is_numeric() or s.dtype == nw.Duration:
         return None
-    return sorted(s.dropna().unique(), key=str)
+    return sorted(s.drop_nulls().unique().to_list(), key=str)
 
 
 def ink(rgba: tuple[float, ...]) -> str:

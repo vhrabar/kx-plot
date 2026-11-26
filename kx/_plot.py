@@ -50,10 +50,12 @@ def plot(*data: DataFrame | Column | str, spec: str | Spec | None = None, title:
     is given.
     """
     x, y, z, spec, by, facet = _arrays(data, spec, by, facet)
-    x, y, z, by, facet = (to_pandas(v) for v in (x, y, z, by, facet))  # the kinds still speak pandas
     name, theme, flags = parse(spec or "line")
     kind = KINDS[name]
-    if kind.takes_table and not (isinstance(x, pd.DataFrame) and y is None and (by is None or kind.takes_by)):
+    if not kind.frames:
+        x, y, z, by, facet = (to_pandas(v) for v in (x, y, z, by, facet))
+    if kind.takes_table and not (isinstance(x, (pd.DataFrame, nw.DataFrame)) and y is None
+                                 and (by is None or kind.takes_by)):
         raise TypeError(f"kind {name!r} takes a whole table and no columns, y, z"
                         f"{'' if kind.takes_by else ' or by='}: kx.plot(df, {name!r}), "
                         f"or kx.plot(df[cols], {name!r}) for some columns")
@@ -70,8 +72,8 @@ def plot(*data: DataFrame | Column | str, spec: str | Spec | None = None, title:
         raise ValueError(f"kind {name!r} draws several panels already; facet splits a single plot")
     if kind.check:
         kind.check(y, z, flags)
-    if "date" in flags:                         # strings and numbers become dates; a Series keeps its name
-        x = pd.to_datetime(x)
+    if "date" in flags:
+        x = _dates(x)
 
     style = plt.style.context(["default", style_path(theme)]) if theme else contextlib.nullcontext()
     with style:
@@ -169,6 +171,18 @@ def _arrays(data: tuple, spec: str | Spec | None, by: ArrayLike | str | None,
     return *data, *[None] * (3 - len(data)), spec, by, facet
 
 
+def _dates(x: Any) -> Any:
+    """date: text and numbers as dates, a date or datetime column as it is; a Series keeps its name."""
+    s = wrap(x)
+    if not isinstance(s, nw.Series):
+        return pd.to_datetime(x)
+    if s.implementation.is_pandas():
+        return wrap(pd.to_datetime(nw.to_native(s)))
+    if s.dtype in (nw.Date, nw.Datetime):
+        return s
+    return s.str.to_datetime() if s.dtype == nw.String else s.cast(nw.Datetime("ns"))
+
+
 def _table_spec(text: str) -> bool:
     """text is a spec for a table kind. Table kinds take no columns, so a column named 'loss' (as in every Keras
     history) does not hide kx.plot(h, 'loss')."""
@@ -248,9 +262,16 @@ def _wrap(axis: mpl.axis.Axis) -> None:
 
 def _full_categories(v: Any) -> Any:
     """Text as a categorical with every category of the whole column, so each facet panel shows the same
-    categories in the same places and colours, even where one of them is missing. Numbers, bools, tables pass."""
-    if v is None or isinstance(v, pd.DataFrame) or np.ndim(v) != 1:
+    categories in the same places and colours, even where one of them is missing. Numbers, bools, tables pass.
+    A narwhals Series stays one: a polars text or Categorical column becomes an Enum of its categories."""
+    if v is None or isinstance(v, (pd.DataFrame, nw.DataFrame)) or np.ndim(v) != 1:
         return v
+    if isinstance(v, nw.Series) and not v.implementation.is_pandas():
+        if v.dtype == nw.String or v.dtype == nw.Categorical:
+            return v.cast(nw.Enum(categories(v)))
+        return v
+    if isinstance(v, nw.Series):
+        return wrap(_full_categories(nw.to_native(v)))
     s = v if isinstance(v, pd.Series) else pd.Series(np.asarray(v, dtype=object))
     if pd.api.types.is_numeric_dtype(s) or pd.api.types.is_bool_dtype(s) or isinstance(s.dtype, pd.CategoricalDtype):
         return v
@@ -264,6 +285,8 @@ def _rows(v: Any, mask: np.ndarray) -> Any:
     """The rows of v where mask is True, keeping a Series' name or a table's columns."""
     if v is None:
         return None
+    if isinstance(v, (nw.Series, nw.DataFrame)):
+        return v.filter(np.asarray(mask, dtype=bool).tolist())
     if isinstance(v, (pd.Series, pd.DataFrame)):
         return v[mask]
     return np.asarray(v)[mask]
@@ -326,7 +349,7 @@ def _facet(ax: Axes, kind: Any, x: Any, y: Any, z: Any, by: Any, facet: Any, fla
            title: str | None, alone: bool, **kwargs: Any) -> np.ndarray:
     """The kind drawn once per value of facet, in ax's place: up to 4 in a row, else 3 per row."""
     groups, masks = _levels(facet)
-    n = len(x) if isinstance(x, pd.DataFrame) else np.size(x) if np.ndim(x) == 1 else len(np.asarray(x))
+    n = len(x) if isinstance(x, (pd.DataFrame, nw.DataFrame)) else np.size(x) if np.ndim(x) == 1 else len(np.asarray(x))
     if np.size(facet) != n:
         raise ValueError(f"facet= has {np.size(facet)} values but the data has {n} rows")
     x, y, z, by = (_full_categories(v) for v in (x, y, z, by))

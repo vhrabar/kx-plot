@@ -4,6 +4,7 @@ from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
@@ -12,6 +13,7 @@ from matplotlib.container import BarContainer
 from matplotlib.patheffects import withStroke
 from numpy.typing import ArrayLike
 
+from .._frame import column, wrap
 from .._spec import kind
 from .._stats import bootstrap
 from .._util import COLOUR, categories, colorbar, diagonal, endlabels, ink, label, norm
@@ -34,10 +36,20 @@ def _boot(flags: set[str], n_boot: int | None, seed: int | None) -> tuple[int, i
 def _mean_ci(x: ArrayLike, v: ArrayLike, n_boot: int, seed: int) -> tuple[Any, np.ndarray, np.ndarray, np.ndarray]:
     """ci: x's distinct values (sorted for numbers, dates and categoricals, in order of appearance for text), the
     mean of v at each, and the bootstrap interval of that mean."""
-    xs = pd.Series(np.asarray(x)) if not isinstance(x, pd.Series) else x.reset_index(drop=True)
-    ordered = (pd.api.types.is_numeric_dtype(xs) or pd.api.types.is_datetime64_any_dtype(xs)
-               or isinstance(xs.dtype, pd.CategoricalDtype))
-    codes, keys = pd.factorize(xs, sort=ordered)
+    s = column(x)
+    xs = np.asarray(s.to_numpy())
+    missing = np.asarray(pd.isna(xs), dtype=bool)
+    present = xs[~missing]
+    if isinstance(s.dtype, nw.Enum) or s.dtype == nw.Categorical:    # the categories there are, in their order
+        seen = set(present.tolist())
+        keys = np.array([c for c in categories(s) if c in seen], dtype=object)
+    elif s.dtype.is_numeric() or s.dtype in (nw.Boolean, nw.Date, nw.Datetime, nw.Duration):
+        keys = np.unique(present)
+    else:
+        keys = np.array(list(dict.fromkeys(present.tolist())), dtype=object)
+    lookup = {k: i for i, k in enumerate(keys.tolist())}
+    codes = np.full(len(xs), -1)
+    codes[~missing] = [lookup[k] for k in present.tolist()]
     vs = np.asarray(v, dtype=float).ravel()
     if len(keys) == np.count_nonzero(codes >= 0):
         raise ValueError("ci bootstraps the y values at each x, and each x has one here. "
@@ -47,7 +59,7 @@ def _mean_ci(x: ArrayLike, v: ArrayLike, n_boot: int, seed: int) -> tuple[Any, n
         warnings.simplefilter("ignore", RuntimeWarning)
         mean = np.array([np.nanmean(g) for g in groups])
     lo, hi = np.array([bootstrap(g, n_boot, seed) for g in groups]).T
-    return np.asarray(keys), mean, lo, hi
+    return keys, mean, lo, hi
 
 
 def _lines(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], drawn: bool,
@@ -70,7 +82,7 @@ def _lines(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set
         endlabels(ax)
 
 
-@kind("line", flags=(*LINES, "ci"))
+@kind("line", flags=(*LINES, "ci"), frames=True)
 def line(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], n_boot: int | None = None,
          seed: int | None = None, **kw: Any) -> None:
     """y and z against x. date = x as dates, mk = a marker on every point, endlab = each line's name at its
@@ -80,7 +92,7 @@ def line(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[s
     _lines(ax, x, y, z, flags, False, n_boot, seed, **kw)
 
 
-@kind("step", flags=(*LINES, "ci"))
+@kind("step", flags=(*LINES, "ci"), frames=True)
 def step(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], n_boot: int | None = None,
          seed: int | None = None, **kw: Any) -> None:
     """Like line, drawn as steps centred on each x; ci as for line, the band in steps too. kw: ax.step."""
@@ -96,7 +108,7 @@ def _check_area(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("flag 'endlab' labels the lines of an overlapping area; a stack ends in bands, not points")
 
 
-@kind("area", flags=("stack", "norm", *LINES), check=_check_area)
+@kind("area", flags=("stack", "norm", *LINES), check=_check_area, frames=True)
 def area(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Filled y and z; stack = on top of each other, norm = 100% stack. kw: the fills (stackplot or fill_between)."""
     series = [(np.asarray(a, dtype=float), label(a, n)) for a, n in ((y, "y"), (z, "z")) if a is not None]
@@ -121,7 +133,7 @@ def _check_band(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("kind 'band' needs z: the half-width of the band (y - z to y + z)")
 
 
-@kind("band", flags=LINES, check=_check_band)
+@kind("band", flags=LINES, check=_check_band, frames=True)
 def band(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike, flags: set[str], **kw: Any) -> None:
     """y line with a y ± z band in the line's colour. kw: the line (ax.plot)."""
     mid, half = np.asarray(y, dtype=float), np.asarray(z, dtype=float)
@@ -157,7 +169,7 @@ def _fit(ax: Axes, x: ArrayLike, y: ArrayLike, **kw: Any) -> str | None:
     return f"slope {slope:.3g}, R² {r2:.2f}"
 
 
-@kind("scatter", flags=("date", "diag", "fit", *COLOUR), check=_check_scatter)
+@kind("scatter", flags=("date", "diag", "fit", *COLOUR), check=_check_scatter, frames=True)
 def scatter(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """y against x; z becomes a colorbar (numbers) or a legend (categories).
     Numeric z: nocb = no colorbar, sym = colours symmetric around 0, logc = log colour scale.
@@ -187,7 +199,7 @@ def scatter(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: se
         diagonal(ax, x, y, flags)
 
 
-@kind("bar", flags=("stack", "sort", "ann", "ci"))
+@kind("bar", flags=("stack", "sort", "ann", "ci"), frames=True)
 def bar(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str],
         horizontal: bool = False, n_boot: int | None = None, seed: int | None = None, **kw: Any) -> None:
     """y and z grouped per category, x = category labels; stack = z on top of y.
@@ -271,7 +283,7 @@ def _check_count(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("kind 'count' counts the categories of x; split them with by=, not y")
 
 
-@kind("count", flags=("stack", "sort", "ann", "norm"), needs_y=False, takes_by=True, check=_check_count)
+@kind("count", flags=("stack", "sort", "ann", "norm"), needs_y=False, takes_by=True, check=_check_count, frames=True)
 def count(ax: Axes, x: ArrayLike, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
           **kw: Any) -> None:
     """How often each category of x occurs, one bar per by= group; missing values count as 'NaN'.
@@ -295,7 +307,7 @@ def count(ax: Axes, x: ArrayLike, y: None, z: None, flags: set[str], by: ArrayLi
         ax.legend(title=label(by, "by"), **({"loc": "center left", "bbox_to_anchor": (1, 0.5)} if full else {}))
 
 
-@kind("barh", flags=("stack", "sort", "ann", "ci"), value_axis="x")
+@kind("barh", flags=("stack", "sort", "ann", "ci"), value_axis="x", frames=True)
 def barh(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], **kw: Any) -> None:
     """Like bar, lying down: categories (x) top to bottom, bar lengths along the x axis; ci as for bar."""
     bar(ax, x, y, z, flags, horizontal=True, **kw)
@@ -307,7 +319,7 @@ def _check_lollipop(y: ArrayLike, z: ArrayLike | None, flags: set[str]) -> None:
         raise ValueError("kind 'lollipop' takes one value per category: y (and z for a dumbbell) 1-D")
 
 
-@kind("lollipop", flags=("sort", "ann"), value_axis="x", check=_check_lollipop)
+@kind("lollipop", flags=("sort", "ann"), value_axis="x", check=_check_lollipop, frames=True)
 def lollipop(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str],
              fmt: str = "{:.3g}", **kw: Any) -> None:
     """A dot per category (x) at its value (y) on a thin stem from 0, lying down like barh, first category on top.
@@ -404,7 +416,7 @@ def _pie(ax: Axes, x: ArrayLike, y: ArrayLike | None, flags: set[str], hole: flo
         _legend_right(ax, label(x, "") or None)
 
 
-@kind("pie", flags=("ann", "sort"), needs_y=False, check=_check_pie)
+@kind("pie", flags=("ann", "sort"), needs_y=False, check=_check_pie, frames=True)
 def pie(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str], top: int = 7, **kw: Any) -> None:
     """Shares of a whole: the counts of x's categories (missing as 'NaN'), or with y their summed values.
     ann = the percent in each slice, sort = largest first. Past top= slices (7) the smallest fold into 'other'.
@@ -412,7 +424,7 @@ def pie(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str], t
     _pie(ax, x, y, flags, 0, top, **kw)
 
 
-@kind("donut", flags=("ann", "sort"), needs_y=False, check=_check_pie)
+@kind("donut", flags=("ann", "sort"), needs_y=False, check=_check_pie, frames=True)
 def donut(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str], top: int = 7,
           hole: float = 0.55, **kw: Any) -> None:
     """A pie with a hole and the total in it. ann = the percent on each segment, sort = largest first.
@@ -426,46 +438,63 @@ def donut(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str],
 MAX_PROFILES = 10                               # more polygons than this on one radar is a scribble
 
 
-def _numeric(frame: pd.DataFrame, name: str, least: int) -> pd.DataFrame:
-    """The table's columns, checked to be numbers, at least `least` of them."""
-    text = [str(c) for c in frame.columns if not pd.api.types.is_numeric_dtype(frame[c])]
+def _numeric(frame: Any, name: str, least: int) -> tuple[list[str], np.ndarray, list[Any]]:
+    """The table's column names, its values as floats (rows x columns, NaN for gaps) and its row labels (a pandas
+    index, else 0..n-1), the columns checked to be numbers (or bools), at least `least` of them."""
+    df = wrap(frame)
+    cols = [df.get_column(c) for c in df.columns]      # get_column: a 2-D array's columns are named 0, 1, ...
+    text = [str(s.name) for s in cols if not (s.dtype.is_numeric() or s.dtype == nw.Boolean)]
     if text:
-        raise ValueError(f"kind {name!r} draws numbers; columns {text} are not. Pass df.select_dtypes('number'), "
+        raise ValueError(f"kind {name!r} draws numbers; columns {text} are not. Pass the numeric columns only, "
                          "or name a column of groups with by=")
-    if frame.shape[1] < least:
-        raise ValueError(f"kind {name!r} needs at least {least} numeric columns, got {frame.shape[1]}")
-    return frame.astype(float)
+    if len(cols) < least:
+        raise ValueError(f"kind {name!r} needs at least {least} numeric columns, got {len(cols)}")
+    values = np.column_stack([np.asarray(s.cast(nw.Float64).to_numpy(), dtype=float) for s in cols])
+    index = nw.maybe_get_index(df)
+    return [str(c) for c in df.columns], values, list(index) if index is not None else list(range(len(df)))
 
 
-def _scaled(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+def _range(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Each column's min and max over its finite values; NaN for a column with none."""
+    if not len(values):
+        return np.full(values.shape[1], np.nan), np.full(values.shape[1], np.nan)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)      # an all-NaN column: NaN, as pandas gives
+        return np.nanmin(values, axis=0), np.nanmax(values, axis=0)
+
+
+def _scaled(values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Each column scaled to 0..1 over its min and max (a constant column sits at 0.5), and the mins and maxes."""
-    lo, hi = frame.min(), frame.max()
-    span = (hi - lo).where(hi > lo)
-    return ((frame - lo) / span).fillna({c: 0.5 for c in frame.columns[span.isna()]}), lo, hi
+    lo, hi = _range(values)
+    span = np.where(hi > lo, hi - lo, np.nan)
+    scaled = (values - lo) / span
+    scaled[:, np.isnan(span)] = 0.5
+    return scaled, lo, hi
 
 
-@kind("radar", flags=("raw",), table=True, takes_by=True, projection="polar")
-def radar(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
+@kind("radar", flags=("raw",), table=True, takes_by=True, projection="polar", frames=True)
+def radar(ax: Axes, x: Any, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
           **kw: Any) -> None:
     """One polygon per row over the numeric columns, or with by= the mean of each group's rows:
     kx.plot(df, 'radar', by='class'). Each column is scaled to 0..1 over the polygons shown, with its range under
     its name; raw = the values as they are, for columns in one unit. kw: the outlines (ax.plot)."""
-    frame = _numeric(x, "radar", 3)
+    names, frame, rows = _numeric(x, "radar", 3)
     if by is not None:
-        groups, masks = _levels(by)
-        frame = pd.DataFrame([frame[m].mean() for m in masks], index=groups)
+        rows, masks = _levels(by)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)  # a group with a column all NaN: NaN, as pandas
+            frame = np.array([np.nanmean(frame[np.asarray(m)], axis=0) for m in masks]).reshape(-1, len(names))
     if len(frame) > MAX_PROFILES:
         raise ValueError(f"kind 'radar' draws one polygon per row: {len(frame)} rows are too many to read. "
                          f"Pass by= to average groups, or at most {MAX_PROFILES} rows (df.head())")
-    angles = np.linspace(0, 2 * np.pi, frame.shape[1], endpoint=False)
-    values, lo, hi = (frame, frame.min(), frame.max()) if "raw" in flags else _scaled(frame)
-    for name, row in values.iterrows():
-        v = np.r_[row.to_numpy(), row.iloc[0]]                  # closed: back to the first corner
+    angles = np.linspace(0, 2 * np.pi, len(names), endpoint=False)
+    values, lo, hi = (frame, *_range(frame)) if "raw" in flags else _scaled(frame)
+    for name, row in zip(rows, values, strict=True):
+        v = np.r_[row, row[0]]                                  # closed: back to the first corner
         ln, = ax.plot(np.r_[angles, 0], v, **{"label": str(name), **kw})
         ax.fill(np.r_[angles, 0], v, color=ln.get_color(), alpha=0.15)
     ax.set_theta_offset(np.pi / 2)              # the first column at 12 o'clock, then clockwise
     ax.set_theta_direction(-1)
-    names = [str(c) for c in frame.columns]
     ax.set_xticks(angles, names if "raw" in flags else [f"{n}\n{a:.3g} to {b:.3g}" for n, a, b in zip(names, lo, hi,
                                                                                                 strict=True)])
     ax.tick_params(axis="x", pad=8)
@@ -479,21 +508,21 @@ def radar(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: Arra
         _legend_right(ax, label(by, "") if by is not None else None, gap=0.3)   # past the right-hand names
 
 
-@kind("parallel", flags=("mean",), table=True, takes_by=True)
-def parallel(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
+@kind("parallel", flags=("mean",), table=True, takes_by=True, frames=True)
+def parallel(ax: Axes, x: Any, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
              **kw: Any) -> None:
     """Parallel coordinates: one line per row across the numeric columns, each column scaled to 0..1 with its
     real min and max at the ends; by= colours the lines by group: kx.plot(df, 'parallel', by='class').
     Lines fade as rows grow, mean = each group's mean as a thick line on top. kw: the lines (LineCollection)."""
-    frame = _numeric(x, "parallel", 2)
+    names, frame, _ = _numeric(x, "parallel", 2)
     values, lo, hi = _scaled(frame)
-    cols = np.arange(frame.shape[1])
+    cols = np.arange(len(names))
     groups, masks = _levels(by) if by is not None else ([None], [np.ones(len(frame), dtype=bool)])
     alpha = float(np.clip(40 / max(len(frame), 1), 0.05, 0.8))
     cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     for i, (g, m) in enumerate(zip(groups, masks, strict=True)):
         color = cycle[i % len(cycle)]
-        rows = values.to_numpy()[np.asarray(m)]
+        rows = values[np.asarray(m)]
         lines = LineCollection([np.c_[cols, r] for r in rows],
                                                **{"color": color, "alpha": alpha, "linewidth": 1, **kw})
         ax.add_collection(lines)
@@ -507,7 +536,7 @@ def parallel(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: A
     for c, a, b in zip(cols, lo, hi, strict=True):
         ax.text(c, 1.02, f"{b:.3g}", ha="center", va="bottom", fontsize="small")
         ax.text(c, -0.02, f"{a:.3g}", ha="center", va="top", fontsize="small")
-    ax.set_xticks(cols, [str(c) for c in frame.columns])
+    ax.set_xticks(cols, names)
     ax.set_xlim(-0.2, cols[-1] + 0.2)
     ax.set_ylim(-0.1, 1.1)
     ax.set_yticks([])

@@ -17,6 +17,24 @@ def wrap(obj: Any) -> Any:
     return found
 
 
+def column(v: Any) -> nw.Series:
+    """v as a narwhals Series: a Series of any backend as it is, anything else 1-D (an array, a list) as a pandas
+    Series that kx builds for itself, so a helper reads every input the same way."""
+    found = wrap(v)
+    if isinstance(found, nw.Series):
+        return found
+    return nw.from_native(pd.Series(np.asarray(v).ravel()), series_only=True)
+
+
+def name(v: Any) -> Any:
+    """The name of a Series (narwhals or pandas), None for an array or an unnamed Series. polars names an
+    unnamed Series ''."""
+    found = getattr(v, "name", None)
+    if found == "" and isinstance(v, nw.Series) and not v.implementation.is_pandas_like():
+        return None
+    return found
+
+
 def to_pandas(obj: Any) -> Any:
     """obj (native or narwhals) as pandas if it is a dataframe or series, else obj unchanged."""
     found = wrap(obj)
