@@ -1,11 +1,18 @@
 # kx-plot
 
+[![PyPI](https://img.shields.io/pypi/v/kx-plot?style=flat-square)](https://pypi.org/project/kx-plot/)
+[![Python versions](https://img.shields.io/pypi/pyversions/kx-plot?style=flat-square)](https://pypi.org/project/kx-plot/)
+[![Tests](https://img.shields.io/github/actions/workflow/status/vhrabar/kx-plot/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/vhrabar/kx-plot/actions/workflows/tests.yml)
+[![Docs](https://img.shields.io/badge/docs-vhrabar.github.io%2Fkx--plot-blue?style=flat-square)](https://vhrabar.github.io/kx-plot)
+[![Kaggle](https://img.shields.io/badge/Kaggle-dataset-20BEFF?logo=kaggle&logoColor=white&style=flat-square)](https://www.kaggle.com/datasets/vhrabar/kx-plot)
+[![License: MIT](https://img.shields.io/pypi/l/kx-plot?style=flat-square)](LICENSE)
+
 One-line matplotlib plots and themes for notebooks and scripts.
 
 `kx` is a small, plain-Python package with `.mplstyle` themes, palettes and colourmaps. It needs nothing beyond
 matplotlib, numpy and pandas and works offline, so it also runs in Kaggle competition notebooks.
 
-![dark theme](https://raw.githubusercontent.com/vhrabar/kx-plot/main/previews/dark.png)
+![dark theme](https://vhrabar.github.io/kx-plot/previews/dark.png)
 
 ## Install
 
@@ -114,7 +121,7 @@ kx.plot(df, 'pair', by='sex')                      # every numeric column agains
 (`radar`, `parallel` and `pair` take `by=`, a column of groups); `kx.plot(df[cols], 'heat')` for some columns.
 `wrap` breaks long tick labels onto several lines.
 
-![kinds with several panels](https://raw.githubusercontent.com/vhrabar/kx-plot/main/previews/dark-panels.png)
+![kinds with several panels](https://vhrabar.github.io/kx-plot/previews/dark-panels.png)
 
 ### Images
 
@@ -133,7 +140,7 @@ kx.plot(d['images'], d['saliency'], 'saliency')    # Grad-CAM or any map over it
 kx.plot(d['images'], d['labels'], d['proba'], 'miscls')  # the mistakes, the most confident first
 ```
 
-![image kinds](https://raw.githubusercontent.com/vhrabar/kx-plot/main/previews/dark-img.png)
+![image kinds](https://vhrabar.github.io/kx-plot/previews/dark-img.png)
 
 ### Embeddings
 
@@ -178,7 +185,7 @@ per class: the class names are the DataFrame's columns, or else the sorted label
 `proba` for a 2-D score, and `pva`, `resid` and a residual `hist` for a numeric `y` with many values. It returns
 the flat array of axes, like `kx.grid`; `spec='dark-grid'` styles every panel.
 
-![machine learning kinds](https://raw.githubusercontent.com/vhrabar/kx-plot/main/previews/dark-ml.png)
+![machine learning kinds](https://vhrabar.github.io/kx-plot/previews/dark-ml.png)
 
 rcParams can be overridden in `kx.use` with `__` for dots: `kx.use('dark', figure__figsize=(8, 4))`.
 
