@@ -7,6 +7,8 @@ DOCS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(DOCS)
 sys.path.insert(0, ROOT)
 
+from sphinx.util.inspect import TypeAliasForwardRef  # noqa: E402
+
 import kx  # noqa: E402
 
 # the kind pages come from the @kind registry: regenerate them on every build
@@ -33,6 +35,13 @@ autodoc_member_order = "bysource"
 autodoc_docstring_signature = False
 autodoc_typehints = "description"
 autodoc_typehints_format = "short"
+autodoc_type_aliases = {
+    "DataFrame": "~kx.typing.DataFrame",
+    "Series": "~kx.typing.Series",
+    "Column": "~kx.typing.Column",
+}
+
+TypeAliasForwardRef.__repr__ = lambda self: self.name
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "matplotlib": ("https://matplotlib.org/stable", None),
@@ -43,6 +52,7 @@ intersphinx_mapping = {
 html_theme = "sphinx_rtd_theme"
 html_title = f"kx-plot {release}"
 html_static_path = ["_static"]
+templates_path = ["_templates"]
 html_theme_options = {
     "navigation_depth": 3,
     "collapse_navigation": False,

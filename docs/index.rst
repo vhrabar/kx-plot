@@ -4,14 +4,14 @@ kx-plot
 **One-line matplotlib plots and themes for notebooks and scripts.**
 
 ``kx`` is a small, plain-Python package with ``.mplstyle`` themes, palettes and colourmaps. It needs nothing beyond
-matplotlib, numpy and pandas and works offline, so it also runs in Kaggle competition notebooks.
+matplotlib, narwhals, numpy and pandas and works offline, so it also runs in Kaggle competition notebooks.
 
 .. code-block:: python
 
    import kx; kx.use("light")
 
    kx.plot(x, y, z, "scatter-grid-leg")         # spec: kind-theme-flag-...
-   kx.plot(df, "month", "y2025", "bar-paper")   # DataFrame columns by name, a theme for this plot only
+   kx.plot(df, "month", "y2025", "bar-paper")   # columns of a pandas or polars frame by name, a theme for this plot only
    kx.plot(df, "value", spec="kde", by="group") # one density curve per group
    kx.save("fig.png")
 
@@ -27,6 +27,7 @@ matplotlib, numpy and pandas and works offline, so it also runs in Kaggle compet
    :caption: User guide
 
    install
+   data
    spec
 
 .. toctree::

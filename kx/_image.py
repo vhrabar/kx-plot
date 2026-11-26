@@ -6,13 +6,21 @@ from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import narwhals.stable.v2 as nw
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
 
+from ._frame import wrap
 from ._util import split
 
 CHANNELS = (1, 3, 4)
+
+
+def _plain(x: Any) -> Any:
+    """A Series (pandas, polars, ...) of paths or arrays as a list; anything else as it is."""
+    found = wrap(x)
+    return found.to_list() if isinstance(found, nw.Series) else x
 
 
 def images(x: Any) -> list[np.ndarray]:
@@ -21,6 +29,7 @@ def images(x: Any) -> list[np.ndarray]:
     arrays, PIL images or file paths (anything plt.imread reads). A single colour image is [img] or img[None].
     Integers are divided by 255 (or 65535 above 255), floats outside 0..1 are scaled per image to fill it,
     alpha is dropped and (H, W, 1) is grey."""
+    x = _plain(x)
     if isinstance(x, (str, os.PathLike)):
         x = [x]
     if isinstance(x, np.ndarray) and x.dtype != object:
@@ -38,6 +47,7 @@ def images(x: Any) -> list[np.ndarray]:
 
 def count(x: Any) -> int:
     """How many images x holds, without reading any: one 2-D array or path is one."""
+    x = _plain(x)
     if isinstance(x, (str, os.PathLike)):
         return 1
     if isinstance(x, np.ndarray) and x.dtype != object:
@@ -47,6 +57,7 @@ def count(x: Any) -> int:
 
 def take(x: Any, idx: list[int]) -> list[np.ndarray]:
     """The images at positions idx, read and scaled like images(); the rest are never read."""
+    x = _plain(x)
     n = count(x)
     bad = [i for i in idx if not -n <= i < n]
     if bad:
@@ -61,6 +72,7 @@ def take(x: Any, idx: list[int]) -> list[np.ndarray]:
 def masks(m: Any, idx: list[int]) -> list[np.ndarray]:
     """The masks at positions idx as bool (H, W) arrays, read without the image scaling: bool as it is, integers
     non-zero inside (a label map's classes all count), floats above 0.5. Colour masks: any channel inside."""
+    m = _plain(m)
     n = count(m)
     bad = [i for i in idx if not -n <= i < n]
     if bad:
@@ -80,6 +92,7 @@ def masks(m: Any, idx: list[int]) -> list[np.ndarray]:
 def heatmaps(m: Any, idx: list[int]) -> list[np.ndarray]:
     """The maps at positions idx as float (h, w) arrays scaled to 0..1 each (a saliency map's units mean nothing
     between methods); a map with channels is averaged over them. A constant map is all 0."""
+    m = _plain(m)
     n = count(m)
     bad = [i for i in idx if not -n <= i < n]
     if bad:

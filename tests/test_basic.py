@@ -1,11 +1,12 @@
 """Basic kinds: line, scatter, step, area, band, bar, barh, lollipop, count, pie, donut, radar, parallel."""
+import datetime as dt
 from collections.abc import Callable
 
 import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import pytest
-from helpers import PASSENGERS, X, Y, Z
+from helpers import PASSENGERS, X, Y, Z, _drawn, _same, _to_polars
 from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
 
@@ -411,3 +412,106 @@ def test_table_kinds_take_by_only_when_they_group() -> None:
         kx.plot(PROFILES.drop(columns="dx"), "heat", by=PROFILES.dx)
     with pytest.raises(ValueError, match="no column 'dz'"):
         kx.plot(PROFILES, "parallel", by="dz")
+
+
+# ---------- pandas and polars draw the same ----------
+_rng = np.random.default_rng(0)
+MIXED = pd.DataFrame({
+    "t": np.arange(40, dtype=float),
+    "a": _rng.normal(size=40).round(2),
+    "b": _rng.normal(size=40).round(2) + 1,
+    "c": _rng.uniform(1, 5, size=40).round(2),
+    "g": _rng.choice(["x", "y", "z"], size=40).astype(object),
+    "h": _rng.choice(["p", "q"], size=40),
+    "k": _rng.integers(0, 4, size=40),
+    "flag": _rng.choice([True, False], size=40),
+    "day": pd.date_range("2025-01-01", periods=40, freq="D"),
+    "text day": pd.date_range("2025-01-01", periods=40, freq="D").strftime("%Y-%m-%d"),
+    "level": pd.Categorical(_rng.choice(["lo", "hi"], size=40), categories=["lo", "mid", "hi"]),
+})
+MIXED.loc[[3, 7], "g"] = None
+MIXED.loc[5, "a"] = np.nan
+NUMBERS = MIXED[["a", "b", "c", "t"]]
+SHORT = pd.DataFrame({"name": list("abcde"), "v": [3.0, 1, 4, 1.5, 9], "w": [2.0, 2, 5, 1, 7]})
+
+PARITY = {
+    "line": lambda f: kx.plot(f(MIXED), "t", "a", "b", "line-leg"),
+    "line endlab": lambda f: kx.plot(f(MIXED), "t", "a", "b", "line-endlab"),
+    "line date": lambda f: kx.plot(f(MIXED), "day", "a", "line-date"),
+    "line text date": lambda f: kx.plot(f(MIXED), "text day", "a", "line-date-mk"),
+    "line ci numbers": lambda f: kx.plot(f(MIXED), "k", "a", "line-ci", n_boot=50),
+    "line ci text": lambda f: kx.plot(f(MIXED), "g", "a", "line-ci", n_boot=50),
+    "line ci enum": lambda f: kx.plot(f(MIXED), "level", "a", "line-ci", n_boot=50),
+    "line ci bool": lambda f: kx.plot(f(MIXED), "flag", "a", "line-ci", n_boot=50),
+    "step ci": lambda f: kx.plot(f(MIXED), "k", "b", "step-ci", n_boot=50),
+    "area": lambda f: kx.plot(f(MIXED), "t", "c", "b", "area-leg"),
+    "area stack": lambda f: kx.plot(f(MIXED), "t", "c", "b", "area-stack"),
+    "area norm": lambda f: kx.plot(f(MIXED), "t", "c", "b", "area-norm-leg"),
+    "band": lambda f: kx.plot(f(MIXED), "t", "a", "c", "band-leg"),
+    "scatter numbers z": lambda f: kx.plot(f(MIXED), "a", "b", "c", "scatter-sym"),
+    "scatter text z fit": lambda f: kx.plot(f(MIXED), "a", "b", "g", "scatter-fit"),
+    "scatter enum z": lambda f: kx.plot(f(MIXED), "a", "b", "level", "scatter"),
+    "scatter bool z": lambda f: kx.plot(f(MIXED), "a", "b", "flag", "scatter"),
+    "scatter fit diag": lambda f: kx.plot(f(MIXED), "a", "b", "scatter-fit-diag"),
+    "bar": lambda f: kx.plot(f(SHORT), "name", "v", "w", "bar-ann-sort"),
+    "bar stack": lambda f: kx.plot(f(SHORT), "name", "v", "w", "bar-stack-ann"),
+    "bar ci": lambda f: kx.plot(f(MIXED), "g", "a", "bar-ci", n_boot=50),
+    "barh": lambda f: kx.plot(f(SHORT), "name", "v", "barh-sort"),
+    "barh ci enum": lambda f: kx.plot(f(MIXED), "level", "a", "barh-ci", n_boot=50),
+    "count": lambda f: kx.plot(f(MIXED), "g", spec="count-ann"),
+    "count by": lambda f: kx.plot(f(MIXED), "g", spec="count-stack-norm", by="h"),
+    "count numbers": lambda f: kx.plot(f(MIXED), "k", spec="count-sort"),
+    "count bool": lambda f: kx.plot(f(MIXED), "flag", spec="count"),
+    "count by enum": lambda f: kx.plot(f(MIXED), "h", spec="count", by="level"),
+    "count passengers": lambda f: kx.plot(f(PASSENGERS), "port", spec="count", by="sex"),
+    "lollipop": lambda f: kx.plot(f(SHORT), "name", "v", "lollipop-ann"),
+    "dumbbell": lambda f: kx.plot(f(SHORT), "name", "v", "w", "lollipop-sort-ann"),
+    "pie": lambda f: kx.plot(f(MIXED), "g", spec="pie-ann"),
+    "pie y": lambda f: kx.plot(f(SHORT), "name", "v", "pie-sort"),
+    "pie y with gaps": lambda f: kx.plot(f(MIXED), "g", "c", "pie"),
+    "donut": lambda f: kx.plot(f(PASSENGERS), "pclass", spec="donut-ann", top=3),
+    "radar": lambda f: kx.plot(f(NUMBERS.head(3)), "radar"),
+    "radar by": lambda f: kx.plot(f(MIXED[["a", "b", "c", "t", "g"]]), "radar", by="g"),
+    "radar raw": lambda f: kx.plot(f(NUMBERS.head(4)), "radar-raw"),
+    "parallel": lambda f: kx.plot(f(NUMBERS), "parallel"),
+    "parallel by": lambda f: kx.plot(f(MIXED[["a", "b", "c", "g"]]), "parallel-mean", by="g"),
+    "parallel constant and empty": lambda f: kx.plot(f(NUMBERS.assign(k=1.0, b=np.nan)), "parallel"),
+    "bar facet": lambda f: kx.plot(f(MIXED), "g", "a", "bar-ci-facet", facet="h", n_boot=50),
+    "count facet": lambda f: kx.plot(f(MIXED), "g", spec="count-facet", facet="h"),
+    "scatter facet enum": lambda f: kx.plot(f(MIXED), "a", "b", "g", "scatter-facet", facet="level"),
+    "line facet": lambda f: kx.plot(f(MIXED), "t", "a", "line-facet", facet="h"),
+    "radar facet series": lambda f: kx.plot(f(MIXED[["a", "b", "c", "h"]]), "radar-facet", by="h",
+                                            facet=f(MIXED["flag"])),
+    "line series": lambda f: kx.plot(f(MIXED["t"]), f(MIXED["a"]), "line-leg"),
+}
+
+
+@pytest.mark.parametrize("name", PARITY)
+def test_basic_kinds_draw_the_same_from_polars(name: str) -> None:
+    pytest.importorskip("polars")
+    assert _drawn(PARITY[name](_to_polars)) == _drawn(PARITY[name](_same))
+
+
+def test_count_on_an_enum_keeps_its_order_and_unused_levels() -> None:
+    pl = pytest.importorskip("polars")
+    levels = ["low", "mid", "high"]
+    values = ["high", "low", "high", None]
+    polars = kx.plot(pl.DataFrame({"v": pl.Series(values, dtype=pl.Enum(levels))}), "v", spec="count")
+    pandas = kx.plot(pd.DataFrame({"v": pd.Categorical(values, categories=levels)}), "v", spec="count")
+    assert [t.get_text() for t in polars.get_xticklabels()] == ["low", "mid", "high", "NaN"]
+    assert [p.get_height() for p in polars.patches] == [1, 0, 2, 1]
+    assert _drawn(polars) == _drawn(pandas)
+
+
+def test_count_on_a_polars_categorical_keeps_its_order() -> None:
+    pl = pytest.importorskip("polars")
+    ax = kx.plot(pl.DataFrame({"v": pl.Series(["z", "y", "z"], dtype=pl.Categorical)}), "v", spec="count")
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["z", "y"]
+
+
+def test_line_date_on_a_polars_date_column() -> None:
+    pl = pytest.importorskip("polars")
+    days = [dt.date(2025, 1, 1) + dt.timedelta(days=i) for i in range(30)]
+    polars = kx.plot(pl.DataFrame({"day": days, "v": np.arange(30.0)}), "day", "v", "line-date")
+    pandas = kx.plot(pd.DataFrame({"day": pd.to_datetime(days), "v": np.arange(30.0)}), "day", "v", "line-date")
+    assert _drawn(polars) == _drawn(pandas)

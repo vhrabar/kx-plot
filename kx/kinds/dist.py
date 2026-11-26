@@ -11,7 +11,8 @@ from numpy.typing import ArrayLike
 
 from .. import _stats
 from .._spec import kind
-from .._util import categories, label
+from .._util import label
+from .basic import _levels
 
 
 def _finite(arr: ArrayLike) -> np.ndarray:
@@ -26,7 +27,8 @@ def _series(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None) -> list[tupl
 
 def _split(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None,
            by: ArrayLike | None) -> list[tuple[np.ndarray, str]]:
-    """x, y, z as separate series, or with by= x split into one series per group (categories in order)."""
+    """x, y, z as separate series, or with by= x split into one series per group, in the order count shows them
+    (a categorical's or Enum's, else sorted). Rows with no group are left out; a group with no rows is too."""
     if by is None:
         return _series(x, y, z)
     if y is not None or z is not None:
@@ -34,10 +36,10 @@ def _split(x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None,
     xs, groups = np.asarray(x, dtype=float).ravel(), np.asarray(by, dtype=object).ravel()
     if len(xs) != len(groups):
         raise ValueError(f"by= has {len(groups)} values but x has {len(xs)}")
-    cats = categories(by)
-    if cats is None:
-        cats = sorted(pd.unique(groups[pd.notna(groups)]))
-    return [(_finite(xs[groups == c]), str(c)) for c in cats if (groups == c).any()]   # unseen: none
+    names, masks = _levels(by)
+    if pd.isna(groups).any():
+        names, masks = names[:-1], masks[:-1]
+    return [(_finite(xs[m]), n) for n, m in zip(names, masks, strict=True) if m.any()]
 
 
 def _need(series: list[tuple[np.ndarray, str]], kind: str, distinct: int) -> None:

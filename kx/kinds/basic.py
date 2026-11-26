@@ -4,6 +4,7 @@ from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
@@ -12,6 +13,7 @@ from matplotlib.container import BarContainer
 from matplotlib.patheffects import withStroke
 from numpy.typing import ArrayLike
 
+from .._frame import column, wrap
 from .._spec import kind
 from .._stats import bootstrap
 from .._util import COLOUR, categories, colorbar, diagonal, endlabels, ink, label, norm
@@ -34,10 +36,20 @@ def _boot(flags: set[str], n_boot: int | None, seed: int | None) -> tuple[int, i
 def _mean_ci(x: ArrayLike, v: ArrayLike, n_boot: int, seed: int) -> tuple[Any, np.ndarray, np.ndarray, np.ndarray]:
     """ci: x's distinct values (sorted for numbers, dates and categoricals, in order of appearance for text), the
     mean of v at each, and the bootstrap interval of that mean."""
-    xs = pd.Series(np.asarray(x)) if not isinstance(x, pd.Series) else x.reset_index(drop=True)
-    ordered = (pd.api.types.is_numeric_dtype(xs) or pd.api.types.is_datetime64_any_dtype(xs)
-               or isinstance(xs.dtype, pd.CategoricalDtype))
-    codes, keys = pd.factorize(xs, sort=ordered)
+    s = column(x)
+    xs = np.asarray(s.to_numpy())
+    missing = np.asarray(pd.isna(xs), dtype=bool)
+    present = xs[~missing]
+    if isinstance(s.dtype, nw.Enum) or s.dtype == nw.Categorical:    # the categories there are, in their order
+        seen = set(present.tolist())
+        keys = np.array([c for c in categories(s) if c in seen], dtype=object)
+    elif s.dtype.is_numeric() or s.dtype in (nw.Boolean, nw.Date, nw.Datetime, nw.Duration):
+        keys = np.unique(present)
+    else:
+        keys = np.array(list(dict.fromkeys(present.tolist())), dtype=object)
+    lookup = {k: i for i, k in enumerate(keys.tolist())}
+    codes = np.full(len(xs), -1)
+    codes[~missing] = [lookup[k] for k in present.tolist()]
     vs = np.asarray(v, dtype=float).ravel()
     if len(keys) == np.count_nonzero(codes >= 0):
         raise ValueError("ci bootstraps the y values at each x, and each x has one here. "
@@ -47,7 +59,7 @@ def _mean_ci(x: ArrayLike, v: ArrayLike, n_boot: int, seed: int) -> tuple[Any, n
         warnings.simplefilter("ignore", RuntimeWarning)
         mean = np.array([np.nanmean(g) for g in groups])
     lo, hi = np.array([bootstrap(g, n_boot, seed) for g in groups]).T
-    return np.asarray(keys), mean, lo, hi
+    return keys, mean, lo, hi
 
 
 def _lines(ax: Axes, x: ArrayLike, y: ArrayLike, z: ArrayLike | None, flags: set[str], drawn: bool,
@@ -426,46 +438,63 @@ def donut(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: None, flags: set[str],
 MAX_PROFILES = 10                               # more polygons than this on one radar is a scribble
 
 
-def _numeric(frame: pd.DataFrame, name: str, least: int) -> pd.DataFrame:
-    """The table's columns, checked to be numbers, at least `least` of them."""
-    text = [str(c) for c in frame.columns if not pd.api.types.is_numeric_dtype(frame[c])]
+def _numeric(frame: Any, name: str, least: int) -> tuple[list[str], np.ndarray, list[Any]]:
+    """The table's column names, its values as floats (rows x columns, NaN for gaps) and its row labels (a pandas
+    index, else 0..n-1), the columns checked to be numbers (or bools), at least `least` of them."""
+    df = wrap(frame)
+    cols = [df.get_column(c) for c in df.columns]      # get_column: a 2-D array's columns are named 0, 1, ...
+    text = [str(s.name) for s in cols if not (s.dtype.is_numeric() or s.dtype == nw.Boolean)]
     if text:
-        raise ValueError(f"kind {name!r} draws numbers; columns {text} are not. Pass df.select_dtypes('number'), "
+        raise ValueError(f"kind {name!r} draws numbers; columns {text} are not. Pass the numeric columns only, "
                          "or name a column of groups with by=")
-    if frame.shape[1] < least:
-        raise ValueError(f"kind {name!r} needs at least {least} numeric columns, got {frame.shape[1]}")
-    return frame.astype(float)
+    if len(cols) < least:
+        raise ValueError(f"kind {name!r} needs at least {least} numeric columns, got {len(cols)}")
+    values = np.column_stack([np.asarray(s.cast(nw.Float64).to_numpy(), dtype=float) for s in cols])
+    index = nw.maybe_get_index(df)
+    return [str(c) for c in df.columns], values, list(index) if index is not None else list(range(len(df)))
 
 
-def _scaled(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+def _range(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Each column's min and max over its finite values; NaN for a column with none."""
+    if not len(values):
+        return np.full(values.shape[1], np.nan), np.full(values.shape[1], np.nan)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)      # an all-NaN column: NaN, as pandas gives
+        return np.nanmin(values, axis=0), np.nanmax(values, axis=0)
+
+
+def _scaled(values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Each column scaled to 0..1 over its min and max (a constant column sits at 0.5), and the mins and maxes."""
-    lo, hi = frame.min(), frame.max()
-    span = (hi - lo).where(hi > lo)
-    return ((frame - lo) / span).fillna({c: 0.5 for c in frame.columns[span.isna()]}), lo, hi
+    lo, hi = _range(values)
+    span = np.where(hi > lo, hi - lo, np.nan)
+    scaled = (values - lo) / span
+    scaled[:, np.isnan(span)] = 0.5
+    return scaled, lo, hi
 
 
 @kind("radar", flags=("raw",), table=True, takes_by=True, projection="polar")
-def radar(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
+def radar(ax: Axes, x: Any, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
           **kw: Any) -> None:
     """One polygon per row over the numeric columns, or with by= the mean of each group's rows:
     kx.plot(df, 'radar', by='class'). Each column is scaled to 0..1 over the polygons shown, with its range under
     its name; raw = the values as they are, for columns in one unit. kw: the outlines (ax.plot)."""
-    frame = _numeric(x, "radar", 3)
+    names, frame, rows = _numeric(x, "radar", 3)
     if by is not None:
-        groups, masks = _levels(by)
-        frame = pd.DataFrame([frame[m].mean() for m in masks], index=groups)
+        rows, masks = _levels(by)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)  # a group with a column all NaN: NaN, as pandas
+            frame = np.array([np.nanmean(frame[np.asarray(m)], axis=0) for m in masks]).reshape(-1, len(names))
     if len(frame) > MAX_PROFILES:
         raise ValueError(f"kind 'radar' draws one polygon per row: {len(frame)} rows are too many to read. "
                          f"Pass by= to average groups, or at most {MAX_PROFILES} rows (df.head())")
-    angles = np.linspace(0, 2 * np.pi, frame.shape[1], endpoint=False)
-    values, lo, hi = (frame, frame.min(), frame.max()) if "raw" in flags else _scaled(frame)
-    for name, row in values.iterrows():
-        v = np.r_[row.to_numpy(), row.iloc[0]]                  # closed: back to the first corner
+    angles = np.linspace(0, 2 * np.pi, len(names), endpoint=False)
+    values, lo, hi = (frame, *_range(frame)) if "raw" in flags else _scaled(frame)
+    for name, row in zip(rows, values, strict=True):
+        v = np.r_[row, row[0]]                                  # closed: back to the first corner
         ln, = ax.plot(np.r_[angles, 0], v, **{"label": str(name), **kw})
         ax.fill(np.r_[angles, 0], v, color=ln.get_color(), alpha=0.15)
     ax.set_theta_offset(np.pi / 2)              # the first column at 12 o'clock, then clockwise
     ax.set_theta_direction(-1)
-    names = [str(c) for c in frame.columns]
     ax.set_xticks(angles, names if "raw" in flags else [f"{n}\n{a:.3g} to {b:.3g}" for n, a, b in zip(names, lo, hi,
                                                                                                 strict=True)])
     ax.tick_params(axis="x", pad=8)
@@ -480,20 +509,20 @@ def radar(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: Arra
 
 
 @kind("parallel", flags=("mean",), table=True, takes_by=True)
-def parallel(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
+def parallel(ax: Axes, x: Any, y: None, z: None, flags: set[str], by: ArrayLike | None = None,
              **kw: Any) -> None:
     """Parallel coordinates: one line per row across the numeric columns, each column scaled to 0..1 with its
     real min and max at the ends; by= colours the lines by group: kx.plot(df, 'parallel', by='class').
     Lines fade as rows grow, mean = each group's mean as a thick line on top. kw: the lines (LineCollection)."""
-    frame = _numeric(x, "parallel", 2)
+    names, frame, _ = _numeric(x, "parallel", 2)
     values, lo, hi = _scaled(frame)
-    cols = np.arange(frame.shape[1])
+    cols = np.arange(len(names))
     groups, masks = _levels(by) if by is not None else ([None], [np.ones(len(frame), dtype=bool)])
     alpha = float(np.clip(40 / max(len(frame), 1), 0.05, 0.8))
     cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     for i, (g, m) in enumerate(zip(groups, masks, strict=True)):
         color = cycle[i % len(cycle)]
-        rows = values.to_numpy()[np.asarray(m)]
+        rows = values[np.asarray(m)]
         lines = LineCollection([np.c_[cols, r] for r in rows],
                                                **{"color": color, "alpha": alpha, "linewidth": 1, **kw})
         ax.add_collection(lines)
@@ -507,7 +536,7 @@ def parallel(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], by: A
     for c, a, b in zip(cols, lo, hi, strict=True):
         ax.text(c, 1.02, f"{b:.3g}", ha="center", va="bottom", fontsize="small")
         ax.text(c, -0.02, f"{a:.3g}", ha="center", va="top", fontsize="small")
-    ax.set_xticks(cols, [str(c) for c in frame.columns])
+    ax.set_xticks(cols, names)
     ax.set_xlim(-0.2, cols[-1] + 0.2)
     ax.set_ylim(-0.1, 1.1)
     ax.set_yticks([])

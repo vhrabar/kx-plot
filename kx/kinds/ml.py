@@ -5,12 +5,14 @@ from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.patheffects import withStroke
 from numpy.typing import ArrayLike
 
+from .._frame import wrap
 from .._metrics import (
     binary,
     brier,
@@ -86,7 +88,7 @@ def _scored(x: ArrayLike, y: ArrayLike, z: ArrayLike | None) -> list[tuple[np.nd
                 if s is not None]
     truth = np.asarray(x, dtype=object).ravel()
     found, scores = classes(truth), np.asarray(y, dtype=float)
-    cols = list(y.columns) if isinstance(y, pd.DataFrame) else None
+    cols = list(y.columns) if isinstance(y, (pd.DataFrame, nw.DataFrame)) else None
     if cols is not None and set(cols) <= set(found):
         pairs = list(zip(cols, cols, strict=True))
     elif len(found) == scores.shape[1]:
@@ -289,7 +291,8 @@ def pva(ax: Axes, x: ArrayLike, y: ArrayLike, z: None, flags: set[str], **kw: An
     ax.text(0.03, 0.97, f"R² {r2:.3f}\nRMSE {rmse:.3g}\nMAE {mae:.3g}", transform=ax.transAxes, ha="left",
             va="top", bbox={"boxstyle": "round", "facecolor": ax.get_facecolor(), "edgecolor": "none",
                             "alpha": 0.85})
-    lo, hi = min(np.min(x), np.min(y)), max(np.max(x), np.max(y))
+    xs, ys = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    lo, hi = min(np.nanmin(xs), np.nanmin(ys)), max(np.nanmax(xs), np.nanmax(ys))   # gaps skipped, as pandas
     pad = 0.03 * (hi - lo) or 1.0
     ax.set_xlim(lo - pad, hi + pad)             # one range on both axes: a square, also in a kx.grid panel
     ax.set_ylim(lo - pad, hi + pad)
@@ -339,13 +342,14 @@ HIGH = ("acc", "auc", "f1", "precision", "recall")    # metrics that are better 
 
 
 @kind("loss", flags=("best",), table=True)
-def loss(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any) -> None:
+def loss(ax: Axes, x: Any, y: None, z: None, flags: set[str], **kw: Any) -> None:
     """Training curves: kx.plot(history, 'loss') with a DataFrame, a dict or a Keras History. The first metric is a
     solid line and its val_ pair a dashed one in the same colour, against an epoch column or the row number from 1.
     Other metrics have other scales: kx.plot(h[['accuracy', 'val_accuracy']], 'loss') draws them.
     best = a marker and a dashed line at the best validation epoch: lowest, or highest for acc, auc, f1,
     precision and recall. kw: the lines (ax.plot)."""
-    epochs = x["epoch"].to_numpy() if "epoch" in x.columns else np.arange(1, len(x) + 1)
+    x = wrap(x)
+    epochs = x.get_column("epoch").to_numpy() if "epoch" in x.columns else np.arange(1, len(x) + 1)
     cols = [str(c) for c in x.columns if c != "epoch"]
     if not cols:
         raise ValueError("kind 'loss' needs at least one metric column besides 'epoch'")
@@ -353,10 +357,11 @@ def loss(ax: Axes, x: pd.DataFrame, y: None, z: None, flags: set[str], **kw: Any
     pair = [c for c in (metric, f"val_{metric}") if c in cols]
     for c in pair:
         style = {"linestyle": "--"} if c.startswith("val_") and c != metric else {}
-        ln, = ax.plot(epochs, x[c].to_numpy(dtype=float), **{"label": c, "color": "C0", **style, **kw})
+        values = np.asarray(x.get_column(c).to_numpy(), dtype=float)
+        ln, = ax.plot(epochs, values, **{"label": c, "color": "C0", **style, **kw})
     if "best" in flags:
         watch = pair[-1]                        # the validation curve when there is one
-        values = x[watch].to_numpy(dtype=float)
+        values = np.asarray(x.get_column(watch).to_numpy(), dtype=float)
         high = any(h in watch.lower() for h in HIGH)
         i = int(np.nanargmax(values) if high else np.nanargmin(values))
         ax.plot(epochs[i], values[i], marker="o", color=ln.get_color(), zorder=3)
@@ -456,7 +461,7 @@ def embed(ax: Axes, x: ArrayLike, y: ArrayLike | None, z: ArrayLike | None, flag
         if z is not None:
             raise ValueError("with an (n, 2) array the labels come next (or by=); there is no z")
         xs, ys = points[:, 0], points[:, 1]
-        names = [str(c) for c in x.columns] if isinstance(x, pd.DataFrame) else ["dim 1", "dim 2"]
+        names = [str(c) for c in x.columns] if isinstance(x, (pd.DataFrame, nw.DataFrame)) else ["dim 1", "dim 2"]
         groups = by if by is not None else y
     else:
         if y is None:

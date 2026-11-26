@@ -8,8 +8,11 @@ Installation
    # adds t-SNE and UMAP to kx.embed (PCA needs neither)
    pip install 'kx-plot[embed]'
 
-Python 3.10 or newer. kx needs only matplotlib, numpy and pandas; the optional ``[embed]`` extra adds
+Python 3.10 or newer. kx needs only matplotlib, narwhals, numpy and pandas; the optional ``[embed]`` extra adds
 scikit-learn and umap-learn for ``method='tsne'`` and ``method='umap'`` in ``kx.embed``.
+
+kx takes polars and pyarrow frames as well as pandas ones, with no extra to install: if you have polars, pass its
+``DataFrame`` or ``Series`` straight to ``kx.plot``. See :doc:`data`.
 
 uv
 --

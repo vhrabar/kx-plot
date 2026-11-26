@@ -48,3 +48,19 @@ jobs:
 
       - name: Run tests
         run: .venv/bin/python -m pytest -q
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install the docs dependencies from uv.lock
+        run: uv sync --locked --group docs
+
+      - name: Build the docs
+        run: uv run --locked sphinx-build -W --keep-going -b html docs docs/_build/html

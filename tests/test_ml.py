@@ -5,7 +5,7 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import pytest
-from helpers import _dashed
+from helpers import _dashed, _drawn, _same, _to_polars
 from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
 
@@ -697,3 +697,25 @@ def test_embed_numeric_labels_colour_scale_or_groups() -> None:
 def test_embed_errors(call: Callable[[], Axes], match: str) -> None:
     with pytest.raises(ValueError, match=match):
         call()
+
+
+# ---------- pandas and polars draw the same ----------
+_rng = np.random.default_rng(3)
+_CLASSES = pd.DataFrame(_rng.dirichlet([1, 1, 1], size=40), columns=["a", "b", "c"])
+_LABELS = pd.Series(_rng.choice(["a", "b", "c"], size=40), name="y")
+_ACTUAL = _rng.normal(size=50).round(2)
+_REGRESSION = pd.DataFrame({"y": _ACTUAL, "pred": (_ACTUAL + _rng.normal(0, 0.3, 50)).round(2)})
+_HISTORY = pd.DataFrame({"epoch": [1, 2, 3], "loss": [1.0, 0.5, 0.3], "val_loss": [1.1, 0.7, 0.6]})
+
+PARITY = {
+    "roc 2-D score": lambda f: kx.plot(f(_LABELS), f(_CLASSES), "roc"),
+    "loss history": lambda f: kx.plot(f(_HISTORY), "loss-best"),
+    "evaluate multiclass": lambda f: kx.evaluate(f(_LABELS), f(_CLASSES)),
+    "evaluate regression": lambda f: kx.evaluate(f(_REGRESSION["y"]), f(_REGRESSION["pred"])),
+}
+
+
+@pytest.mark.parametrize("name", PARITY)
+def test_ml_kinds_draw_the_same_from_polars(name: str) -> None:
+    pytest.importorskip("polars")
+    assert _drawn(PARITY[name](_to_polars)) == _drawn(PARITY[name](_same))

@@ -1,4 +1,6 @@
 """kx.cramers: how strongly each pair of categorical columns goes together, as a heat map."""
+from __future__ import annotations
+
 from typing import Any
 
 import matplotlib as mpl
@@ -7,21 +9,24 @@ import pandas as pd
 from matplotlib.axes import Axes
 
 from . import _stats
+from ._frame import wrap
 from ._plot import plot as draw
+from .typing import DataFrame
 
 MAX_LEVELS = 20
 
 
-def cramers(df: pd.DataFrame, cols: list[str] | None = None, spec: str = "", cluster: bool = False,
+def cramers(df: DataFrame, cols: list[str] | None = None, spec: str = "", cluster: bool = False,
             plot: bool = True, **kw: Any) -> Axes | pd.DataFrame:
     """Cramér's V (bias-corrected, 0 = independent, 1 = one fixes the other) for every pair of categorical
     columns, drawn with heat-ann on 0..1: kx.cramers(df). The columns are cols=, else every column that is not
     a float with at most 20 values (text, bool, small integers such as a class). cluster=True puts the columns
     that go together side by side; the names are turned (rot, tight). plot=False returns the matrix. spec= adds
     a theme and flags; other keywords go to kx.plot (title=, ax=)."""
+    df = wrap(df)
     if cols is None:
-        cols = [c for c in df.columns
-                if not pd.api.types.is_float_dtype(df[c]) and df[c].nunique(dropna=True) <= MAX_LEVELS]
+        cols = [c for c in df.columns if not df.get_column(c).dtype.is_float()
+                and df.get_column(c).drop_nulls().n_unique() <= MAX_LEVELS]
     else:
         missing = [c for c in cols if c not in df.columns]
         if missing:
@@ -31,7 +36,7 @@ def cramers(df: pd.DataFrame, cols: list[str] | None = None, spec: str = "", clu
     v = pd.DataFrame(np.nan, index=cols, columns=cols, dtype=float)
     for i, a in enumerate(cols):
         for b in cols[i:]:
-            v.loc[a, b] = v.loc[b, a] = _stats.cramers_v(df[a], df[b])
+            v.loc[a, b] = v.loc[b, a] = _stats.cramers_v(df.get_column(a), df.get_column(b))
     if cluster:
         far = (1 - v.fillna(0)).to_numpy(copy=True)
         np.fill_diagonal(far, 0)

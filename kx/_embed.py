@@ -1,23 +1,28 @@
 """kx.embed: project a table or images to 2-D (PCA, t-SNE or UMAP) and plot it with the embed kind."""
+from __future__ import annotations
+
 from typing import Any
 
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from numpy.typing import ArrayLike
 
+from ._frame import wrap
 from ._image import images
 from ._plot import plot
+from .typing import Column, DataFrame
 
 METHODS = ("pca", "tsne", "umap")
 NEEDS = {"tsne": ("sklearn.manifold", "TSNE", "scikit-learn"), "umap": ("umap", "UMAP", "umap-learn")}
 
 
-def embed(data: Any, method: str = "pca", by: ArrayLike | str | None = None, spec: str = "", seed: int = 0,
-          ax: Axes | None = None, title: str | None = None, **kw: Any) -> Axes:
+def embed(data: DataFrame | ArrayLike, method: str = "pca", by: Column | str | None = None, spec: str = "",
+          seed: int = 0, ax: Axes | None = None, title: str | None = None, **kw: Any) -> Axes:
     """kx.embed(df, by='label') or kx.embed(images, labels): the rows in 2-D, coloured by label.
-    data: a DataFrame (its numeric columns, standardised; by= may name a column, left out of them), a 2-D
-    array of features, or images (an (N, H, W[, C]) array or a list, flattened; all one size).
+    data: a dataframe, pandas, polars, ... (its numeric columns, standardised; by= may name a column, left out of
+    them), a 2-D array of features, or images (an (N, H, W[, C]) array or a list, flattened; all one size).
     method: 'pca' (numpy, the explained variance in the axis labels), 'tsne' (scikit-learn) or 'umap'
     (umap-learn): pip install 'kx-plot[embed]'. seed= fixes t-SNE and UMAP; other keywords go to them.
     spec= adds a theme and flags (kx.embed(df, by='label', spec='dark-ann')). Returns the axes; the coordinates
@@ -26,7 +31,7 @@ def embed(data: Any, method: str = "pca", by: ArrayLike | str | None = None, spe
         raise ValueError(f"unknown method {method!r}; use one of {list(METHODS)}")
     if kw and method == "pca":
         raise TypeError(f"method='pca' takes no options, got {sorted(kw)}")
-    features, by = _features(data, by)
+    features, by = _features(wrap(data), wrap(by))
     coords, names = _project(features, method, seed, kw)
     axes = plot(pd.Series(coords[:, 0], name=names[0]), pd.Series(coords[:, 1], name=names[1]),
                 spec="-".join(["embed", *([spec] if spec else [])]), by=by, ax=ax, title=title)
@@ -36,16 +41,15 @@ def embed(data: Any, method: str = "pca", by: ArrayLike | str | None = None, spe
 
 def _features(data: Any, by: ArrayLike | str | None) -> tuple[np.ndarray, ArrayLike | None]:
     """The rows as a float matrix to project, and by= as labels (a column name taken out of a table)."""
-    if isinstance(data, pd.DataFrame):
+    if isinstance(data, nw.DataFrame):
         if isinstance(by, str):
             if by not in data.columns:
                 raise ValueError(f"no column {by!r} in the DataFrame. Columns: {list(data.columns)}")
-            data, by = data.drop(columns=by), data[by]
-        cols = [c for c in data.columns
-                if pd.api.types.is_numeric_dtype(data[c]) and not pd.api.types.is_bool_dtype(data[c])]
+            data, by = data.drop(by), data.get_column(by)
+        cols = [data.get_column(c) for c in data.columns if data.get_column(c).dtype.is_numeric()]
         if not cols:
             raise ValueError("kx.embed needs numeric columns to project; this table has none")
-        values = data[cols].to_numpy(dtype=float)
+        values = np.column_stack([np.asarray(s.cast(nw.Float64).to_numpy(), dtype=float) for s in cols])
         spread = values.std(axis=0)
         values = (values - values.mean(axis=0)) / np.where(spread > 0, spread, 1)   # one unit per column
     elif isinstance(by, str):

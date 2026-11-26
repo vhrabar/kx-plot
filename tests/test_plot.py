@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 import matplotlib as mpl
+import narwhals.stable.v2 as nw
 import numpy as np
 import pandas as pd
 import pytest
@@ -121,7 +122,7 @@ def test_table_kind_gets_the_whole_frame(table_kind: list) -> None:
     kx.plot(DF, "tbl")
     kx.plot(DF, spec="tbl")
     for x, y, z in table_kind:
-        assert x is DF
+        assert nw.to_native(x) is DF            # the kinds read narwhals; pandas is not copied
         assert y is None
         assert z is None
 
@@ -129,7 +130,7 @@ def test_table_kind_gets_the_whole_frame(table_kind: list) -> None:
 def test_table_kind_takes_a_2d_array_with_numbered_labels(table_kind: list) -> None:
     m = np.arange(6).reshape(2, 3)
     kx.plot(m, "tbl")
-    x = table_kind[0][0]
+    x = nw.to_native(table_kind[0][0])
     assert isinstance(x, pd.DataFrame)
     assert (x.to_numpy() == m).all()
     assert list(x.columns) == [0, 1, 2]
@@ -156,7 +157,7 @@ def test_frame_without_columns_hints_table_kinds(table_kind: list) -> None:
 
 def test_grammar_says_a_table_kind_takes_a_frame(table_kind: list, capsys: pytest.CaptureFixture[str]) -> None:
     kx.grammar("tbl")
-    assert "takes a DataFrame or 2-D array" in capsys.readouterr().out
+    assert "takes a dataframe (pandas, polars, ...) or 2-D array" in capsys.readouterr().out
     kx.grammar("line")
     assert "DataFrame" not in capsys.readouterr().out
 

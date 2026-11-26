@@ -5,7 +5,7 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import pytest
-from helpers import X, Y, Z
+from helpers import X, Y, Z, _drawn, _same, _to_polars
 from matplotlib.colors import to_hex
 
 import kx
@@ -246,3 +246,67 @@ def test_errbar_errors() -> None:
         kx.plot([np.nan], spec="errbar")
     with pytest.raises(ValueError, match="compares 2 or more"):
         kx.plot(X, spec="errbar-sig")
+
+
+# ---------- pandas and polars draw the same ----------
+_rng = np.random.default_rng(1)
+VALUES = pd.DataFrame({
+    "a": _rng.normal(size=80).round(2),
+    "b": _rng.normal(1, 2, size=80).round(2),
+    "c": _rng.uniform(1, 5, size=80).round(2),
+    "g": _rng.choice(["x", "y", "z"], size=80).astype(object),
+    "h": _rng.choice(["p", "q"], size=80),
+    "k": _rng.integers(0, 3, size=80),
+    "size": pd.Categorical(_rng.choice(["s", "l"], size=80), categories=["s", "m", "l"]),
+})
+VALUES.loc[[2, 9], "g"] = None
+VALUES.loc[[4, 11], "a"] = np.nan
+
+PARITY = {
+    "hist": lambda f: kx.plot(f(VALUES), "a", "b", "c", "hist-stack-mean-ann"),
+    "hist cum": lambda f: kx.plot(f(VALUES), "a", "b", "hist-cum-norm-median"),
+    "kde by text": lambda f: kx.plot(f(VALUES), "a", spec="kde-mean", by="g"),
+    "kde by numbers": lambda f: kx.plot(f(VALUES), "a", spec="kde", by="k"),
+    "ridge by enum": lambda f: kx.plot(f(VALUES), "b", spec="ridge-mean", by="size"),
+    "ecdf by enum": lambda f: kx.plot(f(VALUES), "a", spec="ecdf", by="size"),
+    "box by enum": lambda f: kx.plot(f(VALUES), "a", spec="box-mean-ann", by="size"),
+    "box sig": lambda f: kx.plot(f(VALUES), "a", spec="box-sig-ann", by="g"),
+    "violin by": lambda f: kx.plot(f(VALUES), "c", spec="violin-sig", by="h"),
+    "strip by": lambda f: kx.plot(f(VALUES), "a", spec="strip-mean-ann", by="g"),
+    "errbar sig": lambda f: kx.plot(f(VALUES), "a", spec="errbar-sig-ann", by="g", n_boot=50),
+    "errbar sd": lambda f: kx.plot(f(VALUES), "a", "b", "errbar-sd"),
+    "qq by": lambda f: kx.plot(f(VALUES), "a", spec="qq", by="h"),
+    "box facet": lambda f: kx.plot(f(VALUES), "a", spec="box-facet", by="h", facet="size"),
+    "hist facet": lambda f: kx.plot(f(VALUES), "a", spec="hist-facet", facet="g"),
+    "kde series by series": lambda f: kx.plot(f(VALUES["a"]), spec="kde", by=f(VALUES["h"])),
+}
+
+
+@pytest.mark.parametrize("name", PARITY)
+def test_distribution_kinds_draw_the_same_from_polars(name: str) -> None:
+    pytest.importorskip("polars")
+    assert _drawn(PARITY[name](_to_polars)) == _drawn(PARITY[name](_same))
+
+
+@pytest.mark.parametrize("kind", ["box", "violin", "kde", "ecdf"])
+def test_by_a_polars_categorical_or_enum_keeps_its_order(kind: str) -> None:
+    pl = pytest.importorskip("polars")
+    values = np.arange(12.0)
+    groups = ["late", "early", "mid"] * 4
+    names = {}
+    for dtype in (pl.Categorical, pl.Enum(["mid", "late", "early"])):
+        frame = pl.DataFrame({"v": values, "g": pl.Series(groups, dtype=dtype)})
+        ax = kx.plot(frame, "v", spec=kind, by="g")
+        legend = ax.get_legend()
+        names[str(dtype)] = ([t.get_text() for t in ax.get_xticklabels()] if legend is None
+                             else [t.get_text() for t in legend.texts])
+    assert list(names.values()) == [["late", "early", "mid"], ["mid", "late", "early"]]
+
+
+@pytest.mark.parametrize("kind", ["box", "errbar"])
+def test_sig_gives_the_same_p_values_from_polars(kind: str) -> None:
+    pytest.importorskip("polars")
+    texts = [[t.get_text() for t in kx.plot(f(VALUES), "a", spec=f"{kind}-sig-ann", by="g").texts]
+             for f in (_to_polars, _same)]
+    assert texts[0] == texts[1]
+    assert any(t.startswith("Kruskal-Wallis p") for t in texts[0])
