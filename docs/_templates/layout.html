@@ -2,4 +2,10 @@
 {% block extrahead %}
   {{ super() }}
   <meta name="google-site-verification" content="qQXO5-7zT266AqTIp5GNKyrSAW7w07OSj01A-yBlr-k" />
+  {%- if kx_description %}
+  <meta name="description" content="{{ kx_description|e }}" />
+  {%- endif %}
+  {%- if kx_jsonld %}
+  <script type="application/ld+json">{{ kx_jsonld }}</script>
+  {%- endif %}
 {% endblock %}
